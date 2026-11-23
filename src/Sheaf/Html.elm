@@ -93,6 +93,10 @@ node =
 
 
 {-| Render a tree as HTML.
+
+A [`Sheaf.link`](Sheaf#link) only gets its URL when the site is built, so
+here it renders as an `<a>` without an `href`.
+
 -}
 toString : Html -> String
 toString =

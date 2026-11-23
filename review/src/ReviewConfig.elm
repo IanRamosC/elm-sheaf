@@ -58,9 +58,8 @@ config =
     , NoPrematureLetComputation.rule
     , NoUnused.CustomTypeConstructors.rule []
     , NoUnused.CustomTypeConstructorArgs.rule
-        -- Html.elm: remove once Sheaf.Program reports HtmlProblem as diagnostics.
-        -- Protocol.elm: the break nodes' positions mirror tree.ts but nothing reads them.
-        |> Rule.ignoreErrorsForFiles [ "src/Sheaf/Internal/Html.elm", "src/Sheaf/Internal/Protocol.elm" ]
+        -- The break nodes' positions mirror tree.ts but nothing reads them.
+        |> Rule.ignoreErrorsForFiles [ "src/Sheaf/Internal/Protocol.elm" ]
     , NoUnused.Dependencies.rule
     , NoUnused.Exports.rule
     , NoUnused.Parameters.rule

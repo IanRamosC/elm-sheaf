@@ -33,9 +33,14 @@ import Time
 
 
 {-| Everything the host knows about the site.
+
+`collections` names every folder in `content/`, including empty ones, which
+have no documents.
+
 -}
 type alias Request =
     { build : Build
+    , collections : List String
     , documents : List Document
     }
 
@@ -114,8 +119,9 @@ requestDecoder =
         |> Decode.andThen
             (\version ->
                 if version == protocolVersion then
-                    Decode.map2 Request
+                    Decode.map3 Request
                         (Decode.field "build" buildDecoder)
+                        (Decode.field "collections" (Decode.list Decode.string))
                         (Decode.field "documents" (Decode.list documentDecoder))
 
                 else

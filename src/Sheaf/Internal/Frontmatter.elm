@@ -7,8 +7,8 @@ module Sheaf.Internal.Frontmatter exposing
 
 {-| Frontmatter decoders and the located problems they report.
 
-This is the implementation of `Sheaf.Frontmatter`, plus `decode`, which only
-the host-facing `Sheaf.Program` uses.
+This is the implementation of `Sheaf.Frontmatter`, plus `decode`, which item
+routes use on each document.
 
 @docs Frontmatter, Field, Positions, Problem
 @docs succeed, required, optional, withDefault
@@ -19,6 +19,7 @@ the host-facing `Sheaf.Program` uses.
 
 import Dict exposing (Dict)
 import Json.Decode as Decode exposing (Decoder, Value)
+import Sheaf.Internal.Hint as Hint
 import Sheaf.Internal.Protocol exposing (FieldPosition, Span)
 
 
@@ -285,7 +286,7 @@ oneOf choices =
     let
         allowed : String
         allowed =
-            choices |> List.map (\( name, _ ) -> "`" ++ name ++ "`") |> joinWith "or"
+            choices |> List.map (\( name, _ ) -> "`" ++ name ++ "`") |> Hint.joinWith "or"
     in
     Field
         { singular = "one of " ++ allowed
@@ -628,117 +629,5 @@ orElse fallback maybe =
 
 
 unknownFieldHint : List String -> String -> Maybe String
-unknownFieldHint declared key =
-    case suggestions declared key of
-        [] ->
-            case declared of
-                [] ->
-                    Nothing
-
-                _ ->
-                    Just ("The fields declared here are " ++ joinWith "and" (List.map backticked declared) ++ ".")
-
-        [ only ] ->
-            Just ("Did you mean `" ++ only ++ "`?")
-
-        several ->
-            Just ("Did you mean one of these?\n\n" ++ String.join "\n" (List.map (\name -> "    " ++ name) several))
-
-
-backticked : String -> String
-backticked name =
-    "`" ++ name ++ "`"
-
-
-{-| Up to three declared names close to `key`, closest first.
-
-A name is close when it is within a third of the typed length in edits, but
-never fewer than two: a transposition such as `tilte` costs two edits, and a
-single edit would miss it. It is never the whole word, so short keys such as
-`a` do not suggest every other short name.
-
--}
-suggestions : List String -> String -> List String
-suggestions declared key =
-    let
-        typed : String
-        typed =
-            String.toLower key
-
-        allowed : Int
-        allowed =
-            max 2 (String.length typed // 3)
-    in
-    declared
-        |> List.map (\name -> ( editDistance typed (String.toLower name), name ))
-        |> List.filter (\( distance, _ ) -> distance <= allowed && distance < String.length typed)
-        |> List.sortBy Tuple.first
-        |> List.take 3
-        |> List.map Tuple.second
-
-
-{-| Levenshtein distance, one row of the edit table at a time.
--}
-editDistance : String -> String -> Int
-editDistance from to =
-    let
-        targets : List Char
-        targets =
-            String.toList to
-    in
-    String.toList from
-        |> List.foldl (\char row -> nextRow char targets row) (List.range 0 (List.length targets))
-        |> List.reverse
-        |> List.head
-        |> Maybe.withDefault 0
-
-
-nextRow : Char -> List Char -> List Int -> List Int
-nextRow char targets previous =
-    case previous of
-        [] ->
-            []
-
-        firstOfPrevious :: aboves ->
-            buildRow char targets (firstOfPrevious + 1) previous aboves
-
-
-{-| `diagonals` and `aboves` are the previous row, one column apart, so each
-cell can look at its upper-left and upper neighbours.
--}
-buildRow : Char -> List Char -> Int -> List Int -> List Int -> List Int
-buildRow char targets left diagonals aboves =
-    case ( targets, diagonals, aboves ) of
-        ( target :: remainingTargets, diagonal :: _, above :: remainingAboves ) ->
-            let
-                substitution : Int
-                substitution =
-                    if char == target then
-                        diagonal
-
-                    else
-                        diagonal + 1
-
-                here : Int
-                here =
-                    min substitution (min (above + 1) (left + 1))
-            in
-            left :: buildRow char remainingTargets here aboves remainingAboves
-
-        _ ->
-            [ left ]
-
-
-{-| "`a`, `b` or `c`": names joined with a final conjunction.
--}
-joinWith : String -> List String -> String
-joinWith conjunction items =
-    case List.reverse items of
-        [] ->
-            ""
-
-        [ only ] ->
-            only
-
-        last :: reversedInit ->
-            String.join ", " (List.reverse reversedInit) ++ " " ++ conjunction ++ " " ++ last
+unknownFieldHint =
+    Hint.didYouMean (\declared -> "The fields declared here are " ++ declared ++ ".")

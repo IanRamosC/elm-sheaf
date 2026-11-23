@@ -5,6 +5,9 @@
     "basePath": "/blog",
     "mode": "production"
   },
+  "collections": [
+    "posts"
+  ],
   "documents": [
     {
       "id": "posts/hello-world",

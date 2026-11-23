@@ -39,6 +39,11 @@ requestTests =
                     |> Result.map .build
                     |> Expect.equal
                         (Ok { siteUrl = "https://example.com", basePath = "/blog", mode = Production })
+        , test "decodes the names of the collections" <|
+            \_ ->
+                decodeRequest ProtocolFixtures.allNodesRequest
+                    |> Result.map .collections
+                    |> Expect.equal (Ok [ "pages", "posts" ])
         , test "decodes a document's identity and dates" <|
             \_ ->
                 decodeRequest ProtocolFixtures.minimalRequest

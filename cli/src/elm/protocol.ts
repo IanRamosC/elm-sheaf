@@ -35,6 +35,8 @@ export type RequestDocument = {
 export type Request = {
   protocolVersion: typeof PROTOCOL_VERSION;
   build: BuildInfo;
+  /** Every folder in `content/`, including empty ones, which send no documents. */
+  collections: string[];
   documents: RequestDocument[];
 };
 
@@ -54,11 +56,13 @@ export type ParsedDocument = { source: SourceDocument; tree: Node };
 
 export function encodeRequest(
   build: BuildInfo,
+  collections: string[],
   documents: ParsedDocument[],
 ): Request {
   return {
     protocolVersion: PROTOCOL_VERSION,
     build,
+    collections,
     documents: documents.map(({ source, tree }) => ({
       id: source.id,
       collection: source.collection,

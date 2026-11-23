@@ -48,9 +48,13 @@ describe("encodeRequest", () => {
     test(`produces the ${name} fixture`, () => {
       const expected = fixture(name) as Request;
       expect(PROTOCOL_VERSION).toBe(1);
-      expect(encodeRequest(expected.build, sourcesOf(expected))).toEqual(
-        expected,
-      );
+      expect(
+        encodeRequest(
+          expected.build,
+          expected.collections,
+          sourcesOf(expected),
+        ),
+      ).toEqual(expected);
     });
   }
 });

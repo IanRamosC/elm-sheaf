@@ -5,6 +5,10 @@
     "basePath": "/blog",
     "mode": "drafts"
   },
+  "collections": [
+    "pages",
+    "posts"
+  ],
   "documents": [
     {
       "id": "posts/hello-world",

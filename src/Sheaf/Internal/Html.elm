@@ -1,6 +1,7 @@
 module Sheaf.Internal.Html exposing
     ( Html, Attribute, HtmlProblem(..)
-    , text, node, attribute, booleanAttribute
+    , text, node, attribute, booleanAttribute, link
+    , links, resolveLinks
     , toString, document, problems
     )
 
@@ -10,17 +11,22 @@ It is not exposed by the package so templates cannot build or inspect the tree
 directly.
 
 @docs Html, Attribute, HtmlProblem
-@docs text, node, attribute, booleanAttribute
+@docs text, node, attribute, booleanAttribute, link
+@docs links, resolveLinks
 @docs toString, document, problems
 
 -}
 
+import Sheaf.Ref exposing (Ref)
 
-{-| A piece of a page: text or an element.
+
+{-| A piece of a page: text, an element, or a link to a document whose URL is
+not known until the whole site is rendered.
 -}
 type Html
     = Text String
     | Element String (List Attribute) (List Html)
+    | Link Ref (List Html)
 
 
 {-| An attribute of an element.
@@ -70,6 +76,54 @@ booleanAttribute =
     Flag
 
 
+{-| A link to a document, resolved to an `<a href>` by
+[`resolveLinks`](#resolveLinks).
+-}
+link : Ref -> List Html -> Html
+link =
+    Link
+
+
+
+-- LINKS
+
+
+{-| Every document the tree links to, in document order.
+-}
+links : Html -> List Ref
+links html =
+    case html of
+        Text _ ->
+            []
+
+        Element _ _ children ->
+            List.concatMap links children
+
+        Link ref children ->
+            ref :: List.concatMap links children
+
+
+{-| Turn each link to a document into an `<a href>`. A link whose document has
+no URL is left as it is.
+-}
+resolveLinks : (Ref -> Maybe String) -> Html -> Html
+resolveLinks resolve html =
+    case html of
+        Text _ ->
+            html
+
+        Element tag attributes children ->
+            Element tag attributes (List.map (resolveLinks resolve) children)
+
+        Link ref children ->
+            case resolve ref of
+                Just url ->
+                    Element "a" [ Valued "href" url ] (List.map (resolveLinks resolve) children)
+
+                Nothing ->
+                    Link ref (List.map (resolveLinks resolve) children)
+
+
 
 -- PROBLEMS
 
@@ -97,6 +151,9 @@ problems html =
                         else
                             List.concatMap problems children
                        )
+
+        Link _ children ->
+            List.concatMap problems children
 
 
 attributeProblem : String -> Attribute -> Maybe HtmlProblem
@@ -158,7 +215,8 @@ isVoidElement tag =
 
 {-| Render a tree as HTML.
 
-Parts that [`problems`](#problems) reports are left out.
+Parts that [`problems`](#problems) reports are left out, and a link that was
+not resolved has no `href`.
 
 -}
 toString : Html -> String
@@ -176,6 +234,9 @@ toString html =
 
             else
                 "<" ++ tag ++ renderAttributes attributes ++ ">" ++ renderAll children ++ "</" ++ tag ++ ">"
+
+        Link _ children ->
+            "<a>" ++ renderAll children ++ "</a>"
 
 
 renderAll : List Html -> String
