@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
   existsSync,
+  mkdirSync,
   readFileSync,
   renameSync,
   rmSync,
@@ -66,6 +67,8 @@ describe("build", () => {
 
       expect(titlesOf(result)).toEqual(["BROKEN LINK", "BROKEN LINK"]);
       expect(existsSync(join(root, "dist"))).toBe(false);
+      // The language server needs the references while the author fixes links.
+      expect(existsSync(join(root, ".sheaf/gen/SheafMain.elm"))).toBe(true);
     },
     SLOW,
   );
@@ -77,11 +80,24 @@ describe("build", () => {
       const draftPage = join(root, "dist/posts/work-in-progress/index.html");
 
       clean(root);
-      await build(root, { mode: "production", write: true, now });
+      const production = await build(root, {
+        mode: "production",
+        write: true,
+        now,
+      });
+      expect(production.ok).toBe(true);
+      expect(existsSync(join(root, "dist/posts/hello-world/index.html"))).toBe(
+        true,
+      );
       expect(existsSync(draftPage)).toBe(false);
 
       clean(root);
-      await build(root, { mode: "drafts", write: true, now });
+      const withDrafts = await build(root, {
+        mode: "drafts",
+        write: true,
+        now,
+      });
+      expect(withDrafts.ok).toBe(true);
       expect(existsSync(draftPage)).toBe(true);
     },
     SLOW,
@@ -205,6 +221,33 @@ describe("build", () => {
       expect(titlesOf(result)).toContain("MODULE NOT FOUND");
     },
     SLOW * 2,
+  );
+
+  test("reports an empty folder that cannot be a collection", async () => {
+    const root = copyFixture("minimal");
+    mkdirSync(join(root, "content/_"));
+
+    const result = await build(root, { mode: "production", write: false, now });
+
+    expect(titlesOf(result)).toEqual(["BAD COLLECTION NAME"]);
+  });
+
+  test(
+    "ignores hidden folders in content",
+    async () => {
+      const root = copyFixture("minimal");
+      mkdirSync(join(root, "content/.obsidian"));
+      writeFileSync(join(root, "content/.obsidian/notes.md"), "not a document");
+
+      const result = await build(root, {
+        mode: "production",
+        write: false,
+        now,
+      });
+
+      expect(result.ok && result.value.pages).toBe(1);
+    },
+    SLOW,
   );
 
   test("explains a site without sheaf.json", async () => {

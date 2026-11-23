@@ -12,6 +12,7 @@ export async function writeGenerated(
   files: Map<string, string>,
 ): Promise<void> {
   const generated = join(siteRoot, ".sheaf/gen");
+  for (const path of files.keys()) assertInside(generated, path);
   await rm(generated, { recursive: true, force: true });
   for (const [path, content] of files) {
     await writeInside(generated, path, content);
@@ -28,6 +29,8 @@ export async function writeSite(
   pages: Response["pages"],
 ): Promise<void> {
   const dist = join(siteRoot, "dist");
+  // Checked up front so a bad path cannot leave a half-written dist/.
+  for (const { path } of pages) assertInside(dist, path);
   await rm(dist, { recursive: true, force: true });
   await mkdir(dist, { recursive: true });
   for (const { path, html } of pages) {
@@ -47,14 +50,17 @@ export async function writeSite(
  * Elm chooses these paths, and slugs that could escape were rejected while
  * loading, so one that does is a bug worth stopping for.
  */
+function assertInside(directory: string, path: string): void {
+  if (posix.isAbsolute(path) || path.split("/").includes("..")) {
+    throw new Error(`Refusing to write outside ${directory}: ${path}`);
+  }
+}
+
 async function writeInside(
   directory: string,
   path: string,
   content: string,
 ): Promise<void> {
-  if (posix.isAbsolute(path) || path.split("/").includes("..")) {
-    throw new Error(`Refusing to write outside ${directory}: ${path}`);
-  }
   const target = join(directory, path);
   await mkdir(dirname(target), { recursive: true });
   await writeFile(target, content);

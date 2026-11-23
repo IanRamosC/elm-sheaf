@@ -48,20 +48,28 @@ export async function build(
   if (!config.ok) return config;
 
   const files = await readContentFiles(siteRoot);
-  const documents = loadContent(files, config.value, options.now, options.mode);
+  const collections = await readCollectionNames(siteRoot);
+  const documents = loadContent(
+    files,
+    config.value,
+    options.now,
+    options.mode,
+    collections,
+  );
   if (!documents.ok) return documents;
-
-  const parsed = parseDocuments(documents.value);
-  if (!parsed.ok) return parsed;
 
   const names = assignValueNames(documents.value);
   if (!names.ok) return names;
 
-  const collections = await readCollectionNames(siteRoot);
+  // Generated before the checks that follow, so the language server has the
+  // typed references while the author fixes Markdown errors.
   await writeGenerated(
     siteRoot,
     generateElm(collections, documents.value, names.value),
   );
+
+  const parsed = parseDocuments(documents.value);
+  if (!parsed.ok) return parsed;
 
   const elm = await findElm(siteRoot);
   if (!elm.ok) return elm;

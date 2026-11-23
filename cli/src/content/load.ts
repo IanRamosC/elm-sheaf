@@ -34,11 +34,16 @@ async function readContentEntries(root: string, recursive: boolean) {
   }
 }
 
-/** The name of every folder in `<root>/content`, empty ones included, sorted. */
+const isHidden = (name: string) => name.startsWith(".");
+
+/**
+ * The name of every folder in `<root>/content`, empty ones included, sorted.
+ * Hidden folders (`.obsidian`, `.git`) belong to other tools, so they are skipped.
+ */
 export async function readCollectionNames(root: string): Promise<string[]> {
   const entries = await readContentEntries(root, false);
   return entries
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.isDirectory() && !isHidden(entry.name))
     .map((entry) => entry.name)
     .sort();
 }
@@ -54,6 +59,7 @@ export async function readContentFiles(root: string): Promise<ContentFile[]> {
     .map((entry) =>
       relative(root, join(entry.parentPath, entry.name)).split(sep).join("/"),
     )
+    .filter((path) => !path.split("/").some(isHidden))
     .sort();
   return Promise.all(
     paths.map(async (path) => ({
@@ -65,16 +71,19 @@ export async function readContentFiles(root: string): Promise<ContentFile[]> {
 
 /**
  * Turns content files into documents, reporting every problem found across
- * all of them. It is pure: the caller reads the disk.
+ * all of them. It is pure: the caller reads the disk. `collections` lists
+ * every folder of `content/`, so an empty one is checked too; it defaults to
+ * the folders the files are in.
  */
 export function loadContent(
   files: ContentFile[],
   config: Config,
   buildStart: Date,
   mode: BuildMode,
+  collections: string[] = foldersOf(files),
 ): Result<SourceDocument[], Diagnostic[]> {
   const documents: SourceDocument[] = [];
-  const problems = collectionNameProblems(files);
+  const problems = collectionNameProblems(collections);
 
   for (const file of files) {
     const loaded = loadDocument(file, config, buildStart, mode);
@@ -220,8 +229,7 @@ function parseLayout(path: string): Result<Layout, Diagnostic> {
   );
 }
 
-/** Checks each collection folder once, however many documents it holds. */
-function collectionNameProblems(files: ContentFile[]): Diagnostic[] {
+function foldersOf(files: ContentFile[]): string[] {
   const folders = new Set(
     files.flatMap(({ path }) => {
       const [, folder, ...rest] = path.split("/");
@@ -229,7 +237,11 @@ function collectionNameProblems(files: ContentFile[]): Diagnostic[] {
       return folder !== undefined && rest.length > 0 ? [folder] : [];
     }),
   );
-  return [...folders].flatMap((name) => {
+  return [...folders];
+}
+
+function collectionNameProblems(collections: string[]): Diagnostic[] {
+  return collections.flatMap((name) => {
     const message = collectionNameMessage(name);
     return message === undefined
       ? []

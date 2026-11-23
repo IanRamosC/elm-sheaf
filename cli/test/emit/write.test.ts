@@ -82,14 +82,20 @@ describe("writeSite", () => {
     expect(readdirSync(join(root, "dist"))).toEqual(["index.html"]);
   });
 
-  test("refuses a page path that would leave dist", async () => {
+  test("refuses a page path that would leave dist, before touching dist", async () => {
     const root = siteRoot();
+    mkdirSync(join(root, "dist"));
+    writeFileSync(join(root, "dist/previous.html"), "kept");
 
     await expect(
       writeSite(root, [{ path: "../escape.html", html: "" }]),
     ).rejects.toThrow("../escape.html");
     await expect(
-      writeSite(root, [{ path: "/etc/passwd", html: "" }]),
+      writeSite(root, [
+        { path: "fine.html", html: "" },
+        { path: "/etc/passwd", html: "" },
+      ]),
     ).rejects.toThrow("/etc/passwd");
+    expect(readFileSync(join(root, "dist/previous.html"), "utf8")).toBe("kept");
   });
 });
