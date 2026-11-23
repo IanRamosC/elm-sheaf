@@ -45,12 +45,19 @@ function runtimeError(thrown: unknown): Diagnostic {
   };
 }
 
+type Outcome = Result<{ response: Response; output: string[] }, Diagnostic[]>;
+
 /**
  * Runs the compiled worker once: sends it the request and waits for its
- * response. The code runs in a fresh context so it cannot touch the host;
- * that context has no globals, so it is given the few the Elm runtime uses.
- * Console output is returned rather than printed, because only `cli/` writes
- * to the terminal.
+ * response. The code runs in a fresh context, which keeps it from reaching
+ * the host's globals by accident (it is not a security sandbox). That context
+ * has none of its own, so it is given the few the Elm runtime uses. Console
+ * output is returned rather than printed, because only `cli/` writes to the
+ * terminal.
+ *
+ * The worker's timers are wrapped so that a callback that throws becomes a
+ * runtime error instead of crashing the host, and so that any still pending
+ * when the run ends are cancelled instead of keeping the process alive.
  */
 export async function runElm(
   compiledJs: string,
@@ -58,28 +65,46 @@ export async function runElm(
 ): Promise<Result<{ response: Response; output: string[] }, Diagnostic[]>> {
   const code = await readFile(compiledJs, "utf8");
   const output: string[] = [];
-  const context = createContext({
-    console: captureConsole(output),
-    setTimeout,
-    clearTimeout,
-  });
 
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(
+    const workerTimers = new Set<ReturnType<typeof setTimeout>>();
+    const responseTimeout = setTimeout(
       () =>
-        reject(
-          new Error(
-            `The Elm worker did not respond within ${RESPONSE_TIMEOUT_MS / 1000} seconds`,
+        finish(() =>
+          reject(
+            new Error(
+              `The Elm worker did not respond within ${RESPONSE_TIMEOUT_MS / 1000} seconds`,
+            ),
           ),
         ),
       RESPONSE_TIMEOUT_MS,
     );
-    const settle = (
-      result: Result<{ response: Response; output: string[] }, Diagnostic[]>,
-    ) => {
-      clearTimeout(timeout);
-      resolve(result);
+    const finish = (conclude: () => void) => {
+      clearTimeout(responseTimeout);
+      for (const timer of workerTimers) clearTimeout(timer);
+      conclude();
     };
+    const settle = (outcome: Outcome) => finish(() => resolve(outcome));
+
+    const context = createContext({
+      console: captureConsole(output),
+      setTimeout: (callback: () => void, delay?: number) => {
+        const timer = setTimeout(() => {
+          workerTimers.delete(timer);
+          try {
+            callback();
+          } catch (thrown) {
+            settle(err([runtimeError(thrown)]));
+          }
+        }, delay);
+        workerTimers.add(timer);
+        return timer;
+      },
+      clearTimeout: (timer: ReturnType<typeof setTimeout>) => {
+        workerTimers.delete(timer);
+        clearTimeout(timer);
+      },
+    });
 
     try {
       runInContext(code, context, { filename: compiledJs });
@@ -90,9 +115,12 @@ export async function runElm(
           settle(ok({ response: response.value, output }));
         } else {
           // Our own Elm code produced it, so a bad shape is a bug in Sheaf.
-          clearTimeout(timeout);
-          reject(
-            new Error(`The Elm worker sent a bad response: ${response.error}`),
+          finish(() =>
+            reject(
+              new Error(
+                `The Elm worker sent a bad response: ${response.error}`,
+              ),
+            ),
           );
         }
       });

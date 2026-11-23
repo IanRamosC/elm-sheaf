@@ -148,6 +148,68 @@ describe("runElm", () => {
     });
   });
 
+  test("reports an exception thrown later, from a timer callback", async () => {
+    const path = compiledFile(`(function (scope) {
+      scope.Elm = {
+        SheafMain: {
+          init: function () {
+            var subscriber;
+            return {
+              ports: {
+                sheafResponse: { subscribe: function (callback) { subscriber = callback; } },
+                sheafRequest: {
+                  send: function () {
+                    setTimeout(function () { throw new Error("late"); }, 0);
+                    setTimeout(function () { subscriber({ pages: [], diagnostics: [] }); }, 20);
+                  },
+                },
+              },
+            };
+          },
+        },
+      };
+    })(this);`);
+
+    const result = await runElm(path, emptyRequest);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error[0]?.title).toBe("ELM RUNTIME ERROR");
+    expect(result.error[0]?.message).toBe("late");
+  });
+
+  test("does not keep the process alive for timers left pending", async () => {
+    const path = compiledFile(`(function (scope) {
+      scope.Elm = {
+        SheafMain: {
+          init: function () {
+            var subscriber;
+            return {
+              ports: {
+                sheafResponse: { subscribe: function (callback) { subscriber = callback; } },
+                sheafRequest: {
+                  send: function () {
+                    setTimeout(function () {}, 30000);
+                    subscriber({ pages: [], diagnostics: [] });
+                  },
+                },
+              },
+            };
+          },
+        },
+      };
+    })(this);`);
+    const script = `import { runElm } from ${JSON.stringify(join(import.meta.dir, "../../src/elm/run"))};
+      await runElm(${JSON.stringify(path)}, ${JSON.stringify(emptyRequest)});`;
+    const started = Date.now();
+
+    const child = Bun.spawn([process.execPath, "-e", script]);
+    await child.exited;
+
+    // A leftover timer would hold the process open until it fired, 30 s later.
+    expect(Date.now() - started).toBeLessThan(10_000);
+  }, 40_000);
+
   test("treats a response that is not in the protocol as a bug", async () => {
     const path = compiledFile(`(function (scope) {
       scope.Elm = {
