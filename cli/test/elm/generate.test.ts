@@ -89,4 +89,12 @@ describe("generateElm", () => {
     expect(withEmpty.get("Content/Drafts.elm")).toContain("all =\n    []");
     expect(elmFormatExitCode(withEmpty)).toBe(0);
   });
+
+  test("a document slugged all does not clash with the all list", () => {
+    const files = generate(["posts"], [documentAt("posts", "all")]);
+    const module = files.get("Content/Posts.elm");
+    expect(module).toContain("exposing (all, all_)");
+    expect(module).toContain('all_ =\n    Sheaf.Ref.fromId "posts/all"');
+    expect(elmFormatExitCode(files)).toBe(0);
+  });
 });

@@ -58,6 +58,10 @@ describe("elmValueName", () => {
     });
   });
 
+  test("suffixes `all`, which the generated collection module uses", () => {
+    expect(elmValueName("all")).toEqual({ ok: true, value: "all_" });
+  });
+
   test("suffixes Elm keywords with an underscore", () => {
     expect(elmValueName("type")).toEqual({ ok: true, value: "type_" });
     expect(elmValueName("alias")).toEqual({ ok: true, value: "alias_" });
