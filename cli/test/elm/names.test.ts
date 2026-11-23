@@ -62,6 +62,10 @@ describe("elmValueName", () => {
     expect(elmValueName("all")).toEqual({ ok: true, value: "all_" });
   });
 
+  test("suffixes `main`, which Elm reserves for a program's entry point", () => {
+    expect(elmValueName("main")).toEqual({ ok: true, value: "main_" });
+  });
+
   test("suffixes Elm keywords with an underscore", () => {
     expect(elmValueName("type")).toEqual({ ok: true, value: "type_" });
     expect(elmValueName("alias")).toEqual({ ok: true, value: "alias_" });

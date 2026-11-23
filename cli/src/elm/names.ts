@@ -2,9 +2,11 @@ import type { SourceDocument } from "../content/document";
 import type { Diagnostic } from "../diagnostics/diagnostic";
 import { err, ok, type Result } from "../result";
 
-// `all` is not a keyword, but every generated collection module defines it.
+// Two names are not keywords but still unusable: every generated collection
+// module defines `all`, and Elm requires any top-level `main` to be a program.
 const RESERVED_VALUE_NAMES = new Set([
   "all",
+  "main",
   "if",
   "then",
   "else",
@@ -53,7 +55,7 @@ export function elmModuleName(collection: string): Result<string, string> {
 
 /**
  * The generated Elm value name for a slug: `hello-world` becomes `helloWorld`.
- * A leading digit gets an `n` prefix and an Elm keyword (or `all`) a `_` suffix, because
+ * A leading digit gets an `n` prefix and an Elm keyword (or `all`, or `main`) a `_` suffix, because
  * neither is a legal value name as written.
  */
 export function elmValueName(slug: string): Result<string, string> {
