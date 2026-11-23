@@ -97,4 +97,28 @@ describe("generateElm", () => {
     expect(module).toContain('all_ =\n    Sheaf.Ref.fromId "posts/all"');
     expect(elmFormatExitCode(files)).toBe(0);
   });
+
+  test("escapes quotes, tabs and non-ASCII text in reference ids", () => {
+    const document = { ...documentAt("posts", "x"), id: 'posts/"é"\tend' };
+    const files = generateElm(
+      ["posts"],
+      [document],
+      new Map([[document.id, "x"]]),
+    );
+    expect(files.get("Content/Posts.elm")).toContain(
+      'Sheaf.Ref.fromId "posts/\\"é\\"\\tend"',
+    );
+    expect(elmFormatExitCode(files)).toBe(0);
+  });
+
+  test("keeps comment delimiters in file names out of doc comments", () => {
+    const files = generate(["posts"], [documentAt("posts", "a-}b")]);
+    expect(elmFormatExitCode(files)).toBe(0);
+    expect(files.get("Content/Posts.elm")).toContain("content/posts/a- }b.md");
+  });
+
+  test("keeps comment delimiters in collection names out of the module doc", () => {
+    const files = generate(["a{-b"], []);
+    expect(elmFormatExitCode(files)).toBe(0);
+  });
 });

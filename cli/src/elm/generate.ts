@@ -9,13 +9,41 @@ function byCodePoint(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+/** Elm has fewer string escapes than JSON, so control characters use `\u{XXXX}`. */
+function elmString(text: string): string {
+  const escaped = text.replace(/[\\"\p{Cc}]/gu, (character) => {
+    switch (character) {
+      case "\\":
+      case '"':
+        return `\\${character}`;
+      case "\n":
+        return "\\n";
+      case "\r":
+        return "\\r";
+      case "\t":
+        return "\\t";
+      default:
+        return `\\u{${character.charCodeAt(0).toString(16).padStart(4, "0")}}`;
+    }
+  });
+  return `"${escaped}"`;
+}
+
+/** Paths are user-controlled; Elm comments nest, so `{-` and `-}` must not survive. */
+function inDocComment(text: string): string {
+  return text
+    .replace(/\s*[\r\n]+\s*/g, " ")
+    .replaceAll("{-", "{ -")
+    .replaceAll("-}", "- }");
+}
+
 function referenceDefinition({ name, document }: Reference): string {
   return [
-    `{-| \`${document.sourcePath}\``,
+    `{-| \`${inDocComment(document.sourcePath)}\``,
     "-}",
     `${name} : Sheaf.Ref.Ref`,
     `${name} =`,
-    `    Sheaf.Ref.fromId ${JSON.stringify(document.id)}`,
+    `    Sheaf.Ref.fromId ${elmString(document.id)}`,
   ].join("\n");
 }
 
@@ -53,7 +81,7 @@ function collectionModule(
     "",
     `module Content.${moduleName} exposing (${exposed})`,
     "",
-    `{-| References to the documents in \`content/${collection}/\`.`,
+    `{-| References to the documents in \`content/${inDocComment(collection)}/\`.`,
     "-}",
     "",
     "import Sheaf.Ref",
