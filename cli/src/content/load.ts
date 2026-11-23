@@ -12,6 +12,7 @@ import { splitFrontmatter } from "./frontmatter";
 /** A Markdown file and its text; `path` is relative to the site root. */
 export type ContentFile = { path: string; source: string };
 
+/** `drafts` also builds drafts and documents dated in the future. */
 export type BuildMode = "production" | "drafts";
 
 const RESERVED_KEYS = ["slug", "date", "updated", "draft", "image"];

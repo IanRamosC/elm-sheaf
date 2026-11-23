@@ -1,13 +1,12 @@
 import type { DocumentDate } from "../content/dates";
 import type { SourceDocument } from "../content/document";
+import type { BuildMode } from "../content/load";
 import type { Diagnostic, Span } from "../diagnostics/diagnostic";
 import type { Node } from "../markdown/tree";
 import { err, ok, type Result } from "../result";
 
 /** Bumped whenever the JSON exchanged with the Elm worker changes shape. */
 export const PROTOCOL_VERSION = 1;
-
-export type BuildMode = "production" | "drafts";
 
 export type BuildInfo = {
   siteUrl: string;

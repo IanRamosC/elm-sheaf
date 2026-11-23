@@ -206,8 +206,9 @@ describe("runElm", () => {
     const started = Date.now();
 
     const child = Bun.spawn([process.execPath, "-e", script]);
-    await child.exited;
+    const exitCode = await child.exited;
 
+    expect(exitCode).toBe(0);
     // A leftover timer would hold the process open until it fired, 30 s later.
     expect(Date.now() - started).toBeLessThan(10_000);
   }, 40_000);

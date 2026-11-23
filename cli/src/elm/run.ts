@@ -62,7 +62,7 @@ type Outcome = Result<{ response: Response; output: string[] }, Diagnostic[]>;
 export async function runElm(
   compiledJs: string,
   request: Request,
-): Promise<Result<{ response: Response; output: string[] }, Diagnostic[]>> {
+): Promise<Outcome> {
   const code = await readFile(compiledJs, "utf8");
   const output: string[] = [];
 
