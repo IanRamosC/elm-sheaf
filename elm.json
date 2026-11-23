@@ -7,7 +7,9 @@
     "exposed-modules": [
         "Sheaf",
         "Sheaf.Html",
-        "Sheaf.Html.Attributes"
+        "Sheaf.Html.Attributes",
+        "Sheaf.Markdown",
+        "Sheaf.Ref"
     ],
     "elm-version": "0.19.3 <= v < 0.20.0",
     "dependencies": {

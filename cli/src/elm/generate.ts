@@ -10,7 +10,7 @@ function byCodePoint(a: string, b: string): number {
 }
 
 /** Elm has fewer string escapes than JSON, so control characters use `\u{XXXX}`. */
-function elmString(text: string): string {
+export function elmString(text: string): string {
   const escaped = text.replace(/[\\"\p{Cc}]/gu, (character) => {
     switch (character) {
       case "\\":

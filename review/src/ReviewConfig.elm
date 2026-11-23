@@ -58,11 +58,10 @@ config =
     , NoPrematureLetComputation.rule
     , NoUnused.CustomTypeConstructors.rule []
     , NoUnused.CustomTypeConstructorArgs.rule
-        -- Remove once Sheaf.Program reports HtmlProblem as diagnostics.
-        |> Rule.ignoreErrorsForFiles [ "src/Sheaf/Internal/Html.elm" ]
+        -- Html.elm: remove once Sheaf.Program reports HtmlProblem as diagnostics.
+        -- Protocol.elm: the break nodes' positions mirror tree.ts but nothing reads them.
+        |> Rule.ignoreErrorsForFiles [ "src/Sheaf/Internal/Html.elm", "src/Sheaf/Internal/Protocol.elm" ]
     , NoUnused.Dependencies.rule
-        -- Remove once the modules using elm/json and elm/time exist.
-        |> Rule.ignoreErrorsForFiles [ "elm.json" ]
     , NoUnused.Exports.rule
     , NoUnused.Parameters.rule
     , NoUnused.Patterns.rule

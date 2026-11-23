@@ -1,0 +1,32 @@
+{
+  "pages": [
+    {
+      "path": "posts/hello-world/index.html",
+      "html": "<p>Hello</p>"
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "error",
+      "title": "Unresolved link",
+      "message": "posts/missing does not exist.",
+      "sourcePath": "content/posts/hello-world.md",
+      "span": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 20
+        }
+      },
+      "hint": "Did you mean posts/hello-world?"
+    },
+    {
+      "severity": "warning",
+      "title": "Unused",
+      "message": "Nothing to see."
+    }
+  ]
+}
