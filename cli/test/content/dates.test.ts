@@ -38,6 +38,12 @@ describe("publicationInstant", () => {
     expect(instant("2026-11-30T10:00:00+02:00", "UTC")).toBe(
       "2026-11-30T08:00:00.000Z",
     );
+    expect(instant("2026-11-30T10:00Z", "UTC")).toBe(
+      "2026-11-30T10:00:00.000Z",
+    );
+    expect(instant("2026-11-30T10:00+02:00", "UTC")).toBe(
+      "2026-11-30T08:00:00.000Z",
+    );
     expect(instant("2026-11-30T10:00:00Z", "Europe/Lisbon")).toBe(
       "2026-11-30T10:00:00.000Z",
     );

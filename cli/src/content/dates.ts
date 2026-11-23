@@ -25,13 +25,14 @@ export function publicationInstant(
   if (timestamp) {
     // `new Date` rolls impossible values over (February 30th becomes March
     // 2nd, 24:00 the next day), so the parts are checked first.
-    const [, year, month, day, hour, minute, second] = timestamp.map(Number);
+    const [, year, month, day, hour, minute] = timestamp.map(Number);
+    const second = Number(timestamp[6] ?? 0);
     const instant = new Date(date);
     if (
       isCalendarDate(year as number, month as number, day as number) &&
       (hour as number) <= 23 &&
       (minute as number) <= 59 &&
-      (second ?? 0) <= 59 &&
+      second <= 59 &&
       !Number.isNaN(instant.getTime())
     ) {
       return ok(instant);
