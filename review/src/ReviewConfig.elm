@@ -58,6 +58,8 @@ config =
     , NoPrematureLetComputation.rule
     , NoUnused.CustomTypeConstructors.rule []
     , NoUnused.CustomTypeConstructorArgs.rule
+        -- Remove once Sheaf.Program reports HtmlProblem as diagnostics.
+        |> Rule.ignoreErrorsForFiles [ "src/Sheaf/Internal/Html.elm" ]
     , NoUnused.Dependencies.rule
         -- Remove once the modules using elm/json and elm/time exist.
         |> Rule.ignoreErrorsForFiles [ "elm.json" ]

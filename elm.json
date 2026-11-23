@@ -5,7 +5,9 @@
     "license": "BSD-3-Clause",
     "version": "1.0.0",
     "exposed-modules": [
-        "Sheaf"
+        "Sheaf",
+        "Sheaf.Html",
+        "Sheaf.Html.Attributes"
     ],
     "elm-version": "0.19.3 <= v < 0.20.0",
     "dependencies": {
