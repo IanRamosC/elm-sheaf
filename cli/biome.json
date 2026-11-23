@@ -1,5 +1,13 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.6.8/schema.json",
+  "files": {
+    "includes": [
+      "**",
+      "!test/fixtures/**/content",
+      "!**/.sheaf",
+      "!**/elm-stuff"
+    ]
+  },
   "linter": {
     "enabled": true,
     "rules": {
