@@ -1,3 +1,5 @@
 #!/usr/bin/env bun
 
-console.log("sheaf");
+import { main } from "./cli/main";
+
+process.exitCode = await main(process.argv.slice(2));

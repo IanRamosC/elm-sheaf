@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { parseConfig } from "../../src/config/config";
 import { loadContent, readContentFiles } from "../../src/content/load";
 import { compileElm, findElm } from "../../src/elm/compile";
@@ -21,6 +21,7 @@ import {
   type Request,
 } from "../../src/elm/protocol";
 import { runElm } from "../../src/elm/run";
+import { writeGenerated } from "../../src/emit/write";
 import { checkLinks } from "../../src/markdown/links";
 import { parseMarkdown } from "../../src/markdown/parse";
 
@@ -305,8 +306,9 @@ describe("findElm", () => {
 });
 
 /**
- * Stands in for Task 13's build: loads the site, checks it and writes
- * `.sheaf/gen/`, returning the request the worker will be given.
+ * Loads the site, checks it and writes `.sheaf/gen/`, returning the request
+ * the worker will be given. Unlike `build`, it leaves compiling to the test,
+ * which compiles without `--optimize`.
  */
 async function generateSite(siteRoot: string): Promise<Request> {
   const configText = readFileSync(join(siteRoot, "sheaf.json"), "utf8");
@@ -334,15 +336,10 @@ async function generateSite(siteRoot: string): Promise<Request> {
   const names = assignValueNames(documents);
   if (!names.ok) throw new Error("fixture slugs must have valid names");
   const collections = [...new Set(documents.map((d) => d.collection))];
-  for (const [path, content] of generateElm(
-    collections,
-    documents,
-    names.value,
-  )) {
-    const target = join(siteRoot, ".sheaf/gen", path);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, content);
-  }
+  await writeGenerated(
+    siteRoot,
+    generateElm(collections, documents, names.value),
+  );
 
   return encodeRequest(
     {
@@ -392,11 +389,7 @@ describe("a Sheaf site", () => {
     "turns a compiler error into a diagnostic with the compiler's title",
     async () => {
       const siteRoot = join(FIXTURES, "compile-error");
-      mkdirSync(join(siteRoot, ".sheaf/gen"), { recursive: true });
-      writeFileSync(
-        join(siteRoot, ".sheaf/gen/SheafMain.elm"),
-        generateElm([], [], new Map()).get("SheafMain.elm") ?? "",
-      );
+      await writeGenerated(siteRoot, generateElm([], [], new Map()));
       const elm = await realElm(siteRoot);
 
       const compiled = await compileElm(siteRoot, { elm, optimize: false });

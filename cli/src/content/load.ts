@@ -19,14 +19,36 @@ const DATED_NAME = /^(\d{4}-\d{2}-\d{2})-(.+)$/;
 const DOCUMENT_FOLDER_INDEX = "index.md";
 
 /**
+ * A site without a `content/` folder has no content. That is not an error
+ * here: a template that asks for a collection gets Elm's own explanation.
+ */
+async function readContentEntries(root: string, recursive: boolean) {
+  try {
+    return await readdir(join(root, "content"), {
+      recursive,
+      withFileTypes: true,
+    });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+/** The name of every folder in `<root>/content`, empty ones included, sorted. */
+export async function readCollectionNames(root: string): Promise<string[]> {
+  const entries = await readContentEntries(root, false);
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+}
+
+/**
  * Reads every `.md` file under `<root>/content`, sorted by path so builds are
  * repeatable, with paths relative to `root` and `/` separators on every OS.
  */
 export async function readContentFiles(root: string): Promise<ContentFile[]> {
-  const entries = await readdir(join(root, "content"), {
-    recursive: true,
-    withFileTypes: true,
-  });
+  const entries = await readContentEntries(root, true);
   const paths = entries
     .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
     .map((entry) =>
