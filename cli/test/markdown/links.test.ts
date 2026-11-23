@@ -141,6 +141,16 @@ describe("checkLinks", () => {
   });
 
   test("decodes percent-encoded non-ASCII slugs and paths", () => {
+    for (const url of ["./caf%C3%A9-notes.md", "posts:caf%C3%A9-notes"]) {
+      expect(linkIn(`[x](${url})`)).toMatchObject({
+        type: "sheafLink",
+        collection: "posts",
+        slug: "café-notes",
+      });
+    }
+  });
+
+  test("accepts literal non-ASCII slugs and paths", () => {
     for (const url of ["./café-notes.md", "posts:café-notes"]) {
       expect(linkIn(`[x](${url})`)).toMatchObject({
         type: "sheafLink",
