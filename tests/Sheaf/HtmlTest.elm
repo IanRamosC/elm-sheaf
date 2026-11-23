@@ -29,6 +29,10 @@ renderingTests =
             \_ ->
                 Html.toString (img [ src "a.png" ] [ text "ignored" ])
                     |> Expect.equal "<img src=\"a.png\">"
+        , test "knows every HTML void element, such as source" <|
+            \_ ->
+                Html.toString (Html.node "source" [ src "a.webm" ] [])
+                    |> Expect.equal "<source src=\"a.webm\">"
         , test "renders nested children in order" <|
             \_ ->
                 Html.toString (div [] [ p [] [ text "a" ], p [] [ text "b" ] ])

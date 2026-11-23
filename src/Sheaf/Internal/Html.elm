@@ -206,7 +206,8 @@ isRawTextElement tag =
 
 isVoidElement : String -> Bool
 isVoidElement tag =
-    List.member (String.toLower tag) [ "br", "hr", "img", "input", "meta", "link" ]
+    List.member (String.toLower tag)
+        [ "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr" ]
 
 
 
