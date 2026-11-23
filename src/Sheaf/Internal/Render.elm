@@ -76,12 +76,12 @@ renderSite (Site site) request =
                 |> List.filter (\document -> not document.excluded && Dict.member document.collection context.itemPatterns)
                 |> List.map (\document -> ( document, renderBody context document ))
 
-        drafts : List (Result (List Diagnostic) Draft)
-        drafts =
-            List.concatMap (draftsOf bodies) site.routes
+        made : List (Result (List Diagnostic) UncheckedPage)
+        made =
+            List.concat (List.indexedMap (pagesOf bodies) site.routes)
 
         ( written, duplicates ) =
-            withoutDuplicates (List.filterMap Result.toMaybe drafts)
+            withoutDuplicates (List.filterMap Result.toMaybe made)
 
         finished : List (Result (List Diagnostic) Protocol.Page)
         finished =
@@ -94,7 +94,7 @@ renderSite (Site site) request =
             , List.concatMap (Tuple.second >> errors) bodies
 
             -- Two routes over one collection decode its frontmatter twice.
-            , unique (List.concatMap errors drafts)
+            , unique (List.concatMap errors made)
             , List.concatMap errors finished
             , duplicates
             ]
@@ -317,33 +317,49 @@ errorOf result =
 
 
 {-| A page a route made, before its links are resolved and it is checked.
+
+`route` is the route's place in the site's list, because two routes can have
+the same pattern.
+
 -}
-type alias Draft =
-    { pattern : String
+type alias UncheckedPage =
+    { route : Int
+    , pattern : String
     , url : String
     , page : Page
     }
 
 
-draftsOf : List ( Document, Result (List Diagnostic) (List Html) ) -> Route -> List (Result (List Diagnostic) Draft)
-draftsOf bodies route =
+{-| The pages a route makes. A document whose body has problems (reported
+once, by `renderSite`) gets no page, but its frontmatter is still checked.
+-}
+pagesOf : List ( Document, Result (List Diagnostic) (List Html) ) -> Int -> Route -> List (Result (List Diagnostic) UncheckedPage)
+pagesOf bodies index route =
     case route of
         Single single ->
-            [ Ok { pattern = single.pattern, url = single.pattern, page = single.page } ]
+            [ Ok { route = index, pattern = single.pattern, url = single.pattern, page = single.page } ]
 
         EachItem item ->
             bodies
                 |> List.filter (\( document, _ ) -> document.collection == item.collection)
                 |> List.filterMap
                     (\( document, body ) ->
-                        -- The body's problems are reported once, by `renderSite`.
-                        Result.toMaybe body
-                            |> Maybe.map
-                                (\html ->
-                                    item.pageFor document html
-                                        |> Result.map (\page -> { pattern = item.pattern, url = fillSlug document.slug item.pattern, page = page })
-                                        |> Result.mapError (List.map (frontmatterDiagnostic document))
-                                )
+                        case ( item.templateFor document, body ) of
+                            ( Ok template, Ok html ) ->
+                                Just
+                                    (Ok
+                                        { route = index
+                                        , pattern = item.pattern
+                                        , url = fillSlug document.slug item.pattern
+                                        , page = template html
+                                        }
+                                    )
+
+                            ( Err problems, _ ) ->
+                                Just (Err (List.map (frontmatterDiagnostic document) problems))
+
+                            ( Ok _, Err _ ) ->
+                                Nothing
                     )
 
 
@@ -376,36 +392,36 @@ pathOf url =
 
 {-| The first page at each path, and a diagnostic for every later one.
 -}
-withoutDuplicates : List Draft -> ( List Draft, List Diagnostic )
-withoutDuplicates drafts =
+withoutDuplicates : List UncheckedPage -> ( List UncheckedPage, List Diagnostic )
+withoutDuplicates pages =
     let
-        step : Draft -> ( Dict String String, List Draft, List Diagnostic ) -> ( Dict String String, List Draft, List Diagnostic )
-        step draft ( seen, kept, duplicates ) =
+        step : UncheckedPage -> ( Dict String UncheckedPage, List UncheckedPage, List Diagnostic ) -> ( Dict String UncheckedPage, List UncheckedPage, List Diagnostic )
+        step page ( seen, kept, duplicates ) =
             let
                 path : String
                 path =
-                    pathOf draft.url
+                    pathOf page.url
             in
             case Dict.get path seen of
-                Just firstPattern ->
-                    ( seen, kept, duplicate path firstPattern draft.pattern :: duplicates )
+                Just first ->
+                    ( seen, kept, duplicate path first page :: duplicates )
 
                 Nothing ->
-                    ( Dict.insert path draft.pattern seen, draft :: kept, duplicates )
+                    ( Dict.insert path page seen, page :: kept, duplicates )
 
         ( _, written, found ) =
-            List.foldl step ( Dict.empty, [], [] ) drafts
+            List.foldl step ( Dict.empty, [], [] ) pages
     in
     -- A route without `:slug` makes the same page for every document.
     ( List.reverse written, unique (List.reverse found) )
 
 
-duplicate : String -> String -> String -> Diagnostic
+duplicate : String -> UncheckedPage -> UncheckedPage -> Diagnostic
 duplicate path first second =
-    if first == second then
+    if first.route == second.route then
         { severity = Error
         , title = "DUPLICATE PAGE"
-        , message = "The route `" ++ first ++ "` makes the page `" ++ path ++ "` more than once."
+        , message = "The route `" ++ first.pattern ++ "` makes the page `" ++ path ++ "` more than once."
         , sourcePath = Nothing
         , span = Nothing
         , hint = Just "Put `:slug` in the pattern of an item route, so that each document gets its own page."
@@ -414,7 +430,7 @@ duplicate path first second =
     else
         { severity = Error
         , title = "DUPLICATE PAGE"
-        , message = "The routes `" ++ first ++ "` and `" ++ second ++ "` both make the page `" ++ path ++ "`."
+        , message = "The routes `" ++ first.pattern ++ "` and `" ++ second.pattern ++ "` both make the page `" ++ path ++ "`."
         , sourcePath = Nothing
         , span = Nothing
         , hint = Nothing
@@ -423,7 +439,7 @@ duplicate path first second =
 
 {-| Resolve a page's links, check its HTML and render it.
 -}
-finish : Context -> String -> Draft -> Result (List Diagnostic) Protocol.Page
+finish : Context -> String -> UncheckedPage -> Result (List Diagnostic) Protocol.Page
 finish context language { pattern, url, page } =
     let
         subject : String

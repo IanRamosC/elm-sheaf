@@ -482,6 +482,18 @@ linkProblemTests =
                               }
                             ]
                         }
+        , test "a Markdown link problem does not hide a frontmatter problem" <|
+            \_ ->
+                request [ "posts" ]
+                    [ { linkingToDraft
+                        | frontmatter = [ ( "title", Encode.string "Hello" ), ( "tags", Encode.list identity [ Encode.string "elm", Encode.int 42 ] ) ]
+                        , positions = [ ( "tags.1", span 3 13 15 ) ]
+                      }
+                    , draft "secret-plans"
+                    ]
+                    |> render [ postRoute ]
+                    |> titles
+                    |> Expect.equal [ "LINK TO DRAFT", "BAD FRONTMATTER" ]
         , test "a Markdown link problem is reported once when two routes use the document" <|
             \_ ->
                 request [ "posts" ] [ linkingToDraft, draft "secret-plans" ]
@@ -606,6 +618,21 @@ duplicateTests =
                           , hint = Just "Put `:slug` in the pattern of an item route, so that each document gets its own page."
                           }
                         ]
+        , test "two routes with the same pattern are two routes" <|
+            \_ ->
+                let
+                    page_ : Source
+                    page_ =
+                        post "about"
+                in
+                request [ "posts", "pages" ] [ post "about", { page_ | collection = "pages" } ]
+                    |> render
+                        [ Route.eachItem "/:slug/" posts postPage
+                        , Route.eachItem "/:slug/" (Collection.named "pages" postMeta) postPage
+                        ]
+                    |> .diagnostics
+                    |> Expect.equal
+                        [ error "DUPLICATE PAGE" "The routes `/:slug/` and `/:slug/` both make the page `about/index.html`." ]
         ]
 
 

@@ -60,12 +60,12 @@ eachItem pattern (Site.Collection collection) template =
     Site.EachItem
         { pattern = pattern
         , collection = collection.name
-        , pageFor =
-            \document body ->
+        , templateFor =
+            \document ->
                 Frontmatter.decode collection.frontmatter
                     { values = document.frontmatter, positions = document.frontmatterPositions }
                     |> Result.map
-                        (\meta ->
+                        (\meta body ->
                             template
                                 { ref = Ref.fromId document.id
                                 , slug = document.slug

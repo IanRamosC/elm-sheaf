@@ -32,14 +32,15 @@ type Collection meta
 
 {-| The routes of one site use collections with different `meta` types, so an
 item route keeps its collection's decoder and its template together in
-`pageFor`, which only needs a document from the host and its rendered body.
+`templateFor`. It decodes a document's frontmatter, and gives the template
+waiting for the document's rendered body, which may never come.
 -}
 type Route
     = Single { pattern : String, page : Page }
     | EachItem
         { pattern : String
         , collection : String
-        , pageFor : Protocol.Document -> List Html -> Result (List Problem) Page
+        , templateFor : Protocol.Document -> Result (List Problem) (List Html -> Page)
         }
 
 
