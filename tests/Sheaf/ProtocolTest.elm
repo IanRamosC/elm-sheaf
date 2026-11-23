@@ -3,6 +3,7 @@ module Sheaf.ProtocolTest exposing (suite)
 import Dict
 import Expect
 import Json.Decode as Decode
+import Json.Encode as Encode
 import ProtocolFixtures
 import Sheaf.Internal.Protocol as Protocol exposing (BuildMode(..), Node(..), Severity(..))
 import Test exposing (Test, describe, test)
@@ -164,7 +165,9 @@ responseTests =
                             ]
                         }
                 in
+                -- Compared as text because `==` on JSON values only walks the keys
+                -- of the left side, so a field the encoder dropped would pass.
                 Decode.decodeString Decode.value ProtocolFixtures.responseWithDiagnostic
-                    |> Result.map (Expect.equal (Protocol.encodeResponse response))
+                    |> Result.map (Encode.encode 0 >> Expect.equal (Encode.encode 0 (Protocol.encodeResponse response)))
                     |> Result.withDefault (Expect.fail "the fixture is not JSON")
         ]

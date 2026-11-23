@@ -10,7 +10,8 @@ import {
   type Request,
   type Response,
 } from "../../src/elm/protocol";
-import type { Node } from "../../src/markdown/tree";
+import { checkLinks } from "../../src/markdown/links";
+import { parseMarkdown } from "../../src/markdown/parse";
 
 const FIXTURES = join(import.meta.dir, "../../../tests/fixtures/protocol");
 
@@ -18,25 +19,8 @@ function fixture(name: string): unknown {
   return JSON.parse(readFileSync(join(FIXTURES, `${name}.json`), "utf8"));
 }
 
-type RequestFixture = {
-  build: Parameters<typeof encodeRequest>[0];
-  documents: {
-    id: string;
-    collection: string;
-    sourcePath: string;
-    slug: string;
-    date: { posixMillis: number; isoDate: string } | null;
-    updated: { posixMillis: number; isoDate: string } | null;
-    draft: boolean;
-    excluded: boolean;
-    frontmatter: Record<string, unknown>;
-    frontmatterPositions: SourceDocument["frontmatterPositions"];
-    tree: Node;
-  }[];
-};
-
 /** Rebuilds what the loader and parser would hand to `encodeRequest`. */
-function sourcesOf(request: RequestFixture) {
+function sourcesOf(request: Request) {
   return request.documents.map(({ tree, date, updated, ...rest }) => {
     const source: SourceDocument = {
       ...rest,
@@ -62,13 +46,38 @@ function sourcesOf(request: RequestFixture) {
 describe("encodeRequest", () => {
   for (const name of ["minimal-request", "all-nodes-request"]) {
     test(`produces the ${name} fixture`, () => {
-      const expected = fixture(name) as RequestFixture;
+      const expected = fixture(name) as Request;
       expect(PROTOCOL_VERSION).toBe(1);
       expect(encodeRequest(expected.build, sourcesOf(expected))).toEqual(
-        expected as Request,
+        expected,
       );
     });
   }
+});
+
+describe("the all-nodes fixture tree", () => {
+  test("is what the parser and link checker produce for all-nodes.md", () => {
+    const [fixtureDocument] = (fixture("all-nodes-request") as Request)
+      .documents;
+    if (fixtureDocument === undefined)
+      throw new Error("fixture has no document");
+    const document: SourceDocument = {
+      id: fixtureDocument.id,
+      collection: fixtureDocument.collection,
+      sourcePath: fixtureDocument.sourcePath,
+      slug: fixtureDocument.slug,
+      draft: false,
+      excluded: false,
+      frontmatter: {},
+      frontmatterPositions: {},
+      body: readFileSync(join(FIXTURES, "all-nodes.md"), "utf8"),
+      bodyStartLine: 1,
+    };
+    const parsed = parseMarkdown(document);
+    if (!parsed.ok) throw new Error("the sample does not parse");
+    const checked = checkLinks(parsed.value, document, [document]);
+    expect(checked).toEqual({ ok: true, value: fixtureDocument.tree });
+  });
 });
 
 describe("decodeResponse", () => {
