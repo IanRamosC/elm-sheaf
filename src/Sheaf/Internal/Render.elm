@@ -78,7 +78,11 @@ renderSite (Site site) request =
 
         made : List (Result (List Diagnostic) UncheckedPage)
         made =
-            List.concat (List.indexedMap (pagesOf bodies) site.routes)
+            -- A route with a bad pattern makes no pages; its error ends the build.
+            site.routes
+                |> List.indexedMap Tuple.pair
+                |> List.filter (\( _, route ) -> patternProblem (patternOf route) == Nothing)
+                |> List.concatMap (\( index, route ) -> pagesOf bodies index route)
 
         ( written, duplicates ) =
             withoutDuplicates (List.filterMap Result.toMaybe made)
@@ -90,7 +94,8 @@ renderSite (Site site) request =
     { pages = List.filterMap Result.toMaybe finished
     , diagnostics =
         List.concat
-            [ unknownCollections (usedCollections site.routes) request.collections
+            [ unique (List.filterMap badRoute site.routes)
+            , unknownCollections (usedCollections site.routes) request.collections
             , List.concatMap (Tuple.second >> errors) bodies
 
             -- Two routes over one collection decode its frontmatter twice.
@@ -109,6 +114,16 @@ itemPattern route =
 
         Single _ ->
             Nothing
+
+
+patternOf : Route -> String
+patternOf route =
+    case route of
+        EachItem item ->
+            item.pattern
+
+        Single single ->
+            single.pattern
 
 
 {-| The collections the routes use, in the order they are first used.
@@ -143,6 +158,84 @@ unique =
                 kept ++ [ item ]
         )
         []
+
+
+
+-- ROUTES
+
+
+{-| Why a pattern cannot be turned into a file path inside the output folder,
+or a URL that leads back to it.
+-}
+type PatternProblem
+    = NoLeadingSlash
+    | QueryOrFragment
+    | EmptySegment
+    | DotSegment String
+
+
+patternProblem : String -> Maybe PatternProblem
+patternProblem pattern =
+    if not (String.startsWith "/" pattern) then
+        Just NoLeadingSlash
+
+    else if String.contains "?" pattern || String.contains "#" pattern then
+        Just QueryOrFragment
+
+    else if pattern == "/" then
+        Nothing
+
+    else
+        -- A trailing `/` makes the pattern a folder, so its empty last
+        -- segment is allowed.
+        segmentProblem (String.split "/" (dropTrailingSlash (String.dropLeft 1 pattern)))
+
+
+segmentProblem : List String -> Maybe PatternProblem
+segmentProblem segments =
+    if List.member "" segments then
+        Just EmptySegment
+
+    else
+        segments
+            |> List.filter (\segment -> segment == "." || segment == "..")
+            |> List.head
+            |> Maybe.map DotSegment
+
+
+badRoute : Route -> Maybe Diagnostic
+badRoute route =
+    let
+        pattern : String
+        pattern =
+            patternOf route
+
+        diagnostic : String -> Diagnostic
+        diagnostic problem =
+            { severity = Error
+            , title = "BAD ROUTE"
+            , message = "The route `" ++ pattern ++ "` " ++ problem ++ ", so its pages could not be written."
+            , sourcePath = Nothing
+            , span = Nothing
+            , hint = Just "A pattern starts with `/` and separates its segments with single slashes, as in `/posts/:slug/` or `/404.html`."
+            }
+    in
+    patternProblem pattern
+        |> Maybe.map
+            (\problem ->
+                case problem of
+                    NoLeadingSlash ->
+                        diagnostic "does not start with `/`"
+
+                    QueryOrFragment ->
+                        diagnostic "contains `?` or `#`, which would start a query or a fragment"
+
+                    EmptySegment ->
+                        diagnostic "has an empty segment"
+
+                    DotSegment segment ->
+                        diagnostic ("has a `" ++ segment ++ "` segment")
+            )
 
 
 

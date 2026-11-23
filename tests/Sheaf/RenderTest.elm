@@ -25,6 +25,7 @@ suite =
         , linkProblemTests
         , invalidHtmlTests
         , duplicateTests
+        , badRouteTests
         , badRequestTests
         ]
 
@@ -633,6 +634,58 @@ duplicateTests =
                     |> .diagnostics
                     |> Expect.equal
                         [ error "DUPLICATE PAGE" "The routes `/:slug/` and `/:slug/` both make the page `about/index.html`." ]
+        ]
+
+
+
+-- BAD ROUTES
+
+
+badRouteTests : Test
+badRouteTests =
+    let
+        rejects : String -> String -> Test
+        rejects pattern problem =
+            test ("rejects `" ++ pattern ++ "`, which " ++ problem) <|
+                \_ ->
+                    request [ "posts" ] [ post "hello-world" ]
+                        |> render [ Route.eachItem pattern posts postPage, Route.single "/" (page []) ]
+                        |> Expect.all
+                            [ titles >> Expect.equal [ "BAD ROUTE" ]
+                            , .diagnostics >> List.map (.message >> String.contains ("`" ++ pattern ++ "`")) >> Expect.equal [ True ]
+                            , paths >> Expect.equal [ "index.html" ]
+                            ]
+    in
+    describe "bad routes"
+        [ rejects "posts/:slug/" "does not start with a slash"
+        , rejects "//posts/:slug/" "has an empty segment"
+        , rejects "/posts//:slug/" "has an empty segment in the middle"
+        , rejects "/posts/./:slug/" "has a `.` segment"
+        , rejects "/posts/../:slug/" "has a `..` segment"
+        , rejects "/posts/:slug/?page=1" "has a query"
+        , rejects "/posts/:slug/#top" "has a fragment"
+        , test "says what a pattern looks like" <|
+            \_ ->
+                request [] []
+                    |> render [ Route.single "//" (page []) ]
+                    |> .diagnostics
+                    |> Expect.equal
+                        [ { severity = Error
+                          , title = "BAD ROUTE"
+                          , message = "The route `//` has an empty segment, so its pages could not be written."
+                          , sourcePath = Nothing
+                          , span = Nothing
+                          , hint = Just "A pattern starts with `/` and separates its segments with single slashes, as in `/posts/:slug/` or `/404.html`."
+                          }
+                        ]
+        , test "accepts the root, folders and files" <|
+            \_ ->
+                request [ "posts" ] [ post "hello-world" ]
+                    |> render [ Route.single "/" (page []), Route.single "/404.html" (page []), postRoute ]
+                    |> Expect.all
+                        [ .diagnostics >> Expect.equal []
+                        , paths >> Expect.equal [ "index.html", "404.html", "posts/hello-world/index.html" ]
+                        ]
         ]
 
 
