@@ -123,7 +123,7 @@ main =
         { request = sheafRequest
         , respond = sheafResponse
         }
-        Site.main
+        Site.site
 `;
 
 /**

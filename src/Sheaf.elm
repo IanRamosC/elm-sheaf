@@ -5,14 +5,14 @@ module Sheaf exposing (Site, site, link)
 A site is a list of routes. Each route turns a single template, or every
 document of a collection, into pages:
 
-    module Site exposing (main)
+    module Site exposing (site)
 
     import Sheaf
     import Sheaf.Collection as Collection exposing (Collection)
     import Sheaf.Route as Route
 
-    main : Sheaf.Site
-    main =
+    site : Sheaf.Site
+    site =
         Sheaf.site
             { language = "en"
             , routes =
