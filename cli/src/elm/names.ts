@@ -75,23 +75,25 @@ export function elmValueName(slug: string): Result<string, string> {
 function unusableSlug(document: SourceDocument, reason: string): Diagnostic {
   return {
     severity: "error",
-    title: "Slug cannot become an Elm name",
+    title: "UNUSABLE SLUG",
     message: reason,
     sourcePath: document.sourcePath,
     hint: "Set `slug` in the frontmatter to a name with ASCII letters or digits.",
   };
 }
 
+/** `documents` starts with `first`; the diagnostic points at that file. */
 function nameClash(
-  collection: string,
   name: string,
+  first: SourceDocument,
   documents: SourceDocument[],
 ): Diagnostic {
   const files = documents.map((document) => document.sourcePath).join(", ");
   return {
     severity: "error",
-    title: "Two documents share an Elm name",
-    message: `In "${collection}", ${files} all become \`${name}\`.`,
+    title: "NAME CLASH",
+    message: `In "${first.collection}", ${files} all become \`${name}\`.`,
+    sourcePath: first.sourcePath,
     hint: "Give one of them a different `slug` in its frontmatter.",
   };
 }
@@ -122,9 +124,7 @@ export function assignValueNames(
   for (const sharing of claimants.values()) {
     const [first] = sharing;
     if (first !== undefined && sharing.length > 1) {
-      diagnostics.push(
-        nameClash(first.collection, names.get(first.id) ?? "", sharing),
-      );
+      diagnostics.push(nameClash(names.get(first.id) ?? "", first, sharing));
     }
   }
 

@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import type { Config } from "../config/config";
 import type { Diagnostic } from "../diagnostics/diagnostic";
+import { elmModuleName } from "../elm/names";
 import { err, ok, type Result } from "../result";
 import { URL_SCHEMES } from "../url-schemes";
 import { type DocumentDate, publicationDate } from "./dates";
@@ -83,7 +84,10 @@ export function loadContent(
   collections: string[] = foldersOf(files),
 ): Result<SourceDocument[], Diagnostic[]> {
   const documents: SourceDocument[] = [];
-  const problems = collectionNameProblems(collections);
+  const problems = [
+    ...collectionNameProblems(collections),
+    ...moduleClashProblems(collections),
+  ];
 
   for (const file of files) {
     const loaded = loadDocument(file, config, buildStart, mode);
@@ -253,6 +257,34 @@ function collectionNameProblems(collections: string[]): Diagnostic[] {
             sourcePath: `content/${name}`,
           },
         ];
+  });
+}
+
+/**
+ * Each collection becomes an Elm module, and names such as `a-b` and `a--b`
+ * both become `Content.AB`, so one module would silently replace the other.
+ */
+function moduleClashProblems(collections: string[]): Diagnostic[] {
+  const foldersByModule = new Map<string, string[]>();
+  for (const name of collections) {
+    if (collectionNameMessage(name) !== undefined) continue;
+    const moduleName = elmModuleName(name);
+    if (!moduleName.ok) continue;
+    const folders = foldersByModule.get(moduleName.value) ?? [];
+    foldersByModule.set(moduleName.value, [...folders, `content/${name}`]);
+  }
+  return [...foldersByModule].flatMap(([moduleName, folders]) => {
+    const [first, ...others] = folders;
+    if (first === undefined || others.length === 0) return [];
+    return [
+      {
+        severity: "error",
+        title: "NAME CLASH",
+        message: `The folders ${folders.join(", ")} all become the Elm module \`Content.${moduleName}\`.`,
+        sourcePath: first,
+        hint: "Rename all but one of these folders.",
+      },
+    ];
   });
 }
 

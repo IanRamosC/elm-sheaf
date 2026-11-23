@@ -106,6 +106,8 @@ describe("assignValueNames", () => {
     expect(result.error).toHaveLength(1);
     const [diagnostic] = result.error;
     expect(diagnostic?.severity).toBe("error");
+    expect(diagnostic?.title).toBe("NAME CLASH");
+    expect(diagnostic?.sourcePath).toBe("content/posts/hello-world.md");
     expect(diagnostic?.message).toContain("content/posts/hello-world.md");
     expect(diagnostic?.message).toContain("content/posts/hello_world.md");
     expect(diagnostic?.message).toContain("helloWorld");
@@ -120,8 +122,9 @@ describe("assignValueNames", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error).toHaveLength(2);
-    expect(result.error.map((d) => d.sourcePath)).toContain(
-      "content/posts/日本.md",
-    );
+    expect(result.error[0]).toMatchObject({
+      title: "UNUSABLE SLUG",
+      sourcePath: "content/posts/日本.md",
+    });
   });
 });

@@ -221,6 +221,26 @@ describe("loadContent errors", () => {
     }
   });
 
+  test("reports collection folders that become the same Elm module", () => {
+    const result = loadContent(
+      [file("content/a-b/x.md"), file("content/a--b/y.md")],
+      config,
+      buildStart,
+      "production",
+      ["a--b", "a-b", "posts"],
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toHaveLength(1);
+    expect(result.error[0]).toMatchObject({
+      title: "NAME CLASH",
+      sourcePath: "content/a--b",
+    });
+    expect(result.error[0]?.message).toContain("content/a-b");
+    expect(result.error[0]?.message).toContain("Content.AB");
+  });
+
   test("reports a bad collection once however many files it holds", () => {
     const found = problems([
       file("content/Posts/a.md"),
