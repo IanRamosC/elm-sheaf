@@ -1,9 +1,12 @@
 module Sheaf.Markdown exposing (Body, LinkProblem, render)
 
-{-| The Markdown body of a document, ready to be placed in a page.
+{-| Rendering a Markdown body to HTML, with its links to other documents
+resolved.
 
-The host parses and checks the Markdown, so a body is only ever obtained from a
-document, and all a template can do with it is render it.
+The host parses and checks each document's Markdown, and Sheaf renders it
+before calling a template, so a template receives `Document.body` as HTML
+already. This module is the renderer itself; a `Body` is opaque, and there is
+no way yet for a template to obtain one.
 
 @docs Body, LinkProblem, render
 
