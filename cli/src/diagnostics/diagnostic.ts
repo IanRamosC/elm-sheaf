@@ -14,5 +14,10 @@ export type Diagnostic = {
   message: string;
   sourcePath?: string;
   span?: Span;
+  /**
+   * `false` when the message already quotes the source, as the Elm
+   * compiler's messages do, so the renderer adds no excerpt of its own.
+   */
+  excerpt?: false;
   hint?: string;
 };

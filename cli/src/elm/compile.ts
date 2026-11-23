@@ -150,6 +150,7 @@ function diagnosticsOf(report: ElmReport, siteRoot: string): Diagnostic[] {
       message: messageText(problem.message),
       sourcePath: relativePath(path),
       span: spanOf(problem.region),
+      excerpt: false as const,
     })),
   );
 }

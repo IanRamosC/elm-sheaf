@@ -47,6 +47,17 @@ describe("renderDiagnostic", () => {
     expect(lines.slice(1)).toEqual(["", brokenLink.message]);
   });
 
+  test("keeps the location but leaves out the excerpt when asked to", () => {
+    const { hint: _hint, ...withoutHint } = brokenLink;
+    const lines = renderDiagnostic(
+      { ...withoutHint, excerpt: false },
+      source,
+    ).split("\n");
+
+    expect(lines[0]?.endsWith(" content/posts/a.md:9:32")).toBe(true);
+    expect(lines.slice(1)).toEqual(["", brokenLink.message]);
+  });
+
   test("excerpts a multi-line span from a CRLF source without a stray CR", () => {
     const crlfSource = "title: a\r\ntags: [elm,\r\n  42]\r\n";
     const span = { start: { line: 2, column: 7 }, end: { line: 3, column: 6 } };

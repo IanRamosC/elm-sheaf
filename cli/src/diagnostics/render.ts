@@ -16,7 +16,7 @@ export function renderDiagnostic(
   const sections = [renderHeader(diagnostic), diagnostic.message];
 
   const excerpt =
-    diagnostic.span && source !== undefined
+    diagnostic.span && diagnostic.excerpt !== false && source !== undefined
       ? renderExcerpt(diagnostic.span, source)
       : undefined;
   if (excerpt) {

@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseConfig } from "../../src/config/config";
 import { loadContent, readContentFiles } from "../../src/content/load";
+import { renderDiagnostic } from "../../src/diagnostics/render";
 import { compileElm, findElm } from "../../src/elm/compile";
 import { generateElm } from "../../src/elm/generate";
 import { assignValueNames } from "../../src/elm/names";
@@ -411,6 +412,27 @@ describe("a Sheaf site", () => {
       expect(diagnostic?.message).toContain(
         "But `site` needs the 1st argument",
       );
+    },
+    COMPILE_TIMEOUT_MS,
+  );
+
+  test(
+    "renders a compiler error with the compiler's excerpt only",
+    async () => {
+      const siteRoot = join(FIXTURES, "compile-error");
+      await writeGenerated(siteRoot, generateElm([], [], new Map()));
+      const elm = await realElm(siteRoot);
+
+      const compiled = await compileElm(siteRoot, { elm, optimize: false });
+
+      expect(compiled.ok).toBe(false);
+      if (compiled.ok) return;
+      const [diagnostic] = compiled.error;
+      if (diagnostic === undefined) throw new Error("expected a diagnostic");
+      const source = readFileSync(join(siteRoot, "src/Site.elm"), "utf8");
+      const rendered = renderDiagnostic(diagnostic, source);
+      expect(rendered.split("\n")[0]).toEndWith(" src/Site.elm:9:9");
+      expect(rendered.split("language = 1")).toHaveLength(2);
     },
     COMPILE_TIMEOUT_MS,
   );
