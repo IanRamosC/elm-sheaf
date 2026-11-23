@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -413,6 +414,23 @@ describe("a Sheaf site", () => {
       expect(diagnostic?.message).toContain(
         "But `site` needs the 1st argument",
       );
+    },
+    COMPILE_TIMEOUT_MS,
+  );
+
+  test(
+    "leaves no compiled site behind when compiling fails",
+    async () => {
+      const siteRoot = join(FIXTURES, "compile-error");
+      await writeGenerated(siteRoot, generateElm([], [], new Map()));
+      const compiledJs = join(siteRoot, ".sheaf/site.js");
+      writeFileSync(compiledJs, "// from an earlier, successful compile");
+      const elm = await realElm(siteRoot);
+
+      const compiled = await compileElm(siteRoot, { elm, optimize: false });
+
+      expect(compiled.ok).toBe(false);
+      expect(existsSync(compiledJs)).toBe(false);
     },
     COMPILE_TIMEOUT_MS,
   );

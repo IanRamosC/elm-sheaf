@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { access, constants } from "node:fs/promises";
+import { access, constants, rm } from "node:fs/promises";
 import { delimiter, join, relative } from "node:path";
 import type { Diagnostic, Span } from "../diagnostics/diagnostic";
 import { err, ok, type Result } from "../result";
@@ -171,6 +171,9 @@ export async function compileElm(
     "--report=json",
     ...(options.optimize ? ["--optimize"] : []),
   ];
+  // `elm make` leaves the old output in place when it fails; remove it first
+  // so nothing can run a site that no longer matches its source.
+  await rm(join(siteRoot, COMPILED_OUTPUT), { force: true });
   const { exitCode, stderr } = await run(options.elm, args, siteRoot);
   if (exitCode === 0) return ok(join(siteRoot, COMPILED_OUTPUT));
 
