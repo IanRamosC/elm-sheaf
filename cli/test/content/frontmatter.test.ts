@@ -95,6 +95,12 @@ describe("splitFrontmatter", () => {
     }
   });
 
+  test("keeps a byte order mark that does not start the file", () => {
+    const result = split("Zero\uFEFFwidth\n");
+
+    expect(result.body).toBe("Zero\uFEFFwidth\n");
+  });
+
   test("rejects an opening fence with no closing fence", () => {
     const [problem, ...rest] = problems("---\ntitle: Hello\n\nBody\n");
 

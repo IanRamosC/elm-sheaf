@@ -141,6 +141,11 @@ describe("parseMarkdown", () => {
     });
   });
 
+  test("quotes only the first line of multi-line raw HTML", () => {
+    const [error] = parseErrors("<div>\n  <p>hi</p>\n</div>\n");
+    expect(error?.message).toBe("This document contains raw HTML (`<div>…`).");
+  });
+
   test("reports inline raw HTML", () => {
     const errors = parseErrors("some <b>bold</b> text");
     expect(errors.map((error) => error.title)).toEqual([

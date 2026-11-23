@@ -31,7 +31,7 @@ export type SplitSource = {
 };
 
 const FENCE = "---";
-const BYTE_ORDER_MARK = "﻿";
+const LEADING_BYTE_ORDER_MARK = /^\uFEFF/;
 
 /**
  * Splits `---`-fenced YAML frontmatter from the Markdown that follows it. A
@@ -44,7 +44,7 @@ export function splitFrontmatter(
   // Positions are the same for LF and CRLF files because the line endings are
   // normalised here; the body is returned with LF endings for the same reason.
   const lines = source
-    .replace(BYTE_ORDER_MARK, "")
+    .replace(LEADING_BYTE_ORDER_MARK, "")
     .replaceAll("\r\n", "\n")
     .split("\n");
   const isFence = (line: string) => line.trimEnd() === FENCE;

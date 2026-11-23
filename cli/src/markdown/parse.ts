@@ -168,7 +168,7 @@ export function parseMarkdown(
         errors.push({
           severity: "error",
           title: "RAW HTML",
-          message: `This document contains raw HTML (\`${node.value}\`).`,
+          message: `This document contains raw HTML (\`${firstLine(node.value)}\`).`,
           sourcePath: document.sourcePath,
           span: position,
           hint: "Raw HTML is not supported. Use a component instead.",
@@ -201,4 +201,10 @@ function plainText(node: Nodes): string {
 
 function missingPosition(node: Nodes): never {
   throw new Error(`Markdown ${node.type} node has no position`);
+}
+
+/** A block of HTML can run for many lines; its first is enough to find it. */
+function firstLine(text: string): string {
+  const [first = "", ...rest] = text.split("\n");
+  return rest.length > 0 ? `${first}…` : first;
 }
