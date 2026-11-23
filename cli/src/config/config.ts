@@ -86,13 +86,19 @@ function parseSiteUrl(
   if (typeof value !== "string") {
     return err({ message: '"siteUrl" must be a string.', hint: fullUrlHint });
   }
+  const notAFullUrl = err({
+    message: `"${value}" is not a full URL.`,
+    hint: fullUrlHint,
+  });
   try {
-    return ok(new URL(value));
+    const url = new URL(value);
+    // "localhost:3000" parses with "localhost:" as its scheme, so the scheme
+    // has to be checked for a base path to exist at all.
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? ok(url)
+      : notAFullUrl;
   } catch {
-    return err({
-      message: `"${value}" is not a full URL.`,
-      hint: fullUrlHint,
-    });
+    return notAFullUrl;
   }
 }
 

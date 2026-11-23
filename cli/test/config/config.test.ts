@@ -59,6 +59,16 @@ describe("parseConfig", () => {
     expect(errors[0]?.hint).toBe("Use a full URL such as https://example.com/");
   });
 
+  test("rejects a host and port written without a scheme", () => {
+    for (const siteUrl of ["localhost:3000", "example.com:8080"]) {
+      const errors = errorsOf(`{"siteUrl":"${siteUrl}"}`);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.hint).toBe(
+        "Use a full URL such as https://example.com/",
+      );
+    }
+  });
+
   test("rejects a siteUrl that is not a string", () => {
     expect(errorsOf('{"siteUrl":42}')).toHaveLength(1);
   });
