@@ -119,11 +119,20 @@ withDefault name default field =
 addField : String -> (Maybe Value -> Result (List FieldFailure) a) -> Frontmatter (a -> b) -> Frontmatter b
 addField name readValue (Frontmatter previous) =
     Frontmatter
-        { names = previous.names ++ [ name ]
+        { names = addName name previous.names
         , read =
             \values ->
                 andMap (readValue (Dict.get name values)) (previous.read values)
         }
+
+
+addName : String -> List String -> List String
+addName name names =
+    if List.member name names then
+        names
+
+    else
+        names ++ [ name ]
 
 
 readOptional : String -> Field a -> Maybe Value -> Result (List FieldFailure) (Maybe a)
@@ -363,7 +372,7 @@ describeValue value =
         kinds =
             [ Decode.null () |> Decode.map (always "empty")
             , Decode.string |> Decode.map (always "a string")
-            , Decode.bool |> Decode.map (always "true or false")
+            , Decode.bool |> Decode.map (always "a true or false value")
             , Decode.float |> Decode.map (always "a number")
             , Decode.list Decode.value |> Decode.map (always "a list")
             , Decode.keyValuePairs Decode.value |> Decode.map (always "an object")
@@ -412,7 +421,22 @@ decode (Frontmatter declaration) { values, positions } =
                                 Err found ->
                                     List.map (fieldProblem positions) found
                     in
-                    Err (List.sortBy sortKey (unknown ++ failures))
+                    Err (List.sortBy sortKey (unique (unknown ++ failures)))
+
+
+{-| Declaring a key twice would otherwise report each of its problems twice.
+-}
+unique : List a -> List a
+unique =
+    List.foldl
+        (\item kept ->
+            if List.member item kept then
+                kept
+
+            else
+                kept ++ [ item ]
+        )
+        []
 
 
 notAnObject : Problem
@@ -490,14 +514,19 @@ reservedKeyHint name =
         Nothing
 
 
+{-| Name an item by its whole path, innermost first: "the second item of its
+first item".
+-}
 subject : List Int -> String
 subject itemPath =
-    case itemPath of
+    case List.reverse itemPath of
         [] ->
             "it"
 
-        index :: _ ->
-            "its " ++ ordinal (index + 1) ++ " item"
+        outermost :: innerToOuter ->
+            (List.map (\index -> "the " ++ ordinal (index + 1) ++ " item") innerToOuter |> List.reverse)
+                ++ [ "its " ++ ordinal (outermost + 1) ++ " item" ]
+                |> String.join " of "
 
 
 ordinal : Int -> String
@@ -534,25 +563,42 @@ ordinal number =
             "tenth"
 
         _ ->
-            String.fromInt number ++ "th"
+            String.fromInt number ++ ordinalSuffix number
 
 
-{-| The span of the value itself, or of the whole field when the item has no
-entry of its own.
+ordinalSuffix : Int -> String
+ordinalSuffix number =
+    if List.member (modBy 100 number) [ 11, 12, 13 ] then
+        "th"
+
+    else
+        case modBy 10 number of
+            1 ->
+                "st"
+
+            2 ->
+                "nd"
+
+            3 ->
+                "rd"
+
+            _ ->
+                "th"
+
+
+{-| The span of the value itself, or of the nearest enclosing item or field
+that has an entry when the value has none of its own.
 -}
 valueSpan : Positions -> String -> List Int -> Maybe Span
 valueSpan positions name itemPath =
-    let
-        path : String
-        path =
-            String.join "." (name :: List.map String.fromInt itemPath)
-    in
-    case Dict.get path positions of
-        Just position ->
-            Just position.value
-
-        Nothing ->
-            Dict.get name positions |> Maybe.map .value
+    List.range 0 (List.length itemPath)
+        |> List.reverse
+        |> List.filterMap
+            (\depth ->
+                Dict.get (String.join "." (name :: List.map String.fromInt (List.take depth itemPath))) positions
+            )
+        |> List.head
+        |> Maybe.map .value
 
 
 

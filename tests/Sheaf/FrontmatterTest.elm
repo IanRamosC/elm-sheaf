@@ -207,8 +207,72 @@ badFrontmatterTests =
                     |> problemsOf
                     |> List.map .message
                     |> Expect.equal
-                        [ "The `tags` field should be a list of strings, but its first item is true or false."
+                        [ "The `tags` field should be a list of strings, but its first item is a true or false value."
                         , "The `tags` field should be a list of strings, but its third item is empty."
+                        ]
+        , test "names the whole path of a nested list item" <|
+            \_ ->
+                decodeWith
+                    (Frontmatter.succeed identity
+                        |> Frontmatter.required "grid" (Frontmatter.list (Frontmatter.list Frontmatter.string))
+                    )
+                    [ ( "grid"
+                      , Encode.list (Encode.list identity)
+                            [ [ Encode.string "a" ], [ Encode.string "b", Encode.int 3 ] ]
+                      )
+                    ]
+                    [ ( "grid", span 2 7 20 ), ( "grid.1", span 2 12 19 ) ]
+                    |> problemsOf
+                    |> Expect.equal
+                        [ { title = "BAD FRONTMATTER"
+                          , message = "The `grid` field should be a list of lists of strings, but the second item of its second item is a number."
+                          , span = Just (span 2 12 19)
+                          , hint = Nothing
+                          }
+                        ]
+        , test "uses the right suffix for ordinals past ten" <|
+            \_ ->
+                let
+                    badItems : List Int
+                    badItems =
+                        [ 11, 21, 22, 23, 111 ]
+
+                    items : List Encode.Value
+                    items =
+                        List.range 1 111
+                            |> List.map
+                                (\number ->
+                                    if List.member number badItems then
+                                        Encode.int number
+
+                                    else
+                                        Encode.string "x"
+                                )
+                in
+                decodeWith meta [ ( "title", Encode.string "T" ), ( "tags", Encode.list identity items ) ] []
+                    |> problemsOf
+                    |> List.map .message
+                    |> List.sort
+                    |> Expect.equal
+                        ([ "11th", "21st", "22nd", "23rd", "111th" ]
+                            |> List.map (\ordinal -> "The `tags` field should be a list of strings, but its " ++ ordinal ++ " item is a number.")
+                            |> List.sort
+                        )
+        , test "a key declared twice is reported once" <|
+            \_ ->
+                let
+                    twice : Frontmatter ( String, String )
+                    twice =
+                        Frontmatter.succeed Tuple.pair
+                            |> Frontmatter.required "cat" Frontmatter.string
+                            |> Frontmatter.required "cat" Frontmatter.string
+                in
+                decodeWith twice [ ( "cat", Encode.int 1 ), ( "cta", Encode.int 2 ) ] []
+                    |> problemsOf
+                    |> List.map (\problem -> ( problem.title, problem.hint ))
+                    |> Expect.equal
+                        [ ( "BAD FRONTMATTER", Nothing )
+                        , ( "UNKNOWN FIELD", Just "Did you mean `cat`?" )
                         ]
         , test "describes a value that is not a list" <|
             \_ ->
