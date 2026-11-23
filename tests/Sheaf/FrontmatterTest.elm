@@ -46,11 +46,19 @@ span line from to =
     { start = { line = line, column = from }, end = { line = line, column = to } }
 
 
-{-| The span of the opening `---`, where a missing field is reported.
+{-| The span of the opening `---`, which the host sends as the position of
+the whole frontmatter, and where a missing field is reported.
 -}
 openingFence : Span
 openingFence =
     span 1 1 4
+
+
+{-| What the host sends as the position of the frontmatter when a file has none.
+-}
+startOfFile : Span
+startOfFile =
+    span 1 1 1
 
 
 decodeWith : Frontmatter a -> List ( String, Encode.Value ) -> List ( String, Span ) -> Result (List Problem) a
@@ -58,7 +66,8 @@ decodeWith declaration fields positions =
     Internal.decode declaration
         { values = Encode.object fields
         , positions =
-            positions
+            ( "", openingFence )
+                :: positions
                 |> List.map (\( path, valueSpan ) -> ( path, { key = Nothing, value = valueSpan } ))
                 |> Dict.fromList
         }
@@ -161,6 +170,26 @@ missingFieldTests =
                           , message = "The `title` field is required, but this document does not have it."
                           , span = Just openingFence
                           , hint = Nothing
+                          }
+                        ]
+        , test "is located where the host says the frontmatter is" <|
+            \_ ->
+                decodeWith meta [] [ ( "", span 3 1 4 ) ]
+                    |> problemsOf
+                    |> List.map .span
+                    |> Expect.equal [ Just (span 3 1 4) ]
+        , test "says when the file has no frontmatter at all" <|
+            \_ ->
+                Internal.decode meta
+                    { values = Encode.object []
+                    , positions = Dict.fromList [ ( "", { key = Nothing, value = startOfFile } ) ]
+                    }
+                    |> problemsOf
+                    |> Expect.equal
+                        [ { title = "MISSING FIELD"
+                          , message = "The `title` field is required, but this document does not have it."
+                          , span = Just startOfFile
+                          , hint = Just "This file has no frontmatter. Add it at the top of the file, between two `---` lines."
                           }
                         ]
         , test "explains reserved keys" <|
@@ -474,7 +503,8 @@ collectingTests =
                             ]
                     , positions =
                         Dict.fromList
-                            [ ( "sumary", { key = Just (span 2 1 7), value = span 2 9 10 } )
+                            [ ( "", { key = Nothing, value = openingFence } )
+                            , ( "sumary", { key = Just (span 2 1 7), value = span 2 9 10 } )
                             , ( "tags", { key = Just (span 3 1 5), value = span 3 7 10 } )
                             ]
                     }

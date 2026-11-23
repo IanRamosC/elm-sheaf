@@ -463,10 +463,21 @@ fieldProblem : Positions -> FieldFailure -> Problem
 fieldProblem positions failure =
     case failure of
         Missing name ->
+            let
+                frontmatter : Maybe Span
+                frontmatter =
+                    Dict.get "" positions |> Maybe.map .value
+            in
             { title = "MISSING FIELD"
             , message = "The `" ++ name ++ "` field is required, but this document does not have it."
-            , span = Just openingFence
-            , hint = reservedKeyHint name
+            , span = frontmatter
+            , hint =
+                case reservedKeyHint name of
+                    Just hint ->
+                        Just hint
+
+                    Nothing ->
+                        Maybe.andThen noFrontmatterHint frontmatter
             }
 
         Invalid name (WrongType wrong) ->
@@ -493,12 +504,16 @@ fieldProblem positions failure =
             }
 
 
-{-| The opening `---` is always the first line of the file, and there is no
-position entry for the block, so a missing field is reported there.
+{-| The host places the whole frontmatter at its opening `---`, or, for a
+file without frontmatter, at an empty span at the start of the file.
 -}
-openingFence : Span
-openingFence =
-    { start = { line = 1, column = 1 }, end = { line = 1, column = 4 } }
+noFrontmatterHint : Span -> Maybe String
+noFrontmatterHint { start, end } =
+    if start == end then
+        Just "This file has no frontmatter. Add it at the top of the file, between two `---` lines."
+
+    else
+        Nothing
 
 
 reservedKeys : List String

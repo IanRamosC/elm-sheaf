@@ -22,7 +22,8 @@ export type SplitSource = {
   /**
    * Keyed by dotted path (`tags`, `tags.1`, `author.name`), in file lines and
    * columns. The root path `""` is always present so that a missing field
-   * still has somewhere to point.
+   * still has somewhere to point: the opening fence, or an empty span at 1:1
+   * when the file has no frontmatter, which Elm mentions in its hint.
    */
   positions: Record<string, FieldPosition>;
   body: string;
