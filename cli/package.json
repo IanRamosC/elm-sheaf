@@ -1,0 +1,19 @@
+{
+  "name": "elm-sheaf",
+  "version": "0.1.0",
+  "description": "Static site generator whose templates are written in Elm.",
+  "license": "BSD-3-Clause",
+  "type": "module",
+  "bin": {
+    "sheaf": "src/index.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "check": "bunx --bun biome check . && bunx --bun tsc --noEmit"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.8",
+    "@types/bun": "^1.4.5",
+    "typescript": "^7.0.2"
+  }
+}
