@@ -50,6 +50,10 @@ describe("publicationInstant", () => {
       "yesterday",
       "2026-11-30T10:00:00",
       "2026-11-30T25:00:00Z",
+      "2026-02-30T10:00:00Z",
+      "2026-11-30T24:00:00Z",
+      "2026-11-30T10:60:00Z",
+      "2026-11-30T10:00:60Z",
     ]) {
       expect(publicationInstant(bad, "UTC").ok).toBe(false);
     }

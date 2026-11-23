@@ -5,7 +5,7 @@ export type DocumentDate = { instant: Date; isoDate: string };
 
 const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TIMESTAMP_WITH_OFFSET =
-  /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
+  /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/;
 const MINUTE = 60_000;
 
 /**
@@ -21,9 +21,21 @@ export function publicationInstant(
     const [, year, month, day] = dateOnly.map(Number);
     return midnightIn(timezone, year as number, month as number, day as number);
   }
-  const instant = new Date(date);
-  if (TIMESTAMP_WITH_OFFSET.test(date) && !Number.isNaN(instant.getTime())) {
-    return ok(instant);
+  const timestamp = TIMESTAMP_WITH_OFFSET.exec(date);
+  if (timestamp) {
+    // `new Date` rolls impossible values over (February 30th becomes March
+    // 2nd, 24:00 the next day), so the parts are checked first.
+    const [, year, month, day, hour, minute, second] = timestamp.map(Number);
+    const instant = new Date(date);
+    if (
+      isCalendarDate(year as number, month as number, day as number) &&
+      (hour as number) <= 23 &&
+      (minute as number) <= 59 &&
+      (second ?? 0) <= 59 &&
+      !Number.isNaN(instant.getTime())
+    ) {
+      return ok(instant);
+    }
   }
   return err(
     `"${date}" is not a date. Write YYYY-MM-DD, or a timestamp with an offset such as 2026-11-30T10:00:00+02:00.`,
@@ -48,14 +60,10 @@ function midnightIn(
   month: number,
   day: number,
 ): Result<Date, string> {
-  const wallClock = new Date(Date.UTC(year, month - 1, day));
-  const exists =
-    wallClock.getUTCFullYear() === year &&
-    wallClock.getUTCMonth() === month - 1 &&
-    wallClock.getUTCDate() === day;
-  if (!exists) {
+  if (!isCalendarDate(year, month, day)) {
     return err(`${year}-${pad(month)}-${pad(day)} is not a calendar date.`);
   }
+  const wallClock = new Date(Date.UTC(year, month - 1, day));
 
   // The timezone's offset depends on the instant we are looking for, so
   // measure it at the wall clock read as UTC, then once more at that first
@@ -65,6 +73,16 @@ function midnightIn(
   const estimate = wallClock.getTime() - offsetAt(wallClock, timezone);
   return ok(
     new Date(wallClock.getTime() - offsetAt(new Date(estimate), timezone)),
+  );
+}
+
+/** Whether the day exists, which `Date.UTC` would not say: it rolls overflow into the next month. */
+function isCalendarDate(year: number, month: number, day: number): boolean {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
   );
 }
 
