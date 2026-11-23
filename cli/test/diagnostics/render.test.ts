@@ -47,6 +47,20 @@ describe("renderDiagnostic", () => {
     expect(lines.slice(1)).toEqual(["", brokenLink.message]);
   });
 
+  test("excerpts a multi-line span from a CRLF source without a stray CR", () => {
+    const crlfSource = "title: a\r\ntags: [elm,\r\n  42]\r\n";
+    const span = { start: { line: 2, column: 7 }, end: { line: 3, column: 6 } };
+    const { hint: _hint, ...withoutHint } = brokenLink;
+    const lines = renderDiagnostic({ ...withoutHint, span }, crlfSource).split(
+      "\n",
+    );
+
+    expect(lines.slice(4)).toEqual([
+      "    2| tags: [elm,",
+      `${" ".repeat(7 + 6)}${"^".repeat(5)}`,
+    ]);
+  });
+
   test("keeps four dashes before a path too long for 80 columns", () => {
     const sourcePath = `content/${"deeply/".repeat(12)}a.md`;
     const header =

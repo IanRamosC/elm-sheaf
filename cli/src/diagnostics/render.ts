@@ -43,7 +43,7 @@ function renderHeader({ title, sourcePath, span }: Diagnostic): string {
 }
 
 function renderExcerpt(span: Span, source: string): string | undefined {
-  const line = source.split("\n")[span.start.line - 1];
+  const line = source.split(/\r?\n/)[span.start.line - 1];
   if (line === undefined) {
     return undefined;
   }
