@@ -35,9 +35,19 @@ export function parseMarkdown(
   }
 
   function convertChildren(node: Parents): Node[] {
-    return node.children.flatMap((child) =>
-      child.type === "definition" ? [] : convert(child),
-    );
+    // Inline HTML arrives one tag at a time, so `<b>bold</b>` is two nodes.
+    // The closing tag of an element already reported is not a second problem.
+    const reportedTags = new Set<string>();
+    return node.children.flatMap((child) => {
+      if (child.type === "definition") return [];
+      if (child.type === "html") {
+        const closing = tagName(CLOSING_TAG, child.value);
+        if (closing !== undefined && reportedTags.delete(closing)) return [];
+        const opening = tagName(OPENING_TAG, child.value);
+        if (opening !== undefined) reportedTags.add(opening);
+      }
+      return convert(child);
+    });
   }
 
   // Returns a list because raw HTML converts to nothing (it is reported instead).
@@ -201,6 +211,13 @@ function plainText(node: Nodes): string {
 
 function missingPosition(node: Nodes): never {
   throw new Error(`Markdown ${node.type} node has no position`);
+}
+
+const OPENING_TAG = /^<([A-Za-z][A-Za-z0-9-]*)\b[^>]*>$/;
+const CLOSING_TAG = /^<\/([A-Za-z][A-Za-z0-9-]*)\s*>$/;
+
+function tagName(pattern: RegExp, html: string): string | undefined {
+  return pattern.exec(html)?.[1]?.toLowerCase();
 }
 
 /** A block of HTML can run for many lines; its first is enough to find it. */

@@ -146,13 +146,19 @@ describe("parseMarkdown", () => {
     expect(error?.message).toBe("This document contains raw HTML (`<div>…`).");
   });
 
-  test("reports inline raw HTML", () => {
+  test("reports an inline element once, not once per tag", () => {
     const errors = parseErrors("some <b>bold</b> text");
-    expect(errors.map((error) => error.title)).toEqual([
-      "RAW HTML",
-      "RAW HTML",
-    ]);
+    expect(errors.map((error) => error.title)).toEqual(["RAW HTML"]);
     expect(errors[0]?.span?.start).toEqual({ line: 1, column: 6 });
+  });
+
+  test("reports each inline element and a stray closing tag", () => {
+    const errors = parseErrors("<b>a</b> <i>b</i> and </u>");
+    expect(errors.map((error) => error.message)).toEqual([
+      "This document contains raw HTML (`<b>`).",
+      "This document contains raw HTML (`<i>`).",
+      "This document contains raw HTML (`</u>`).",
+    ]);
   });
 
   test("replaces a reference-style link with a link at the reference", () => {
