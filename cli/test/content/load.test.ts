@@ -190,6 +190,26 @@ describe("loadContent errors", () => {
     }
   });
 
+  test("rejects URL delimiters and escapes in a file name", () => {
+    for (const name of ["c#-tips", "why?", "100%"]) {
+      const [problem] = problems([file(`content/posts/${name}.md`)]);
+
+      expect(problem?.title).toBe("BAD SLUG");
+      expect(problem?.message).toContain("`#`, `?` or `%`");
+    }
+  });
+
+  test("rejects URL delimiters and escapes in a slug override", () => {
+    for (const slug of ["c#-tips", "why?", "100%"]) {
+      const [problem] = problems([
+        file("content/posts/a.md", `slug: "${slug}"`),
+      ]);
+
+      expect(problem?.title).toBe("BAD FRONTMATTER");
+      expect(problem?.span?.start).toEqual({ line: 2, column: 1 });
+    }
+  });
+
   test("rejects a slug that is not text", () => {
     const [problem] = problems([file("content/posts/a.md", "slug: 12")]);
 

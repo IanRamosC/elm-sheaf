@@ -320,10 +320,10 @@ function collisionProblems(documents: SourceDocument[]): Diagnostic[] {
 }
 
 const SLUG_RULE =
-  "A slug is a single path segment without `/`, `\\`, spaces or control characters.";
+  "A slug is a single path segment without `/`, `\\`, spaces or control characters, and without `#`, `?` or `%`, which would end or escape the URL path.";
 
 function isSlug(text: string): boolean {
-  return text !== "." && text !== ".." && /^[^/\\\s\p{Cc}]+$/u.test(text);
+  return text !== "." && text !== ".." && /^[^/\\\s\p{Cc}#?%]+$/u.test(text);
 }
 
 function parseSlug(value: unknown): Result<string, string> {
