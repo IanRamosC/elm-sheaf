@@ -1,6 +1,11 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { fixturePath } from "./support/fixtures";
+import {
+  copyFixture,
+  fixturePath,
+  removeFixtureCopies,
+} from "./support/fixtures";
 
 const ENTRY = join(import.meta.dir, "../src/index.ts");
 const SLOW = 60_000;
@@ -19,6 +24,8 @@ async function sheaf(args: string[], cwd: string) {
   ]);
   return { stdout, stderr, exitCode };
 }
+
+afterEach(removeFixtureCopies);
 
 describe("sheaf", () => {
   test(
@@ -48,6 +55,25 @@ describe("sheaf", () => {
       expect(stdout).toContain("content/posts/2026-11-23-hello-world.md:5:6");
       expect(stdout).toContain("^^^^");
       expect(stdout).toContain("Found 2 errors");
+    },
+    SLOW,
+  );
+
+  test(
+    "check names a misspelled frontmatter key and suggests the right one",
+    async () => {
+      const root = copyFixture("minimal");
+      const post = join(root, "content/posts/2026-11-23-hello-world.md");
+      writeFileSync(
+        post,
+        readFileSync(post, "utf8").replace("title:", "titel:"),
+      );
+
+      const { stdout, exitCode } = await sheaf(["check"], root);
+
+      expect(exitCode).toBe(1);
+      expect(stdout).toContain("-- UNKNOWN FIELD ---");
+      expect(stdout).toContain("Did you mean `title`?");
     },
     SLOW,
   );
