@@ -515,17 +515,18 @@ reservedKeyHint name =
 
 
 {-| Name an item by its whole path, innermost first: "the second item of its
-first item".
+first item". The path runs from the outermost list inwards.
 -}
 subject : List Int -> String
 subject itemPath =
-    case List.reverse itemPath of
+    case itemPath of
         [] ->
             "it"
 
-        outermost :: innerToOuter ->
-            (List.map (\index -> "the " ++ ordinal (index + 1) ++ " item") innerToOuter |> List.reverse)
+        outermost :: inner ->
+            (List.map (\index -> "the " ++ ordinal (index + 1) ++ " item") (List.reverse inner)
                 ++ [ "its " ++ ordinal (outermost + 1) ++ " item" ]
+            )
                 |> String.join " of "
 
 

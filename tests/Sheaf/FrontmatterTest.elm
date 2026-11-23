@@ -230,6 +230,45 @@ badFrontmatterTests =
                           , hint = Nothing
                           }
                         ]
+        , test "names a nested item outermost-last, whatever its position" <|
+            \_ ->
+                let
+                    grid : Frontmatter (List (List String))
+                    grid =
+                        Frontmatter.succeed identity
+                            |> Frontmatter.required "grid" (Frontmatter.list (Frontmatter.list Frontmatter.string))
+                in
+                decodeWith grid
+                    [ ( "grid", Encode.list (Encode.list identity) [ [ Encode.string "a", Encode.int 3 ] ] ) ]
+                    []
+                    |> problemsOf
+                    |> List.map .message
+                    |> Expect.equal
+                        [ "The `grid` field should be a list of lists of strings, but the second item of its first item is a number." ]
+        , test "names a three-level item from the inside out" <|
+            \_ ->
+                let
+                    cube : Frontmatter (List (List (List String)))
+                    cube =
+                        Frontmatter.succeed identity
+                            |> Frontmatter.required "cube" (Frontmatter.list (Frontmatter.list (Frontmatter.list Frontmatter.string)))
+                in
+                decodeWith cube
+                    [ ( "cube"
+                      , Encode.list identity
+                            [ Encode.list identity []
+                            , Encode.list identity
+                                [ Encode.list Encode.string [ "a" ]
+                                , Encode.list Encode.int [ 3 ]
+                                ]
+                            ]
+                      )
+                    ]
+                    []
+                    |> problemsOf
+                    |> List.map .message
+                    |> Expect.equal
+                        [ "The `cube` field should be a list of lists of lists of strings, but the first item of the second item of its second item is a number." ]
         , test "uses the right suffix for ordinals past ten" <|
             \_ ->
                 let
