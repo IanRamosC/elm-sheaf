@@ -417,7 +417,7 @@ collectionTests =
                           , message = "A route uses `Collection.named \"notse\"`, but there is no `content/notse` folder."
                           , sourcePath = Nothing
                           , span = Nothing
-                          , hint = Just "Did you mean `notes`?"
+                          , hint = Just "Did you mean `notes`?\n\nGit does not keep empty folders: add an empty `content/notse/.gitkeep` file and commit it."
                           }
                         , { severity = Error
                           , title = "UNKNOWN COLLECTION"
@@ -434,9 +434,17 @@ collectionTests =
                     |> .diagnostics
                     |> List.map .hint
                     |> Expect.equal
-                        [ Just "The folders in `content/` are `posts` and `pages`."
+                        [ Just "The folders in `content/` are `posts` and `pages`.\n\nGit does not keep empty folders: add an empty `content/recipes/.gitkeep` file and commit it."
                         , Just "The routes use `posts` and `recipes`."
                         ]
+        , test "a declared collection without a folder reminds that Git does not keep empty folders" <|
+            \_ ->
+                request [] []
+                    |> render [ postRoute ]
+                    |> .diagnostics
+                    |> List.map .hint
+                    |> Expect.equal
+                        [ Just "Git does not keep empty folders: add an empty `content/posts/.gitkeep` file and commit it." ]
         , test "an empty folder still counts as a collection" <|
             \_ ->
                 request [ "posts" ] []

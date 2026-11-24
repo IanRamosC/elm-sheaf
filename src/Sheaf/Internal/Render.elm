@@ -255,8 +255,19 @@ declaredWithoutFolder folders name =
     , message = "A route uses `Collection.named \"" ++ name ++ "\"`, but there is no `content/" ++ name ++ "` folder."
     , sourcePath = Nothing
     , span = Nothing
-    , hint = Hint.didYouMean (\names -> "The folders in `content/` are " ++ names ++ ".") folders name
+    , hint =
+        Hint.didYouMean (\names -> "The folders in `content/` are " ++ names ++ ".") folders name
+            |> Maybe.map (\suggestion -> suggestion ++ "\n\n" ++ emptyFolderHint name)
+            |> Maybe.withDefault (emptyFolderHint name)
+            |> Just
     }
+
+
+{-| An empty collection is a real case, and Git silently drops its folder.
+-}
+emptyFolderHint : String -> String
+emptyFolderHint name =
+    "Git does not keep empty folders: add an empty `content/" ++ name ++ "/.gitkeep` file and commit it."
 
 
 folderWithoutRoute : List String -> String -> Diagnostic

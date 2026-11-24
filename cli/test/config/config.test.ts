@@ -69,6 +69,20 @@ describe("parseConfig", () => {
     }
   });
 
+  test("rejects a siteUrl with a query or a fragment", () => {
+    for (const siteUrl of [
+      "https://example.com/?x=1",
+      "https://example.com/#top",
+    ]) {
+      const errors = errorsOf(`{"siteUrl":"${siteUrl}"}`);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.title).toBe("BAD CONFIG");
+      expect(errors[0]?.hint).toBe(
+        'Write the site\'s address without "?" or "#", such as https://example.com/blog/.',
+      );
+    }
+  });
+
   test("rejects a siteUrl that is not a string", () => {
     expect(errorsOf('{"siteUrl":42}')).toHaveLength(1);
   });

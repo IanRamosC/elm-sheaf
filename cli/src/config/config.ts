@@ -94,9 +94,16 @@ function parseSiteUrl(
     const url = new URL(value);
     // "localhost:3000" parses with "localhost:" as its scheme, so the scheme
     // has to be checked for a base path to exist at all.
-    return url.protocol === "http:" || url.protocol === "https:"
-      ? ok(url)
-      : notAFullUrl;
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return notAFullUrl;
+    }
+    if (url.search !== "" || url.hash !== "") {
+      return err({
+        message: `"${value}" has a query or a fragment.`,
+        hint: 'Write the site\'s address without "?" or "#", such as https://example.com/blog/.',
+      });
+    }
+    return ok(url);
   } catch {
     return notAFullUrl;
   }

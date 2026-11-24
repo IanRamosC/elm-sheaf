@@ -80,7 +80,7 @@ export function splitFrontmatter(
 
   return ok({
     data: parsed.value.data,
-    positions: { "": { value: openingFence }, ...parsed.value.positions },
+    positions: { ...parsed.value.positions, "": { value: openingFence } },
     body: lines.slice(closingIndex + 1).join("\n"),
     bodyStartLine: closingIndex + 2,
   });

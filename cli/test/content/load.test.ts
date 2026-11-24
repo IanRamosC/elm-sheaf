@@ -302,6 +302,26 @@ describe("loadContent errors", () => {
     expect(problem?.span?.start).toEqual({ line: 2, column: 1 });
   });
 
+  test("points a bad updated value at its key", () => {
+    const [problem] = problems([
+      file("content/posts/a.md", "updated: 2026-13-01"),
+    ]);
+
+    expect(problem).toMatchObject({
+      title: "BAD FRONTMATTER",
+      span: { start: { line: 2, column: 1 } },
+    });
+  });
+
+  test("points a date with no value at its key", () => {
+    const [problem] = problems([file("content/posts/a.md", "date:")]);
+
+    expect(problem).toMatchObject({
+      title: "BAD FRONTMATTER",
+      span: { start: { line: 2, column: 1 } },
+    });
+  });
+
   test("reports a malformed date prefix in the file name", () => {
     const [problem] = problems([file("content/posts/2026-13-45-a.md")]);
 

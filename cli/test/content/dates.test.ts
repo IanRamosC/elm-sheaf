@@ -34,6 +34,19 @@ describe("publicationInstant", () => {
     );
   });
 
+  test("starts the day at the change when midnight does not exist", () => {
+    // Sao Paulo skipped 00:00-01:00 on 2018-11-04, moving from -03:00 to -02:00.
+    expect(instant("2018-11-04", "America/Sao_Paulo")).toBe(
+      "2018-11-04T03:00:00.000Z",
+    );
+  });
+
+  test("reads a timestamp with a space instead of the T", () => {
+    expect(instant("2026-11-30 10:00:00+02:00", "UTC")).toBe(
+      "2026-11-30T08:00:00.000Z",
+    );
+  });
+
   test("takes a full timestamp with an offset as given", () => {
     expect(instant("2026-11-30T10:00:00+02:00", "UTC")).toBe(
       "2026-11-30T08:00:00.000Z",

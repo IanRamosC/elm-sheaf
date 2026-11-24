@@ -18,20 +18,27 @@ export function publicationInstant(
 ): Result<Date, string> {
   const dateOnly = DATE_ONLY.exec(date);
   if (dateOnly) {
-    const [, year, month, day] = dateOnly.map(Number);
-    return midnightIn(timezone, year as number, month as number, day as number);
+    return midnightIn(
+      timezone,
+      Number(dateOnly[1]),
+      Number(dateOnly[2]),
+      Number(dateOnly[3]),
+    );
   }
   const timestamp = TIMESTAMP_WITH_OFFSET.exec(date);
   if (timestamp) {
     // `new Date` rolls impossible values over (February 30th becomes March
     // 2nd, 24:00 the next day), so the parts are checked first.
-    const [, year, month, day, hour, minute] = timestamp.map(Number);
     const second = Number(timestamp[6] ?? 0);
     const instant = new Date(date);
     if (
-      isCalendarDate(year as number, month as number, day as number) &&
-      (hour as number) <= 23 &&
-      (minute as number) <= 59 &&
+      isCalendarDate(
+        Number(timestamp[1]),
+        Number(timestamp[2]),
+        Number(timestamp[3]),
+      ) &&
+      Number(timestamp[4]) <= 23 &&
+      Number(timestamp[5]) <= 59 &&
       second <= 59 &&
       !Number.isNaN(instant.getTime())
     ) {
@@ -70,10 +77,20 @@ function midnightIn(
   // measure it at the wall clock read as UTC, then once more at that first
   // estimate. The first reading can fall on the wrong side of a daylight
   // saving change by up to the offset itself; the second cannot, except in
-  // the hour a change skips or repeats, where any answer is a guess.
-  const estimate = wallClock.getTime() - offsetAt(wallClock, timezone);
+  // the hour a change skips or repeats.
+  const before = offsetAt(wallClock, timezone);
+  const after = offsetAt(new Date(wallClock.getTime() - before), timezone);
+  const midnight = wallClock.getTime() - after;
+
+  // Midnight fell in a gap if the answer reads as the evening before. The day
+  // then begins at the change itself: the wall clock read with the offset in
+  // force before it, which is the smaller one as clocks move forward. A day
+  // the zone skipped entirely (Pacific/Apia on 2011-12-30) thus resolves to
+  // the next day's midnight.
+  const inGap =
+    midnight + offsetAt(new Date(midnight), timezone) < wallClock.getTime();
   return ok(
-    new Date(wallClock.getTime() - offsetAt(new Date(estimate), timezone)),
+    new Date(inGap ? wallClock.getTime() - Math.min(before, after) : midnight),
   );
 }
 
@@ -95,8 +112,13 @@ function offsetAt(instant: Date, timezone: string): number {
   }).formatToParts(instant);
   const name = parts.find((part) => part.type === "timeZoneName")?.value ?? "";
   // "GMT" alone means UTC; otherwise "GMT+01:00" or "GMT-03:30".
-  const [, sign, hours, minutes] =
-    /^GMT(?:([+−-])(\d{2}):(\d{2}))?$/.exec(name) ?? [];
+  const match = /^GMT(?:([+−-])(\d{2}):(\d{2}))?$/.exec(name);
+  // `parseConfig` has already validated the timezone, so a name we cannot
+  // read is a bug here, not bad input.
+  if (match === null) {
+    throw new Error(`Cannot read the offset of ${timezone} from "${name}".`);
+  }
+  const [, sign, hours, minutes] = match;
   if (sign === undefined) return 0;
   const offset = (Number(hours) * 60 + Number(minutes)) * MINUTE;
   return sign === "+" ? offset : -offset;

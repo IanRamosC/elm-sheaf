@@ -64,6 +64,12 @@ describe("splitFrontmatter", () => {
     });
   });
 
+  test("keeps the root position on the opening fence when a key is empty", () => {
+    const result = split('---\n"": value\n---\nBody\n');
+
+    expect(result.positions[""]).toEqual({ value: span(1, 1, 1, 4) });
+  });
+
   test("treats a file without frontmatter as all body", () => {
     const result = split("Just text.\n");
 
