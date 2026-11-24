@@ -4,7 +4,11 @@ module RenderFixtures exposing
     , bodyAt
     , draft
     , error
+    , footnoteDefinition
+    , footnoteReference
     , headAt
+    , image
+    , link
     , markdownLink
     , metadata
     , page
@@ -16,10 +20,12 @@ module RenderFixtures exposing
     , postRoute
     , posts
     , render
+    , renderWithFeeds
     , request
     , requestUnder
     , requestWithSlugs
     , span
+    , textNode
     , titles
     )
 
@@ -30,6 +36,7 @@ import Json.Encode as Encode exposing (Value)
 import Sheaf
 import Sheaf.Collection as Collection exposing (Collection)
 import Sheaf.Document exposing (Document)
+import Sheaf.Feed exposing (Feed)
 import Sheaf.Frontmatter as Frontmatter exposing (Frontmatter)
 import Sheaf.Html as Html
 import Sheaf.Internal.Protocol exposing (Diagnostic, Response, Severity(..), Span)
@@ -79,7 +86,12 @@ page body =
 
 render : List Route -> Value -> Response
 render routes =
-    Render.render (Sheaf.site { metadata = metadata, routes = routes, feeds = [] })
+    renderWithFeeds routes []
+
+
+renderWithFeeds : List Route -> List Feed -> Value -> Response
+renderWithFeeds routes feeds =
+    Render.render (Sheaf.site { metadata = metadata, routes = routes, feeds = feeds })
 
 
 metadata : Sheaf.Metadata
@@ -99,6 +111,7 @@ type alias Source =
     { collection : String
     , slug : String
     , date : Maybe String
+    , updated : Maybe String
     , excluded : Bool
     , frontmatter : List ( String, Value )
     , positions : List ( String, Span )
@@ -111,6 +124,7 @@ post slug =
     { collection = "posts"
     , slug = slug
     , date = Nothing
+    , updated = Nothing
     , excluded = False
     , frontmatter = [ ( "title", Encode.string slug ) ]
     , positions = []
@@ -185,18 +199,21 @@ encodeSource source =
         , ( "collection", Encode.string source.collection )
         , ( "sourcePath", Encode.string (sourcePathOf source) )
         , ( "slug", Encode.string source.slug )
-        , ( "date"
-          , source.date
-                |> Maybe.map (\isoDate -> Encode.object [ ( "posixMillis", Encode.int (midnightUtc isoDate) ), ( "isoDate", Encode.string isoDate ) ])
-                |> Maybe.withDefault Encode.null
-          )
-        , ( "updated", Encode.null )
+        , ( "date", encodeDate source.date )
+        , ( "updated", encodeDate source.updated )
         , ( "draft", Encode.bool source.excluded )
         , ( "excluded", Encode.bool source.excluded )
         , ( "frontmatter", Encode.object source.frontmatter )
         , ( "frontmatterPositions", Encode.object (List.map (\( path, at ) -> ( path, Encode.object [ ( "value", encodeSpan at ) ] )) source.positions) )
         , ( "tree", markdownNode "root" [ ( "children", Encode.list identity source.body ) ] )
         ]
+
+
+encodeDate : Maybe String -> Value
+encodeDate date =
+    date
+        |> Maybe.map (\isoDate -> Encode.object [ ( "posixMillis", Encode.int (midnightUtc isoDate) ), ( "isoDate", Encode.string isoDate ) ])
+        |> Maybe.withDefault Encode.null
 
 
 {-| The instant of `YYYY-MM-DD` at midnight UTC, so that dated sources sort
@@ -295,6 +312,28 @@ markdownLink id at =
 
         _ ->
             Encode.null
+
+
+{-| A plain Markdown link to `url`.
+-}
+link : String -> Value
+link url =
+    markdownNode "link" [ ( "url", Encode.string url ), ( "children", Encode.list identity [ textNode "link" ] ) ]
+
+
+image : String -> Value
+image url =
+    markdownNode "image" [ ( "url", Encode.string url ), ( "alt", Encode.string "" ) ]
+
+
+footnoteReference : String -> Value
+footnoteReference identifier =
+    markdownNode "footnoteReference" [ ( "identifier", Encode.string identifier ) ]
+
+
+footnoteDefinition : String -> String -> Value
+footnoteDefinition identifier note =
+    markdownNode "footnoteDefinition" [ ( "identifier", Encode.string identifier ), ( "children", Encode.list identity [ paragraph [ textNode note ] ] ) ]
 
 
 

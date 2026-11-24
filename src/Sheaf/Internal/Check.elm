@@ -23,6 +23,7 @@ import Sheaf.Internal.Html as Html exposing (GroupLink, HtmlProblem(..), Url(..)
 import Sheaf.Internal.Protocol as Protocol exposing (Diagnostic, Severity(..))
 import Sheaf.Internal.Site exposing (Page)
 import Sheaf.Ref as Ref exposing (Ref)
+import Time
 
 
 
@@ -52,7 +53,8 @@ urlOf location =
 {-| A page a route made, before its links are resolved and it is checked.
 
 `route` is the route's place in the site's list, because two routes can have
-the same pattern.
+the same pattern. An item's page was last modified when its document was
+updated, which the sitemap tells search engines.
 
 -}
 type alias UncheckedPage =
@@ -60,6 +62,7 @@ type alias UncheckedPage =
     , routeName : String
     , location : Location
     , page : Page
+    , lastModified : Maybe Time.Posix
     }
 
 

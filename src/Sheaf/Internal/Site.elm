@@ -1,12 +1,12 @@
 module Sheaf.Internal.Site exposing
-    ( Site(..), Metadata, Feed, Route(..), Grouping, NamedGroup, ListedDocument, FrontmatterProblems, Pagination, Collection(..), Page
+    ( Site(..), Metadata, Feed(..), Description, Route(..), Grouping, NamedGroup, ListedDocument, FrontmatterProblems, Pagination, Collection(..), Page
     , nameOf, patternOf, collectionOf, itemPattern, listedCollection, perPageOf, groupingOf, groupedPattern
     )
 
 {-| The site a user declares, behind `Sheaf`, `Sheaf.Route` and
 `Sheaf.Collection`, which only expose ways to build it.
 
-@docs Site, Metadata, Feed, Route, Grouping, NamedGroup, ListedDocument, FrontmatterProblems, Pagination, Collection, Page
+@docs Site, Metadata, Feed, Description, Route, Grouping, NamedGroup, ListedDocument, FrontmatterProblems, Pagination, Collection, Page
 
 
 # What a route uses
@@ -38,11 +38,25 @@ type alias Metadata =
     Protocol.Metadata
 
 
-{-| A feed of the site. Nobody can make one yet, because
-`Never` has no values, so a site has no feeds.
+{-| A feed of the site: the paths of its RSS and Atom files, as written, and
+the collection it lists. It decodes a document's frontmatter for its title
+and summary, as an item route does for its template.
 -}
 type Feed
-    = Feed Never
+    = Feed
+        { rss : String
+        , atom : String
+        , collection : String
+        , describe : Protocol.Document -> Result (List Problem) Description
+        }
+
+
+{-| What a feed item says about its document, besides its content.
+-}
+type alias Description =
+    { title : String
+    , summary : Maybe String
+    }
 
 
 {-| A content folder and how to decode the frontmatter of its documents.

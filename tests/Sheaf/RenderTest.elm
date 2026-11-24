@@ -53,7 +53,7 @@ pageTests =
                               }
                             ]
                         , feeds = []
-                        , sitemap = []
+                        , sitemap = [ { url = "https://example.com/blog/posts/hello-world/", lastModified = Nothing } ]
                         , diagnostics = []
                         }
         , test "gives the template the document's ref, slug and date" <|
@@ -405,7 +405,7 @@ linkProblemTests =
                         }
         , test "a link to a collection without an item route has no page" <|
             \_ ->
-                request [ "notes" ] [ { collection = "notes", slug = "hello", date = Nothing, excluded = False, frontmatter = [], positions = [], body = [] } ]
+                request [ "notes" ] [ { collection = "notes", slug = "hello", date = Nothing, updated = Nothing, excluded = False, frontmatter = [], positions = [], body = [] } ]
                     |> render [ homeLinkingTo "notes/hello" ]
                     |> .diagnostics
                     |> List.filter (\diagnostic -> diagnostic.title == "NO PAGE FOR LINK")

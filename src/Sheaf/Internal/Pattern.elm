@@ -30,6 +30,7 @@ import Sheaf.Internal.Path as Path
   - `Listing`: page 1 at the pattern and page n under it, at `page/<n>/`.
   - `Grouped`: a page for each group, at `:group`.
   - `GroupedListing`: the pages of each group's listing, at `:group`.
+  - `File`: a file that is not a page, such as a feed.
 
 -}
 type Kind
@@ -38,6 +39,7 @@ type Kind
     | Listing
     | Grouped
     | GroupedListing
+    | File
 
 
 {-| A segment that a route replaces with a value of each page.
@@ -57,6 +59,7 @@ type Problem
     | UnknownPlaceholder String
     | MissingPlaceholder Placeholder
     | NotAFolder
+    | NotAFile
 
 
 {-| The first problem of a pattern for a kind of route, if it has one.
@@ -122,12 +125,16 @@ placeholderProblem kind patternSegments =
             Nothing
 
 
-{-| Later pages of a listing are written under its first one.
+{-| Later pages of a listing are written under its first one, and a file
+cannot be written as a folder's `index.html`.
 -}
 folderProblem : Kind -> String -> Maybe Problem
 folderProblem kind pattern =
     if (kind == Listing || kind == GroupedListing) && not (String.endsWith "/" pattern) then
         Just NotAFolder
+
+    else if kind == File && String.endsWith "/" pattern then
+        Just NotAFile
 
     else
         Nothing
@@ -161,6 +168,9 @@ placeholderOf kind =
             Nothing
 
         Listing ->
+            Nothing
+
+        File ->
             Nothing
 
 

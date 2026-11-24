@@ -12,16 +12,18 @@ import Dict exposing (Dict)
 import Json.Decode as Decode
 import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Check as Check exposing (CheckedPage, LinkProblem(..), Location(..), UncheckedPage)
+import Sheaf.Internal.Feed as Feed
 import Sheaf.Internal.Grouping as Grouping exposing (GroupPages, Grouped)
 import Sheaf.Internal.Hint as Hint
 import Sheaf.Internal.Html as Html exposing (Url(..))
 import Sheaf.Internal.Listing as Listing exposing (Body)
 import Sheaf.Internal.Markdown as Markdown
+import Sheaf.Internal.Output as Output exposing (Output(..))
 import Sheaf.Internal.Path as Path
 import Sheaf.Internal.Pattern as Pattern
-import Sheaf.Internal.Protocol as Protocol exposing (Diagnostic, Document, GroupSlug, Request, Response, Severity(..))
+import Sheaf.Internal.Protocol as Protocol exposing (Diagnostic, Document, GroupSlug, Request, Response, Severity(..), SitemapEntry)
 import Sheaf.Internal.RouteCheck as RouteCheck
-import Sheaf.Internal.Site as Site exposing (FrontmatterProblems, Page, Route(..), Site(..))
+import Sheaf.Internal.Site as Site exposing (Feed(..), FrontmatterProblems, Page, Route(..), Site(..))
 import Sheaf.Ref as Ref exposing (Ref)
 
 
@@ -82,9 +84,13 @@ renderSite (Site site) request =
             , slugs = request.slugs
             }
 
+        feedCollections : List String
+        feedCollections =
+            List.map collectionOfFeed site.feeds
+
         used : List String
         used =
-            usedCollections site.routes
+            unique (List.filterMap Site.collectionOf site.routes ++ feedCollections)
 
         published : List Document
         published =
@@ -110,8 +116,16 @@ renderSite (Site site) request =
         made =
             List.concatMap (\( index, route ) -> pagesOf context bodies groupings index route) goodRoutes
 
-        ( written, duplicates ) =
-            withoutDuplicates (List.filterMap Result.toMaybe made)
+        feeds : List (Result (List Diagnostic) Protocol.Feed)
+        feeds =
+            List.map (Feed.render context bodies) site.feeds
+
+        ( written, clashes ) =
+            Output.withoutClashes
+                (List.map PageFile (List.filterMap Result.toMaybe made)
+                    ++ List.concatMap Feed.outputs site.feeds
+                    ++ [ Sitemap ]
+                )
 
         groupPages : GroupPages
         groupPages =
@@ -128,19 +142,21 @@ renderSite (Site site) request =
                     }
                 )
                 written
+
+        good : List CheckedPage
+        good =
+            List.filter (\page -> List.isEmpty page.brokenLinks && List.isEmpty page.problems) checked
     in
     { site = site.metadata
-    , pages =
-        checked
-            |> List.filter (\page -> List.isEmpty page.brokenLinks && List.isEmpty page.problems)
-            |> List.map (write (urlTarget context groupPages) site.metadata.language)
-    , feeds = []
-    , sitemap = []
+    , pages = List.map (write (urlTarget context groupPages) site.metadata.language) good
+    , feeds = List.filterMap Result.toMaybe feeds
+    , sitemap = List.filterMap (sitemapEntry context) good
     , diagnostics =
         List.concat
             [ unique (List.filterMap RouteCheck.badRoute site.routes)
+            , List.concatMap errors feeds
             , unknownCollections used request.collections
-            , Listing.missingDates (unique (List.filterMap Site.listedCollection site.routes)) published
+            , Listing.missingDates (unique (List.filterMap Site.listedCollection site.routes ++ feedCollections)) published
             , List.concatMap (Tuple.second >> errors) bodies
             , Grouping.diagnostics goodRoutes groupings
 
@@ -148,16 +164,18 @@ renderSite (Site site) request =
             , unique (List.concatMap errors made)
             , Check.brokenLinkDiagnostics checked
             , List.concatMap .problems checked
-            , duplicates
+
+            -- A third route with the same pattern as the second repeats its message.
+            , unique clashes
             ]
     }
 
 
-{-| The collections the routes use, in the order they are first used.
+{-| A feed uses its collection, and lists it by date as a listing route does.
 -}
-usedCollections : List Route -> List String
-usedCollections routes =
-    unique (List.filterMap Site.collectionOf routes)
+collectionOfFeed : Feed -> String
+collectionOfFeed (Feed feed) =
+    feed.collection
 
 
 errors : Result (List e) a -> List e
@@ -320,7 +338,7 @@ pagesOf context bodies groupings index route =
     let
         madeAt : String -> Page -> UncheckedPage
         madeAt url page =
-            { route = index, routeName = Site.nameOf route, location = At url, page = page }
+            { route = index, routeName = Site.nameOf route, location = At url, page = page, lastModified = Nothing }
 
         groupedPages : (Grouped -> List (Result (List FrontmatterProblems) UncheckedPage)) -> List (Result (List Diagnostic) UncheckedPage)
         groupedPages pagesFor =
@@ -337,7 +355,7 @@ pagesOf context bodies groupings index route =
             [ Ok (madeAt single.pattern single.page) ]
 
         NotFound page ->
-            [ Ok { route = index, routeName = Site.nameOf route, location = InPlaceOfMissingPages, page = page } ]
+            [ Ok { route = index, routeName = Site.nameOf route, location = InPlaceOfMissingPages, page = page, lastModified = Nothing } ]
 
         EachItem item ->
             bodies
@@ -346,7 +364,22 @@ pagesOf context bodies groupings index route =
                     (\( document, body ) ->
                         case ( item.templateFor document, body ) of
                             ( Ok template, Ok html ) ->
-                                Just (Ok (madeAt (Pattern.fill Pattern.Slug document.slug item.pattern) (template html)))
+                                let
+                                    made : UncheckedPage
+                                    made =
+                                        madeAt (Pattern.fill Pattern.Slug document.slug item.pattern) (template html)
+
+                                    -- The host sends `updated` only when the author wrote one.
+                                    updated : Maybe Protocol.Date
+                                    updated =
+                                        case document.updated of
+                                            Just _ ->
+                                                document.updated
+
+                                            Nothing ->
+                                                document.date
+                                in
+                                Just (Ok { made | lastModified = Maybe.map .posix updated })
 
                             ( Err problems, _ ) ->
                                 Just (Err (List.map (Listing.frontmatterDiagnostic document) problems))
@@ -397,64 +430,28 @@ pagesOf context bodies groupings index route =
                 )
 
 
-{-| A pattern ending in `/` is a folder, written as its `index.html`.
+{-| An HTML page for search engines to find. The 404 page has no URL of its
+own, and a file such as `humans.txt` is not a page.
 -}
-pathOf : Location -> String
-pathOf location =
-    let
-        relative : String
-        relative =
-            Path.dropLeadingSlash (Check.urlOf location)
-    in
-    if relative == "" || String.endsWith "/" relative then
-        relative ++ "index.html"
+sitemapEntry : Context -> CheckedPage -> Maybe SitemapEntry
+sitemapEntry context { unchecked } =
+    case unchecked.location of
+        At url ->
+            if String.endsWith ".html" (Output.pathOf unchecked.location) then
+                Just { url = context.origin ++ Path.join context.basePath url, lastModified = unchecked.lastModified }
 
-    else
-        relative
+            else
+                Nothing
 
-
-{-| The first page at each path, and a diagnostic for every later one.
--}
-withoutDuplicates : List UncheckedPage -> ( List UncheckedPage, List Diagnostic )
-withoutDuplicates pages =
-    let
-        step : UncheckedPage -> ( Dict String UncheckedPage, List UncheckedPage, List Diagnostic ) -> ( Dict String UncheckedPage, List UncheckedPage, List Diagnostic )
-        step page ( seen, kept, duplicates ) =
-            let
-                path : String
-                path =
-                    pathOf page.location
-            in
-            case Dict.get path seen of
-                Just first ->
-                    ( seen, kept, duplicate path first page :: duplicates )
-
-                Nothing ->
-                    ( Dict.insert path page seen, page :: kept, duplicates )
-
-        ( _, written, found ) =
-            List.foldl step ( Dict.empty, [], [] ) pages
-    in
-    -- A third route with the same pattern as the second repeats its message.
-    ( List.reverse written, unique (List.reverse found) )
-
-
-duplicate : String -> UncheckedPage -> UncheckedPage -> Diagnostic
-duplicate path first second =
-    { severity = Error
-    , title = "DUPLICATE PAGE"
-    , message = "The routes `" ++ first.routeName ++ "` and `" ++ second.routeName ++ "` both make the page `" ++ path ++ "`."
-    , sourcePath = Nothing
-    , span = Nothing
-    , hint = Nothing
-    }
+        InPlaceOfMissingPages ->
+            Nothing
 
 
 {-| Resolve a page's URLs and render it.
 -}
 write : (Url -> Maybe String) -> String -> CheckedPage -> Protocol.Page
 write resolve language { unchecked, head } =
-    { path = pathOf unchecked.location
+    { path = Output.pathOf unchecked.location
     , html =
         Html.document
             { lang = language

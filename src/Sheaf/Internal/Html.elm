@@ -1,7 +1,7 @@
 module Sheaf.Internal.Html exposing
     ( Html, Attribute, Url(..), GroupLink, HtmlProblem(..)
     , text, node, attribute, booleanAttribute, sitePathAttribute, link, groupLink
-    , urls, resolveUrls
+    , urls, resolveUrls, rewriteUrls
     , toString, document, problems
     )
 
@@ -12,7 +12,7 @@ directly.
 
 @docs Html, Attribute, Url, GroupLink, HtmlProblem
 @docs text, node, attribute, booleanAttribute, sitePathAttribute, link, groupLink
-@docs urls, resolveUrls
+@docs urls, resolveUrls, rewriteUrls
 @docs toString, document, problems
 
 -}
@@ -182,6 +182,38 @@ resolveAttribute resolve attr =
             resolve url
                 |> Maybe.map (Valued name)
                 |> Maybe.withDefault attr
+
+        _ ->
+            attr
+
+
+{-| Rewrite the value of every `href` and `src` the tree already has, as a
+feed does to make each of them absolute.
+-}
+rewriteUrls : (String -> String) -> Html -> Html
+rewriteUrls rewrite html =
+    case html of
+        Text _ ->
+            html
+
+        Element tag attributes children ->
+            Element tag
+                (List.map (rewriteAttribute rewrite) attributes)
+                (List.map (rewriteUrls rewrite) children)
+
+        Link url children ->
+            Link url (List.map (rewriteUrls rewrite) children)
+
+
+rewriteAttribute : (String -> String) -> Attribute -> Attribute
+rewriteAttribute rewrite attr =
+    case attr of
+        Valued name value ->
+            if name == "href" || name == "src" then
+                Valued name (rewrite value)
+
+            else
+                attr
 
         _ ->
             attr
