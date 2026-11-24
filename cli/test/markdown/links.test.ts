@@ -152,6 +152,8 @@ describe("checkLinks", () => {
       "/notes.pdf",
       "../b/",
       "//example.com/readme.md",
+      "../v1.2/",
+      "../node.js-tips/",
     ]) {
       expect(linkIn(`[x](${url})`)).toMatchObject({ type: "link", url });
     }
@@ -199,6 +201,31 @@ describe("checkLinks", () => {
     expect(errorsFor("[x]\n\n[x]: posts:helo\n")[0]?.span).toEqual({
       start: { line: 1, column: 1 },
       end: { line: 1, column: 4 },
+    });
+  });
+
+  test("keeps the whole span of a reference link whose label holds an image", () => {
+    expect(
+      errorsFor("[![img](a.png)][r]\n\n[r]: posts:helo\n")[0]?.span,
+    ).toEqual({
+      start: { line: 1, column: 1 },
+      end: { line: 1, column: 19 },
+    });
+  });
+
+  test("never looks past a reference link into the next link", () => {
+    const body =
+      "[![badge](https://x/b.svg)][r] and [y](https://e.com)\n\n[r]: posts:helo\n";
+    expect(errorsFor(body)[0]?.span).toEqual({
+      start: { line: 1, column: 1 },
+      end: { line: 1, column: 31 },
+    });
+  });
+
+  test("ends an angle-bracketed destination at its unescaped `>`", () => {
+    expect(errorsFor("[y](<a\\>b.md>)")[0]?.span).toEqual({
+      start: { line: 1, column: 6 },
+      end: { line: 1, column: 13 },
     });
   });
 

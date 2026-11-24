@@ -181,10 +181,13 @@ export function checkLinks(
     const [beforeFragment, fragment] = splitFragment(link.url);
     const [encodedPath = ""] = beforeFragment.split("?");
     // A root-relative link to anything but a document points into `static/`,
-    // and a path without an extension, such as `../b/`, is a page URL.
+    // and a path ending in `/` or without an extension, such as `../b/`, is a
+    // page URL. `../v1.2/` has an extension to `extname`, but names a folder.
     const checked = encodedPath.endsWith(".md")
       ? !encodedPath.startsWith("//")
-      : !encodedPath.startsWith("/") && posix.extname(encodedPath) !== "";
+      : !encodedPath.startsWith("/") &&
+        !encodedPath.endsWith("/") &&
+        posix.extname(encodedPath) !== "";
     return checked ? checkPathLink(link, encodedPath, fragment) : ok(link);
   }
 
@@ -235,21 +238,28 @@ class BodySource {
     if (written.startsWith("<") && written.endsWith(">")) {
       return this.spanBetween(start + 1, end - 1);
     }
-    if (!written.startsWith("[") || !written.includes("](")) {
-      return link.position;
-    }
+    if (!written.startsWith("[")) return link.position;
     const lastChild = link.children.at(-1);
     const labelEnd = lastChild
       ? this.offsetOf(lastChild.position.end)
       : start + 1;
-    let from = this.text.indexOf("](", labelEnd) + 2;
+    // Only an inline link has `](` right after its label. A `](` anywhere
+    // else belongs to something inside the label, such as an image, or to
+    // the text after a reference link.
+    if (!this.text.startsWith("](", labelEnd)) return link.position;
+    let from = labelEnd + 2;
     while (from < end && /\s/.test(this.text.charAt(from))) from++;
-    if (this.text.charAt(from) === "<") {
-      return this.spanBetween(from + 1, this.text.indexOf(">", from));
+    if (this.text.charAt(from) !== "<") {
+      let to = from;
+      while (to < end && !/[\s)]/.test(this.text.charAt(to))) to++;
+      return this.spanBetween(from, to);
     }
-    let to = from;
-    while (to < end && !/[\s)]/.test(this.text.charAt(to))) to++;
-    return this.spanBetween(from, to);
+    for (let to = from + 1; to < end; to++) {
+      const character = this.text.charAt(to);
+      if (character === ">") return this.spanBetween(from + 1, to);
+      if (character === "\\") to++;
+    }
+    return link.position;
   }
 
   private offsetOf({ line, column }: Position): number {
