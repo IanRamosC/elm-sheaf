@@ -1,9 +1,9 @@
-module Sheaf.Internal.Site exposing (Site(..), Route(..), Collection(..), Page)
+module Sheaf.Internal.Site exposing (Site(..), Metadata, Feed, Route(..), Collection(..), Page)
 
 {-| The site a user declares, behind `Sheaf`, `Sheaf.Route` and
 `Sheaf.Collection`, which only expose ways to build it.
 
-@docs Site, Route, Collection, Page
+@docs Site, Metadata, Feed, Route, Collection, Page
 
 -}
 
@@ -12,13 +12,27 @@ import Sheaf.Internal.Frontmatter exposing (Frontmatter, Problem)
 import Sheaf.Internal.Protocol as Protocol
 
 
-{-| Every route of the site, and the language of its pages.
+{-| What the site says about itself, and every route and feed of it.
 -}
 type Site
     = Site
-        { language : String
+        { metadata : Metadata
         , routes : List Route
+        , feeds : List Feed
         }
+
+
+{-| The site's title, description, author and the language of its pages.
+-}
+type alias Metadata =
+    Protocol.Metadata
+
+
+{-| A feed of the site. Nobody can make one yet, because
+`Never` has no values, so a site has no feeds.
+-}
+type Feed
+    = Feed Never
 
 
 {-| A content folder and how to decode the frontmatter of its documents.

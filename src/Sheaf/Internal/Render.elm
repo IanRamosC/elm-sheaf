@@ -27,13 +27,16 @@ one build reports as many problems as it can.
 
 -}
 render : Site -> Decode.Value -> Response
-render site json =
+render ((Site { metadata }) as site) json =
     case Decode.decodeValue Protocol.requestDecoder json of
         Ok request ->
             renderSite site request
 
         Err problem ->
-            { pages = []
+            { site = metadata
+            , pages = []
+            , feeds = []
+            , sitemap = []
             , diagnostics =
                 [ { severity = Error
                   , title = "BAD REQUEST"
@@ -89,9 +92,12 @@ renderSite (Site site) request =
 
         finished : List (Result (List Diagnostic) Protocol.Page)
         finished =
-            List.map (finish context site.language) written
+            List.map (finish context site.metadata.language) written
     in
-    { pages = List.filterMap Result.toMaybe finished
+    { site = site.metadata
+    , pages = List.filterMap Result.toMaybe finished
+    , feeds = []
+    , sitemap = []
     , diagnostics =
         List.concat
             [ unique (List.filterMap badRoute site.routes)

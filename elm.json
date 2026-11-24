@@ -8,6 +8,7 @@
         "Sheaf",
         "Sheaf.Collection",
         "Sheaf.Document",
+        "Sheaf.Feed",
         "Sheaf.Frontmatter",
         "Sheaf.Html",
         "Sheaf.Html.Attributes",

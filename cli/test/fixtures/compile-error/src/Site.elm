@@ -6,6 +6,12 @@ import Sheaf
 site : Sheaf.Site
 site =
     Sheaf.site
-        { language = 1
+        { metadata =
+            { title = "Test site"
+            , description = "A site for tests."
+            , author = { name = "Ada", email = Nothing }
+            , language = 1
+            }
         , routes = []
+        , feeds = []
         }

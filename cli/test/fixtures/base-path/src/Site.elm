@@ -21,10 +21,16 @@ posts =
 site : Sheaf.Site
 site =
     Sheaf.site
-        { language = "en"
+        { metadata =
+            { title = "Test site"
+            , description = "A site for tests."
+            , author = { name = "Ada", email = Nothing }
+            , language = "en"
+            }
         , routes =
             [ Route.eachItem "/posts/:slug/"
                 posts
                 (\post -> { title = post.meta.title, body = post.body })
             ]
+        , feeds = []
         }

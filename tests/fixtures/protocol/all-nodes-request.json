@@ -1,10 +1,18 @@
 {
-  "protocolVersion": 1,
+  "protocolVersion": 2,
   "build": {
     "siteUrl": "https://example.com",
+    "origin": "https://example.com",
     "basePath": "/blog",
     "mode": "drafts"
   },
+  "slugs": [
+    {
+      "value": "Elm",
+      "slug": "elm",
+      "folded": "elm"
+    }
+  ],
   "collections": [
     "pages",
     "posts"

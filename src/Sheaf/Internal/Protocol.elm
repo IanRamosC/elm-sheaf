@@ -1,9 +1,9 @@
 module Sheaf.Internal.Protocol exposing
-    ( Request, Build, BuildMode(..), Document, Date
+    ( Request, Build, BuildMode(..), GroupSlug, Document, Date
     , Span, Position, FieldPosition
     , Node(..), Container, Alignment(..)
     , requestDecoder
-    , Response, Page, Diagnostic, Severity(..), encodeResponse
+    , Response, Metadata, Page, Feed, FeedItem, SitemapEntry, Diagnostic, Severity(..), encodeResponse
     )
 
 {-| The JSON the host and the Elm worker exchange.
@@ -14,11 +14,11 @@ change to one side is a change to the other.
 
 It is not exposed by the package.
 
-@docs Request, Build, BuildMode, Document, Date
+@docs Request, Build, BuildMode, GroupSlug, Document, Date
 @docs Span, Position, FieldPosition
 @docs Node, Container, Alignment
 @docs requestDecoder
-@docs Response, Page, Diagnostic, Severity, encodeResponse
+@docs Response, Metadata, Page, Feed, FeedItem, SitemapEntry, Diagnostic, Severity, encodeResponse
 
 -}
 
@@ -35,20 +35,24 @@ import Time
 {-| Everything the host knows about the site.
 
 `collections` names every folder in `content/`, including empty ones, which
-have no documents.
+have no documents. `slugs` is the host's table of group slugs, by the value
+that was slugged.
 
 -}
 type alias Request =
     { build : Build
+    , slugs : Dict String GroupSlug
     , collections : List String
     , documents : List Document
     }
 
 
-{-| How this build was invoked.
+{-| How this build was invoked. `origin` has no trailing slash, so an
+absolute URL is `origin ++ url`, where `url` already has the base path.
 -}
 type alias Build =
     { siteUrl : String
+    , origin : String
     , basePath : String
     , mode : BuildMode
     }
@@ -59,6 +63,15 @@ type alias Build =
 type BuildMode
     = Production
     | Drafts
+
+
+{-| The slug a frontmatter value groups under. `folded` is the value with its
+case and accents removed, to tell when two values would share a slug.
+-}
+type alias GroupSlug =
+    { slug : String
+    , folded : String
+    }
 
 
 {-| One Markdown file, with its reserved frontmatter keys already resolved.
@@ -108,7 +121,7 @@ type alias FieldPosition =
 -}
 protocolVersion : Int
 protocolVersion =
-    1
+    2
 
 
 {-| Decodes the host's request, which must speak this protocol version.
@@ -119,8 +132,9 @@ requestDecoder =
         |> Decode.andThen
             (\version ->
                 if version == protocolVersion then
-                    Decode.map3 Request
+                    Decode.map4 Request
                         (Decode.field "build" buildDecoder)
+                        (Decode.field "slugs" slugsDecoder)
                         (Decode.field "collections" (Decode.list Decode.string))
                         (Decode.field "documents" (Decode.list documentDecoder))
 
@@ -136,10 +150,22 @@ requestDecoder =
 
 buildDecoder : Decoder Build
 buildDecoder =
-    Decode.map3 Build
+    Decode.map4 Build
         (Decode.field "siteUrl" Decode.string)
+        (Decode.field "origin" Decode.string)
         (Decode.field "basePath" Decode.string)
         (Decode.field "mode" buildModeDecoder)
+
+
+slugsDecoder : Decoder (Dict String GroupSlug)
+slugsDecoder =
+    Decode.list
+        (Decode.map3 (\value slug folded -> ( value, { slug = slug, folded = folded } ))
+            (Decode.field "value" Decode.string)
+            (Decode.field "slug" Decode.string)
+            (Decode.field "folded" Decode.string)
+        )
+        |> Decode.map Dict.fromList
 
 
 buildModeDecoder : Decoder BuildMode
@@ -429,11 +455,25 @@ alignmentDecoder =
 -- RESPONSE
 
 
-{-| What the worker sends back.
+{-| What the worker sends back. `feeds` and `sitemap` are what the host
+writes besides the pages.
 -}
 type alias Response =
-    { pages : List Page
+    { site : Metadata
+    , pages : List Page
+    , feeds : List Feed
+    , sitemap : List SitemapEntry
     , diagnostics : List Diagnostic
+    }
+
+
+{-| What the site says about itself, for feeds and the sitemap.
+-}
+type alias Metadata =
+    { title : String
+    , description : String
+    , author : { name : String, email : Maybe String }
+    , language : String
     }
 
 
@@ -442,6 +482,37 @@ type alias Response =
 type alias Page =
     { path : String
     , html : String
+    }
+
+
+{-| An RSS and an Atom file for the same items. The paths are relative to
+`dist/`, without the base path.
+-}
+type alias Feed =
+    { rss : String
+    , atom : String
+    , items : List FeedItem
+    }
+
+
+{-| One entry of a feed. `url` is absolute.
+-}
+type alias FeedItem =
+    { documentId : String
+    , url : String
+    , title : String
+    , summary : Maybe String
+    , html : String
+    , date : Time.Posix
+    , updated : Time.Posix
+    }
+
+
+{-| A page for search engines to find. `url` is absolute.
+-}
+type alias SitemapEntry =
+    { url : String
+    , lastModified : Maybe Time.Posix
     }
 
 
@@ -464,15 +535,69 @@ type Severity
     | Warning
 
 
-{-| The response as the host decodes it. Missing optional fields are left out
-rather than sent as `null`.
+{-| The response as the host decodes it. Missing fields of a diagnostic are
+left out, while the optional fields of the site, feeds and sitemap are sent as
+`null`.
 -}
 encodeResponse : Response -> Encode.Value
 encodeResponse response =
     Encode.object
-        [ ( "pages", Encode.list encodePage response.pages )
+        [ ( "site", encodeMetadata response.site )
+        , ( "pages", Encode.list encodePage response.pages )
+        , ( "feeds", Encode.list encodeFeed response.feeds )
+        , ( "sitemap", Encode.list encodeSitemapEntry response.sitemap )
         , ( "diagnostics", Encode.list encodeDiagnostic response.diagnostics )
         ]
+
+
+encodeMetadata : Metadata -> Encode.Value
+encodeMetadata metadata =
+    Encode.object
+        [ ( "title", Encode.string metadata.title )
+        , ( "description", Encode.string metadata.description )
+        , ( "author"
+          , Encode.object
+                [ ( "name", Encode.string metadata.author.name )
+                , ( "email", encodeNullable Encode.string metadata.author.email )
+                ]
+          )
+        , ( "language", Encode.string metadata.language )
+        ]
+
+
+encodeFeed : Feed -> Encode.Value
+encodeFeed feed =
+    Encode.object
+        [ ( "rss", Encode.string feed.rss )
+        , ( "atom", Encode.string feed.atom )
+        , ( "items", Encode.list encodeFeedItem feed.items )
+        ]
+
+
+encodeFeedItem : FeedItem -> Encode.Value
+encodeFeedItem item =
+    Encode.object
+        [ ( "documentId", Encode.string item.documentId )
+        , ( "url", Encode.string item.url )
+        , ( "title", Encode.string item.title )
+        , ( "summary", encodeNullable Encode.string item.summary )
+        , ( "html", Encode.string item.html )
+        , ( "date", Encode.int (Time.posixToMillis item.date) )
+        , ( "updated", Encode.int (Time.posixToMillis item.updated) )
+        ]
+
+
+encodeSitemapEntry : SitemapEntry -> Encode.Value
+encodeSitemapEntry entry =
+    Encode.object
+        [ ( "url", Encode.string entry.url )
+        , ( "lastModified", encodeNullable (Time.posixToMillis >> Encode.int) entry.lastModified )
+        ]
+
+
+encodeNullable : (a -> Encode.Value) -> Maybe a -> Encode.Value
+encodeNullable encode maybe =
+    maybe |> Maybe.map encode |> Maybe.withDefault Encode.null
 
 
 encodePage : Page -> Encode.Value

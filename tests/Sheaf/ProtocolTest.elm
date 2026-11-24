@@ -38,7 +38,19 @@ requestTests =
                 decodeRequest ProtocolFixtures.minimalRequest
                     |> Result.map .build
                     |> Expect.equal
-                        (Ok { siteUrl = "https://example.com", basePath = "/blog", mode = Production })
+                        (Ok { siteUrl = "https://example.com", origin = "https://example.com", basePath = "/blog", mode = Production })
+        , test "decodes the slug table by value" <|
+            \_ ->
+                decodeRequest ProtocolFixtures.minimalRequest
+                    |> Result.map .slugs
+                    |> Expect.equal
+                        (Ok
+                            (Dict.fromList
+                                [ ( "Elm", { slug = "elm", folded = "elm" } )
+                                , ( "Café", { slug = "cafe", folded = "cafe" } )
+                                ]
+                            )
+                        )
         , test "decodes the names of the collections" <|
             \_ ->
                 decodeRequest ProtocolFixtures.allNodesRequest
@@ -95,7 +107,7 @@ requestTests =
         , test "rejects another protocol version" <|
             \_ ->
                 ProtocolFixtures.minimalRequest
-                    |> String.replace "\"protocolVersion\": 1" "\"protocolVersion\": 2"
+                    |> String.replace "\"protocolVersion\": 2" "\"protocolVersion\": 1"
                     |> decodeRequest
                     |> Result.mapError (always ())
                     |> Expect.equal (Err ())
@@ -151,7 +163,32 @@ responseTests =
                 let
                     response : Protocol.Response
                     response =
-                        { pages = [ { path = "posts/hello-world/index.html", html = "<p>Hello</p>" } ]
+                        { site =
+                            { title = "Example"
+                            , description = "A site."
+                            , author = { name = "Ada", email = Nothing }
+                            , language = "en"
+                            }
+                        , pages = [ { path = "posts/hello-world/index.html", html = "<p>Hello</p>" } ]
+                        , feeds =
+                            [ { rss = "feed.xml"
+                              , atom = "atom.xml"
+                              , items =
+                                    [ { documentId = "posts/hello-world"
+                                      , url = "https://example.com/blog/posts/hello-world/"
+                                      , title = "Hello"
+                                      , summary = Nothing
+                                      , html = "<p>Hello</p>"
+                                      , date = Time.millisToPosix 1767225600000
+                                      , updated = Time.millisToPosix 1767312000000
+                                      }
+                                    ]
+                              }
+                            ]
+                        , sitemap =
+                            [ { url = "https://example.com/blog/", lastModified = Just (Time.millisToPosix 1767312000000) }
+                            , { url = "https://example.com/blog/about/", lastModified = Nothing }
+                            ]
                         , diagnostics =
                             [ { severity = Error
                               , title = "Unresolved link"

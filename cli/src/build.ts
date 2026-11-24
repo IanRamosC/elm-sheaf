@@ -8,6 +8,7 @@ import {
   readCollectionNames,
   readContentFiles,
 } from "./content/load";
+import { slugTable } from "./content/slug";
 import type { Diagnostic } from "./diagnostics/diagnostic";
 import { compileElm, findElm } from "./elm/compile";
 import { generateElm } from "./elm/generate";
@@ -87,6 +88,7 @@ export async function build(
     },
     collections,
     parsed.value,
+    slugTable(documents.value),
   );
   const ran = await runElm(compiled.value, request);
   if (!ran.ok) return ran;

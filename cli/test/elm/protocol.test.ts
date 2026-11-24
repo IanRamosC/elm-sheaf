@@ -47,16 +47,31 @@ describe("encodeRequest", () => {
   for (const name of ["minimal-request", "all-nodes-request"]) {
     test(`produces the ${name} fixture`, () => {
       const expected = fixture(name) as Request;
-      expect(PROTOCOL_VERSION).toBe(1);
+      expect(PROTOCOL_VERSION).toBe(2);
       expect(
         encodeRequest(
           expected.build,
           expected.collections,
           sourcesOf(expected),
+          expected.slugs,
         ),
       ).toEqual(expected);
     });
   }
+
+  test("sends the origin of the site URL, without its base path", () => {
+    const request = encodeRequest(
+      {
+        siteUrl: "https://example.com/blog/",
+        basePath: "/blog/",
+        mode: "production",
+      },
+      [],
+      [],
+      [],
+    );
+    expect(request.build.origin).toBe("https://example.com");
+  });
 });
 
 describe("the all-nodes fixture tree", () => {
@@ -93,14 +108,22 @@ describe("decodeResponse", () => {
     });
   });
 
+  test("decodes a response whose optional fields are null", () => {
+    const result = decodeResponse(fixture("response-with-diagnostic"));
+    if (!result.ok) throw new Error(result.error);
+    expect(result.value.site.author.email).toBeNull();
+    expect(result.value.feeds[0]?.items[0]?.summary).toBeNull();
+    expect(result.value.sitemap[1]?.lastModified).toBeNull();
+  });
+
   test("rejects a response that is not an object", () => {
     expect(decodeResponse("nope").ok).toBe(false);
   });
 
   test("names the field that is wrong", () => {
     const result = decodeResponse({
+      ...(fixture("response-with-diagnostic") as Response),
       pages: [{ path: "a/index.html" }],
-      diagnostics: [],
     });
     expect(result).toEqual({
       ok: false,
@@ -110,7 +133,7 @@ describe("decodeResponse", () => {
 
   test("rejects an unknown severity", () => {
     const result = decodeResponse({
-      pages: [],
+      ...(fixture("response-with-diagnostic") as Response),
       diagnostics: [{ severity: "fatal", title: "t", message: "m" }],
     });
     expect(result).toEqual({

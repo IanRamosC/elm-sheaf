@@ -1,4 +1,4 @@
-module Sheaf exposing (Site, site, link)
+module Sheaf exposing (Site, Metadata, site, withRoutes, withFeeds, link)
 
 {-| Sheaf is a static site generator whose templates are written in Elm.
 
@@ -29,11 +29,17 @@ from `content/posts/`, with one reference per document:
     site : Sheaf.Site
     site =
         Sheaf.site
-            { language = "en"
+            { metadata =
+                { title = "My blog"
+                , description = "Notes on Elm."
+                , author = { name = "Ada Lovelace", email = Nothing }
+                , language = "en"
+                }
             , routes =
                 [ Route.single "/" home
                 , Route.eachItem "/posts/:slug/" posts post
                 ]
+            , feeds = []
             }
 
     home : Page
@@ -48,10 +54,11 @@ from `content/posts/`, with one reference per document:
         , body = [ article [] (h1 [] [ text document.meta.title ] :: document.body) ]
         }
 
-@docs Site, site, link
+@docs Site, Metadata, site, withRoutes, withFeeds, link
 
 -}
 
+import Sheaf.Feed exposing (Feed)
 import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Html as Html
 import Sheaf.Internal.Site as Internal
@@ -65,12 +72,35 @@ type alias Site =
     Internal.Site
 
 
-{-| A site with these routes, whose pages are in `language` (for the `lang`
-attribute of `<html>`).
+{-| The title, description and author of the site, and the language of its
+pages (for the `lang` attribute of `<html>`).
 -}
-site : { language : String, routes : List Route } -> Site
+type alias Metadata =
+    Internal.Metadata
+
+
+{-| A site with these routes and feeds.
+-}
+site : { metadata : Metadata, routes : List Route, feeds : List Feed } -> Site
 site =
     Internal.Site
+
+
+{-| Adds routes after the ones the site has.
+
+    Blog.site config |> Sheaf.withRoutes [ Route.single "/about/" about ]
+
+-}
+withRoutes : List Route -> Site -> Site
+withRoutes extra (Internal.Site site_) =
+    Internal.Site { site_ | routes = site_.routes ++ extra }
+
+
+{-| Adds feeds after the ones the site has.
+-}
+withFeeds : List Feed -> Site -> Site
+withFeeds extra (Internal.Site site_) =
+    Internal.Site { site_ | feeds = site_.feeds ++ extra }
 
 
 {-| A link to a document, such as `Sheaf.link Content.Posts.helloWorld [ text "Hello" ]`.

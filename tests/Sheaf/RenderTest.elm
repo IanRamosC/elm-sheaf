@@ -27,6 +27,7 @@ suite =
         , duplicateTests
         , badRouteTests
         , badRequestTests
+        , siteTests
         ]
 
 
@@ -71,7 +72,16 @@ page body =
 
 render : List Route -> Value -> Response
 render routes =
-    Render.render (Sheaf.site { language = "en", routes = routes })
+    Render.render (Sheaf.site { metadata = metadata, routes = routes, feeds = [] })
+
+
+metadata : Sheaf.Metadata
+metadata =
+    { title = "Example"
+    , description = "A site."
+    , author = { name = "Ada", email = Just "ada@example.com" }
+    , language = "en"
+    }
 
 
 
@@ -114,14 +124,16 @@ draft slug =
 request : List String -> List Source -> Value
 request collections sources =
     Encode.object
-        [ ( "protocolVersion", Encode.int 1 )
+        [ ( "protocolVersion", Encode.int 2 )
         , ( "build"
           , Encode.object
                 [ ( "siteUrl", Encode.string "https://example.com/blog/" )
+                , ( "origin", Encode.string "https://example.com" )
                 , ( "basePath", Encode.string "/blog/" )
                 , ( "mode", Encode.string "production" )
                 ]
           )
+        , ( "slugs", Encode.list identity [] )
         , ( "collections", Encode.list Encode.string collections )
         , ( "documents", Encode.list encodeSource sources )
         ]
@@ -256,11 +268,14 @@ pageTests =
                 request [ "posts" ] [ post "hello-world" ]
                     |> render [ postRoute ]
                     |> Expect.equal
-                        { pages =
+                        { site = metadata
+                        , pages =
                             [ { path = "posts/hello-world/index.html"
                               , html = "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>hello-world</title></head><body><article><h1>hello-world</h1><p>Hi</p></article></body></html>"
                               }
                             ]
+                        , feeds = []
+                        , sitemap = []
                         , diagnostics = []
                         }
         , test "gives the template the document's ref, slug and date" <|
@@ -379,7 +394,10 @@ frontmatterTests =
                 request [ "posts" ] [ source ]
                     |> render [ postRoute ]
                     |> Expect.equal
-                        { pages = []
+                        { site = metadata
+                        , pages = []
+                        , feeds = []
+                        , sitemap = []
                         , diagnostics =
                             [ { severity = Error
                               , title = "BAD FRONTMATTER"
@@ -480,7 +498,10 @@ linkProblemTests =
                 request [ "posts" ] [ linkingToDraft, draft "secret-plans" ]
                     |> render [ postRoute ]
                     |> Expect.equal
-                        { pages = []
+                        { site = metadata
+                        , pages = []
+                        , feeds = []
+                        , sitemap = []
                         , diagnostics =
                             [ { severity = Error
                               , title = "LINK TO DRAFT"
@@ -518,7 +539,10 @@ linkProblemTests =
                             (\_ -> page [ Sheaf.link (Ref.fromId "posts/secret-plans") [ Html.text "Plans" ] ])
                         ]
                     |> Expect.equal
-                        { pages = []
+                        { site = metadata
+                        , pages = []
+                        , feeds = []
+                        , sitemap = []
                         , diagnostics =
                             [ { severity = Error
                               , title = "LINK TO DRAFT"
@@ -566,7 +590,10 @@ invalidHtmlTests =
                 request [] []
                     |> render [ Route.single "/" (page [ Html.node "style" [] [ Html.text "p { color: red }" ] ]) ]
                     |> Expect.equal
-                        { pages = []
+                        { site = metadata
+                        , pages = []
+                        , feeds = []
+                        , sitemap = []
                         , diagnostics =
                             [ { severity = Error
                               , title = "INVALID HTML"
@@ -714,9 +741,40 @@ badRequestTests =
                         ]
         , test "names a protocol version mismatch" <|
             \_ ->
-                Encode.object [ ( "protocolVersion", Encode.int 2 ) ]
+                Encode.object [ ( "protocolVersion", Encode.int 1 ) ]
                     |> render []
                     |> .diagnostics
-                    |> List.map (.message >> String.contains "protocol version 2")
+                    |> List.map (.message >> (\message -> String.contains "protocol version 1" message && String.contains "speaks 2" message))
                     |> Expect.equal [ True ]
+        ]
+
+
+
+-- THE SITE METADATA
+
+
+siteTests : Test
+siteTests =
+    describe "the site"
+        [ test "the response carries the declared metadata" <|
+            \_ ->
+                request [] []
+                    |> render []
+                    |> .site
+                    |> Expect.equal metadata
+        , test "the metadata is sent even when the request is bad" <|
+            \_ ->
+                Encode.string "nope"
+                    |> render []
+                    |> .site
+                    |> Expect.equal metadata
+        , test "withRoutes adds routes after the existing ones" <|
+            \_ ->
+                request [] []
+                    |> Render.render
+                        (Sheaf.site { metadata = metadata, routes = [ Route.single "/" (page []) ], feeds = [] }
+                            |> Sheaf.withRoutes [ Route.single "/about/" (page []) ]
+                        )
+                    |> paths
+                    |> Expect.equal [ "index.html", "about/index.html" ]
         ]

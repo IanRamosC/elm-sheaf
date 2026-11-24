@@ -1,8 +1,44 @@
 {
+  "site": {
+    "title": "Example",
+    "description": "A site.",
+    "author": {
+      "name": "Ada",
+      "email": null
+    },
+    "language": "en"
+  },
   "pages": [
     {
       "path": "posts/hello-world/index.html",
       "html": "<p>Hello</p>"
+    }
+  ],
+  "feeds": [
+    {
+      "rss": "feed.xml",
+      "atom": "atom.xml",
+      "items": [
+        {
+          "documentId": "posts/hello-world",
+          "url": "https://example.com/blog/posts/hello-world/",
+          "title": "Hello",
+          "summary": null,
+          "html": "<p>Hello</p>",
+          "date": 1767225600000,
+          "updated": 1767312000000
+        }
+      ]
+    }
+  ],
+  "sitemap": [
+    {
+      "url": "https://example.com/blog/",
+      "lastModified": 1767312000000
+    },
+    {
+      "url": "https://example.com/blog/about/",
+      "lastModified": null
     }
   ],
   "diagnostics": [

@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseConfig } from "../../src/config/config";
 import { loadContent, readContentFiles } from "../../src/content/load";
+import { slugTable } from "../../src/content/slug";
 import { renderDiagnostic } from "../../src/diagnostics/render";
 import { compileElm, findElm } from "../../src/elm/compile";
 import { generateElm } from "../../src/elm/generate";
@@ -21,6 +22,7 @@ import {
   type ParsedDocument,
   PROTOCOL_VERSION,
   type Request,
+  type Response,
 } from "../../src/elm/protocol";
 import { runElm } from "../../src/elm/run";
 import { writeGenerated } from "../../src/emit/write";
@@ -47,9 +49,31 @@ afterEach(() => {
   }
 });
 
+const emptyResponse: Response = {
+  site: {
+    title: "",
+    description: "",
+    author: { name: "", email: null },
+    language: "en",
+  },
+  pages: [],
+  feeds: [],
+  sitemap: [],
+  diagnostics: [],
+};
+
+/** The same response as source for the fake workers, which are JavaScript text. */
+const emptyResponseJs = JSON.stringify(emptyResponse);
+
 const emptyRequest: Request = {
   protocolVersion: PROTOCOL_VERSION,
-  build: { siteUrl: "https://example.com/", basePath: "/", mode: "production" },
+  build: {
+    siteUrl: "https://example.com/",
+    origin: "https://example.com",
+    basePath: "/",
+    mode: "production",
+  },
+  slugs: [],
   collections: [],
   documents: [],
 };
@@ -64,7 +88,7 @@ function respondingWorker(body: string): string {
           return {
             ports: {
               sheafResponse: { subscribe: function (callback) { subscriber = callback; } },
-              sheafRequest: { send: function () { subscriber({ pages: [], diagnostics: [] }); } },
+              sheafRequest: { send: function () { subscriber(${emptyResponseJs}); } },
             },
           };
         },
@@ -91,7 +115,7 @@ describe("runElm", () => {
             return {
               ports: {
                 sheafResponse: { subscribe: function (callback) { subscriber = callback; } },
-                sheafRequest: { send: function () { subscriber({ pages: [], diagnostics: [] }); } },
+                sheafRequest: { send: function () { subscriber(${emptyResponseJs}); } },
               },
             };
           },
@@ -104,7 +128,7 @@ describe("runElm", () => {
     expect(result).toEqual({
       ok: true,
       value: {
-        response: { pages: [], diagnostics: [] },
+        response: emptyResponse,
         output: ["warn: Compiled in DEV mode.", "starting"],
       },
     });
@@ -163,7 +187,7 @@ describe("runElm", () => {
                 sheafRequest: {
                   send: function () {
                     setTimeout(function () { throw new Error("late"); }, 0);
-                    setTimeout(function () { subscriber({ pages: [], diagnostics: [] }); }, 20);
+                    setTimeout(function () { subscriber(${emptyResponseJs}); }, 20);
                   },
                 },
               },
@@ -193,7 +217,7 @@ describe("runElm", () => {
                 sheafRequest: {
                   send: function () {
                     setTimeout(function () {}, 30000);
-                    subscriber({ pages: [], diagnostics: [] });
+                    subscriber(${emptyResponseJs});
                   },
                 },
               },
@@ -223,7 +247,7 @@ describe("runElm", () => {
             return {
               ports: {
                 sheafResponse: { subscribe: function (callback) { subscriber = callback; } },
-                sheafRequest: { send: function () { subscriber({ pages: "nope" }); } },
+                sheafRequest: { send: function () { subscriber({ ...${emptyResponseJs}, pages: "nope" }); } },
               },
             };
           },
@@ -352,6 +376,7 @@ async function generateSite(siteRoot: string): Promise<Request> {
     },
     collections,
     parsed,
+    slugTable(documents),
   );
 }
 
@@ -406,7 +431,7 @@ describe("a Sheaf site", () => {
       expect(diagnostic?.sourcePath).toBe("src/Site.elm");
       expect(diagnostic?.span).toEqual({
         start: { line: 9, column: 9 },
-        end: { line: 11, column: 10 },
+        end: { line: 17, column: 10 },
       });
       expect(diagnostic?.message).toContain(
         "The 1st argument to `site` is not what I expect:",
