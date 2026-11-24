@@ -311,7 +311,14 @@ function filesMentioning(root: string, words: string[]): string[] {
 }
 
 describe("the blog fixture", () => {
-  const hidden = ["secret", "Postcard from the future"];
+  // The draft's and future post's titles, tag and URLs, so that a leak into
+  // a page, a feed or the sitemap is caught.
+  const hidden = [
+    "secret",
+    "Postcard from the future",
+    "posts/plans/",
+    "from-the-future",
+  ];
 
   test(
     "writes every route, both feeds and the sitemap under the base path",
