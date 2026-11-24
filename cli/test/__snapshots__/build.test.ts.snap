@@ -1,0 +1,179 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`the blog fixture writes every route, both feeds and the sitemap under the base path: files 1`] = `
+[
+  "404.html",
+  "about/index.html",
+  "archive/index.html",
+  "atom.xml",
+  "feed.xml",
+  "index.html",
+  "page/2/index.html",
+  "page/3/index.html",
+  "posts/feeds/index.html",
+  "posts/formatting/index.html",
+  "posts/hello-sheaf/index.html",
+  "posts/tags-and-groups/index.html",
+  "posts/typed-templates/index.html",
+  "sitemap.xml",
+  "style.css",
+  "tags/elm/index.html",
+  "tags/elm/page/2/index.html",
+  "tags/index.html",
+  "tags/tooling/index.html",
+  "tags/tooling/page/2/index.html",
+]
+`;
+
+exports[`the blog fixture writes every route, both feeds and the sitemap under the base path: feed.xml 1`] = `
+"<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Test blog</title>
+    <link>https://example.com/blog/</link>
+    <description>A blog for tests.</description>
+    <language>en</language>
+    <lastBuildDate>Sun, 22 Nov 2026 00:00:00 GMT</lastBuildDate>
+    <atom:link href="https://example.com/blog/feed.xml" rel="self" type="application/rss+xml"/>
+    <managingEditor>ada@example.com (Ada)</managingEditor>
+    <item>
+      <title>Tags &amp; groups</title>
+      <link>https://example.com/blog/posts/tags-and-groups/</link>
+      <guid isPermaLink="true">https://example.com/blog/posts/tags-and-groups/</guid>
+      <pubDate>Fri, 20 Nov 2026 00:00:00 GMT</pubDate>
+      <description>&lt;p&gt;Tags that differ only in case share a page. Read &lt;a href=&quot;https://example.com/blog/about/&quot;&gt;about this blog&lt;/a&gt;.&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>Feeds for free</title>
+      <link>https://example.com/blog/posts/feeds/</link>
+      <guid isPermaLink="true">https://example.com/blog/posts/feeds/</guid>
+      <pubDate>Sun, 15 Nov 2026 00:00:00 GMT</pubDate>
+      <description>&lt;p&gt;Every post is in the RSS and Atom feeds. See &lt;a href=&quot;https://example.com/blog/posts/hello-sheaf/&quot;&gt;the first post&lt;/a&gt;.&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>Formatting on save</title>
+      <link>https://example.com/blog/posts/formatting/</link>
+      <guid isPermaLink="true">https://example.com/blog/posts/formatting/</guid>
+      <pubDate>Tue, 10 Nov 2026 00:00:00 GMT</pubDate>
+      <description>&lt;p&gt;Run &lt;code&gt;elm-format&lt;/code&gt; on save and stop arguing about whitespace.&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>Typed templates</title>
+      <link>https://example.com/blog/posts/typed-templates/</link>
+      <guid isPermaLink="true">https://example.com/blog/posts/typed-templates/</guid>
+      <pubDate>Thu, 05 Nov 2026 00:00:00 GMT</pubDate>
+      <description>&lt;p&gt;Templates are Elm functions, so a typo in a field name is a compile error.&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>Hello, Sheaf</title>
+      <link>https://example.com/blog/posts/hello-sheaf/</link>
+      <guid isPermaLink="true">https://example.com/blog/posts/hello-sheaf/</guid>
+      <pubDate>Sun, 01 Nov 2026 00:00:00 GMT</pubDate>
+      <description>&lt;p&gt;This blog is built with Sheaf.&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>
+"
+`;
+
+exports[`the blog fixture writes every route, both feeds and the sitemap under the base path: atom.xml 1`] = `
+"<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>https://example.com/blog/atom.xml</id>
+  <link rel="self" href="https://example.com/blog/atom.xml"/>
+  <link rel="alternate" href="https://example.com/blog/"/>
+  <title>Test blog</title>
+  <subtitle>A blog for tests.</subtitle>
+  <updated>2026-11-22T00:00:00.000Z</updated>
+  <author><name>Ada</name><email>ada@example.com</email></author>
+  <entry>
+    <id>https://example.com/blog/posts/tags-and-groups/</id>
+    <title>Tags &amp; groups</title>
+    <link href="https://example.com/blog/posts/tags-and-groups/"/>
+    <published>2026-11-20T00:00:00.000Z</published>
+    <updated>2026-11-22T00:00:00.000Z</updated>
+    <summary>Why &lt;Elm&gt; and elm are one tag.</summary>
+    <content type="html">&lt;p&gt;Tags that differ only in case share a page. Read &lt;a href=&quot;https://example.com/blog/about/&quot;&gt;about this blog&lt;/a&gt;.&lt;/p&gt;</content>
+  </entry>
+  <entry>
+    <id>https://example.com/blog/posts/feeds/</id>
+    <title>Feeds for free</title>
+    <link href="https://example.com/blog/posts/feeds/"/>
+    <published>2026-11-15T00:00:00.000Z</published>
+    <updated>2026-11-15T00:00:00.000Z</updated>
+    <content type="html">&lt;p&gt;Every post is in the RSS and Atom feeds. See &lt;a href=&quot;https://example.com/blog/posts/hello-sheaf/&quot;&gt;the first post&lt;/a&gt;.&lt;/p&gt;</content>
+  </entry>
+  <entry>
+    <id>https://example.com/blog/posts/formatting/</id>
+    <title>Formatting on save</title>
+    <link href="https://example.com/blog/posts/formatting/"/>
+    <published>2026-11-10T00:00:00.000Z</published>
+    <updated>2026-11-10T00:00:00.000Z</updated>
+    <summary>elm-format, everywhere.</summary>
+    <content type="html">&lt;p&gt;Run &lt;code&gt;elm-format&lt;/code&gt; on save and stop arguing about whitespace.&lt;/p&gt;</content>
+  </entry>
+  <entry>
+    <id>https://example.com/blog/posts/typed-templates/</id>
+    <title>Typed templates</title>
+    <link href="https://example.com/blog/posts/typed-templates/"/>
+    <published>2026-11-05T00:00:00.000Z</published>
+    <updated>2026-11-05T00:00:00.000Z</updated>
+    <content type="html">&lt;p&gt;Templates are Elm functions, so a typo in a field name is a compile error.&lt;/p&gt;</content>
+  </entry>
+  <entry>
+    <id>https://example.com/blog/posts/hello-sheaf/</id>
+    <title>Hello, Sheaf</title>
+    <link href="https://example.com/blog/posts/hello-sheaf/"/>
+    <published>2026-11-01T00:00:00.000Z</published>
+    <updated>2026-11-01T00:00:00.000Z</updated>
+    <summary>The first post.</summary>
+    <content type="html">&lt;p&gt;This blog is built with Sheaf.&lt;/p&gt;</content>
+  </entry>
+</feed>
+"
+`;
+
+exports[`the blog fixture writes every route, both feeds and the sitemap under the base path: sitemap.xml 1`] = `
+"<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://example.com/blog/</loc></url>
+  <url><loc>https://example.com/blog/page/2/</loc></url>
+  <url><loc>https://example.com/blog/page/3/</loc></url>
+  <url><loc>https://example.com/blog/posts/hello-sheaf/</loc><lastmod>2026-11-01T00:00:00.000Z</lastmod></url>
+  <url><loc>https://example.com/blog/posts/typed-templates/</loc><lastmod>2026-11-05T00:00:00.000Z</lastmod></url>
+  <url><loc>https://example.com/blog/posts/formatting/</loc><lastmod>2026-11-10T00:00:00.000Z</lastmod></url>
+  <url><loc>https://example.com/blog/posts/feeds/</loc><lastmod>2026-11-15T00:00:00.000Z</lastmod></url>
+  <url><loc>https://example.com/blog/posts/tags-and-groups/</loc><lastmod>2026-11-22T00:00:00.000Z</lastmod></url>
+  <url><loc>https://example.com/blog/about/</loc></url>
+  <url><loc>https://example.com/blog/tags/</loc></url>
+  <url><loc>https://example.com/blog/tags/elm/</loc></url>
+  <url><loc>https://example.com/blog/tags/elm/page/2/</loc></url>
+  <url><loc>https://example.com/blog/tags/tooling/</loc></url>
+  <url><loc>https://example.com/blog/tags/tooling/page/2/</loc></url>
+  <url><loc>https://example.com/blog/archive/</loc></url>
+</urlset>
+"
+`;
+
+exports[`the blog fixture writes every route, both feeds and the sitemap under the base path: index.html 1`] = `"<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Test blog</title><link rel="canonical" href="https://example.com/blog/"><link rel="stylesheet" href="/blog/style.css"><link rel="alternate" type="application/rss+xml" title="Test blog" href="/blog/feed.xml"><link rel="alternate" type="application/atom+xml" title="Test blog" href="/blog/atom.xml"></head><body><header><nav><a href="/blog/">Home</a><a href="/blog/archive/">Archive</a><a href="/blog/tags/">Tags</a><a href="/blog/about/">About</a></nav></header><main><ul><li><h2><a href="/blog/posts/tags-and-groups/">Tags &amp; groups</a></h2><time datetime="2026-11-20">2026-11-20</time></li><li><h2><a href="/blog/posts/feeds/">Feeds for free</a></h2><time datetime="2026-11-15">2026-11-15</time></li></ul><nav><a href="/blog/page/2/">Older posts</a></nav></main><footer><a href="/blog/feed.xml">RSS</a></footer></body></html>"`;
+
+exports[`the blog fixture writes every route, both feeds and the sitemap under the base path: tags/elm/index.html 1`] = `"<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Posts tagged Elm</title><link rel="canonical" href="https://example.com/blog/tags/elm/"><link rel="stylesheet" href="/blog/style.css"><link rel="alternate" type="application/rss+xml" title="Test blog" href="/blog/feed.xml"><link rel="alternate" type="application/atom+xml" title="Test blog" href="/blog/atom.xml"></head><body><header><nav><a href="/blog/">Home</a><a href="/blog/archive/">Archive</a><a href="/blog/tags/">Tags</a><a href="/blog/about/">About</a></nav></header><main><h1>Elm</h1><ul><li><h2><a href="/blog/posts/tags-and-groups/">Tags &amp; groups</a></h2><time datetime="2026-11-20">2026-11-20</time></li><li><h2><a href="/blog/posts/feeds/">Feeds for free</a></h2><time datetime="2026-11-15">2026-11-15</time></li></ul><nav><a href="/blog/tags/elm/page/2/">Older posts</a></nav></main><footer><a href="/blog/feed.xml">RSS</a></footer></body></html>"`;
+
+exports[`the routes fixture writes every kind of route and a feed without the blog preset: files 1`] = `
+[
+  "404.html",
+  "archive/index.html",
+  "index.html",
+  "notes/atom.xml",
+  "notes/feed.xml",
+  "notes/index.html",
+  "notes/page/2/index.html",
+  "notes/parsing-markdown/index.html",
+  "notes/phantom-types/index.html",
+  "notes/typed-frontmatter/index.html",
+  "sitemap.xml",
+  "topics/index.html",
+  "topics/parsing/index.html",
+  "topics/types/index.html",
+]
+`;

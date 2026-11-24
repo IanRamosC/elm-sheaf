@@ -2,12 +2,14 @@ import { afterEach, describe, expect, test } from "bun:test";
 import {
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { build } from "../src/build";
 import {
   copyFixture,
@@ -258,4 +260,185 @@ describe("build", () => {
 
     expect(titlesOf(result)).toEqual(["NO SHEAF.JSON"]);
   });
+});
+
+/** Every file under `dir`, as sorted paths relative to it. */
+function filesUnder(dir: string): string[] {
+  return readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => relative(dir, join(entry.parentPath, entry.name)))
+    .sort();
+}
+
+/**
+ * The `href` and `src` values in `dist/` that point into the site but match
+ * no written file. A full URL of the site counts as its path, because feeds
+ * make every link absolute.
+ */
+function unresolvedLinks(root: string, siteUrl: string): string[] {
+  const dist = join(root, "dist");
+  const basePath = new URL(siteUrl).pathname;
+  const unresolved: string[] = [];
+
+  for (const file of filesUnder(dist)) {
+    const text = readFileSync(join(dist, file), "utf8");
+    for (const [, url] of text.matchAll(/(?:href|src)="([^"]*)"/g)) {
+      const path = url?.startsWith(siteUrl)
+        ? basePath + url.slice(siteUrl.length)
+        : url;
+      if (!path?.startsWith(basePath)) continue;
+
+      const target = join(
+        dist,
+        decodeURIComponent(path.slice(basePath.length).replace(/#.*$/, "")),
+      );
+      const resolves =
+        (existsSync(target) && statSync(target).isFile()) ||
+        existsSync(join(target, "index.html"));
+      if (!resolves) unresolved.push(`${file}: ${url}`);
+    }
+  }
+  return unresolved;
+}
+
+/** The files of `dist/` whose path or content mentions any of `words`. */
+function filesMentioning(root: string, words: string[]): string[] {
+  const dist = join(root, "dist");
+  return filesUnder(dist).filter((file) => {
+    const text = `${file}\n${readFileSync(join(dist, file), "utf8")}`;
+    return words.some((word) => text.includes(word));
+  });
+}
+
+describe("the blog fixture", () => {
+  const hidden = ["secret", "Postcard from the future"];
+
+  test(
+    "writes every route, both feeds and the sitemap under the base path",
+    async () => {
+      const root = fixturePath("blog");
+      clean(root);
+
+      const result = await build(root, {
+        mode: "production",
+        write: true,
+        now,
+      });
+
+      expect(titlesOf(result)).toEqual([]);
+      expect(filesUnder(join(root, "dist"))).toMatchSnapshot("files");
+      for (const file of [
+        "feed.xml",
+        "atom.xml",
+        "sitemap.xml",
+        "index.html",
+        "tags/elm/index.html",
+      ]) {
+        expect(readFileSync(join(root, "dist", file), "utf8")).toMatchSnapshot(
+          file,
+        );
+      }
+      expect(unresolvedLinks(root, "https://example.com/blog/")).toEqual([]);
+      expect(filesMentioning(root, hidden)).toEqual([]);
+    },
+    SLOW,
+  );
+
+  test(
+    "builds drafts and future posts with --drafts",
+    async () => {
+      const root = copyFixture("blog");
+
+      const result = await build(root, { mode: "drafts", write: true, now });
+
+      expect(titlesOf(result)).toEqual([]);
+      expect(filesMentioning(root, hidden)).toEqual(
+        expect.arrayContaining([
+          "feed.xml",
+          "posts/from-the-future/index.html",
+          "posts/plans/index.html",
+          "tags/secret/index.html",
+        ]),
+      );
+      expect(unresolvedLinks(root, "https://example.com/blog/")).toEqual([]);
+    },
+    SLOW,
+  );
+
+  for (const name of ["archive.md", "Archive.md"]) {
+    test(
+      `reports a page named ${name} as a duplicate of the archive`,
+      async () => {
+        const root = copyFixture("blog");
+        writeFileSync(
+          join(root, "content/pages", name),
+          "---\ntitle: Archive\n---\n\nOld posts.\n",
+        );
+
+        const result = await build(root, {
+          mode: "production",
+          write: false,
+          now,
+        });
+
+        expect(titlesOf(result)).toEqual(["DUPLICATE PAGE"]);
+        const message = result.ok ? "" : (result.error[0]?.message ?? "");
+        expect(message).toContain("`/:slug/`");
+        expect(message).toContain("`/archive/`");
+      },
+      SLOW,
+    );
+  }
+
+  test(
+    "builds the index, empty feeds and a sitemap with no posts",
+    async () => {
+      const root = copyFixture("blog");
+      const postsDir = join(root, "content/posts");
+      rmSync(postsDir, { recursive: true });
+      mkdirSync(postsDir);
+      writeFileSync(join(postsDir, ".gitkeep"), "");
+
+      const result = await build(root, {
+        mode: "production",
+        write: true,
+        now,
+      });
+
+      expect(titlesOf(result)).toEqual([]);
+      const dist = join(root, "dist");
+      expect(existsSync(join(dist, "index.html"))).toBe(true);
+      expect(readFileSync(join(dist, "feed.xml"), "utf8")).not.toContain(
+        "<item>",
+      );
+      expect(readFileSync(join(dist, "atom.xml"), "utf8")).not.toContain(
+        "<entry>",
+      );
+      expect(readFileSync(join(dist, "sitemap.xml"), "utf8")).toContain(
+        "<loc>https://example.com/blog/</loc>",
+      );
+    },
+    SLOW,
+  );
+});
+
+describe("the routes fixture", () => {
+  test(
+    "writes every kind of route and a feed without the blog preset",
+    async () => {
+      const root = fixturePath("routes");
+      clean(root);
+
+      const result = await build(root, {
+        mode: "production",
+        write: true,
+        now,
+      });
+
+      expect(titlesOf(result)).toEqual([]);
+      expect(filesUnder(join(root, "dist"))).toMatchSnapshot("files");
+      expect(unresolvedLinks(root, "https://example.com/")).toEqual([]);
+    },
+    SLOW,
+  );
 });
