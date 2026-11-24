@@ -18,6 +18,7 @@ module RenderFixtures exposing
     , render
     , request
     , requestUnder
+    , requestWithSlugs
     , span
     , titles
     )
@@ -137,7 +138,20 @@ request =
 {-| A request for the site at `https://example.com` and `basePath`.
 -}
 requestUnder : String -> List String -> List Source -> Value
-requestUnder basePath collections sources =
+requestUnder basePath =
+    requestWith { basePath = basePath, slugs = [] }
+
+
+{-| A request for the site at `https://example.com/blog/`, with the host's
+table of group slugs: each value, its slug and its folded form.
+-}
+requestWithSlugs : List ( String, String, String ) -> List String -> List Source -> Value
+requestWithSlugs slugs =
+    requestWith { basePath = "/blog/", slugs = slugs }
+
+
+requestWith : { basePath : String, slugs : List ( String, String, String ) } -> List String -> List Source -> Value
+requestWith { basePath, slugs } collections sources =
     Encode.object
         [ ( "protocolVersion", Encode.int 2 )
         , ( "build"
@@ -148,7 +162,17 @@ requestUnder basePath collections sources =
                 , ( "mode", Encode.string "production" )
                 ]
           )
-        , ( "slugs", Encode.list identity [] )
+        , ( "slugs"
+          , Encode.list
+                (\( value, slug, folded ) ->
+                    Encode.object
+                        [ ( "value", Encode.string value )
+                        , ( "slug", Encode.string slug )
+                        , ( "folded", Encode.string folded )
+                        ]
+                )
+                slugs
+          )
         , ( "collections", Encode.list Encode.string collections )
         , ( "documents", Encode.list encodeSource sources )
         ]

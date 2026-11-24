@@ -1,6 +1,6 @@
 module Sheaf.Internal.Check exposing
     ( Location(..), urlOf, UncheckedPage, Build, check, CheckedPage
-    , LinkProblem(..), linkDiagnostic
+    , BrokenLink, LinkProblem(..), GroupLinkProblem(..), linkDiagnostic
     , brokenLinkDiagnostics
     )
 
@@ -11,14 +11,15 @@ A broken link is reported once for all the pages of a route that have it,
 since a layout they share usually made it.
 
 @docs Location, urlOf, UncheckedPage, Build, check, CheckedPage
-@docs LinkProblem, linkDiagnostic
+@docs BrokenLink, LinkProblem, GroupLinkProblem, linkDiagnostic
 @docs brokenLinkDiagnostics
 
 -}
 
 import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Head as Head
-import Sheaf.Internal.Html as Html exposing (HtmlProblem(..), Url(..))
+import Sheaf.Internal.Hint as Hint
+import Sheaf.Internal.Html as Html exposing (GroupLink, HtmlProblem(..), Url(..))
 import Sheaf.Internal.Protocol as Protocol exposing (Diagnostic, Severity(..))
 import Sheaf.Internal.Site exposing (Page)
 import Sheaf.Ref as Ref exposing (Ref)
@@ -69,18 +70,19 @@ come from a layout they share.
 type alias CheckedPage =
     { unchecked : UncheckedPage
     , head : List Html
-    , brokenLinks : List ( Ref, LinkProblem )
+    , brokenLinks : List BrokenLink
     , problems : List Diagnostic
     }
 
 
 {-| What checking a page needs from the build: where the site is, and what is
-wrong with a link to a document, if anything.
+wrong with a link to a document or a group, if anything.
 -}
 type alias Build =
     { origin : String
     , basePath : String
     , linkProblem : Ref -> Maybe LinkProblem
+    , groupLinkProblem : GroupLink -> Maybe GroupLinkProblem
     }
 
 
@@ -120,7 +122,10 @@ check build unchecked =
                 (\target ->
                     case target of
                         DocumentUrl ref ->
-                            Maybe.map (Tuple.pair ref) (build.linkProblem ref)
+                            Maybe.map (BrokenDocumentLink ref) (build.linkProblem ref)
+
+                        GroupUrl link ->
+                            Maybe.map (BrokenGroupLink link) (build.groupLinkProblem link)
 
                         SitePath _ ->
                             Nothing
@@ -135,6 +140,22 @@ check build unchecked =
 
 
 -- LINKS
+
+
+{-| A link of a template with nowhere to point, and why.
+-}
+type BrokenLink
+    = BrokenDocumentLink Ref LinkProblem
+    | BrokenGroupLink GroupLink GroupLinkProblem
+
+
+{-| Why a link to a group has nowhere to point. `NoGroupedRoute` has the
+patterns of the site's `groupedBy` routes, to suggest one.
+-}
+type GroupLinkProblem
+    = NoGroupedRoute (List String)
+    | ValueWithoutSlug
+    | EmptyGroup
 
 
 {-| Why a link to a document has nowhere to point.
@@ -191,18 +212,17 @@ brokenLinkDiagnostics pages =
 {-| The same broken link on the pages of one route. A page links to it once or
 more, and is counted once: its URL is the last one counted.
 -}
-type alias BrokenLink =
+type alias RepeatedLink =
     { route : Int
     , routeName : String
-    , ref : Ref
-    , problem : LinkProblem
+    , link : BrokenLink
     , firstUrl : String
     , lastUrl : String
     , pages : Int
     }
 
 
-groupBrokenLinks : List CheckedPage -> List BrokenLink
+groupBrokenLinks : List CheckedPage -> List RepeatedLink
 groupBrokenLinks pages =
     List.foldl
         (\{ unchecked, brokenLinks } found -> List.foldl (addBrokenLink unchecked) found brokenLinks)
@@ -210,12 +230,12 @@ groupBrokenLinks pages =
         pages
 
 
-addBrokenLink : UncheckedPage -> ( Ref, LinkProblem ) -> List BrokenLink -> List BrokenLink
-addBrokenLink page ( ref, problem ) found =
+addBrokenLink : UncheckedPage -> BrokenLink -> List RepeatedLink -> List RepeatedLink
+addBrokenLink page link found =
     let
-        isSame : BrokenLink -> Bool
-        isSame link =
-            link.route == page.route && link.ref == ref && link.problem == problem
+        isSame : RepeatedLink -> Bool
+        isSame repeated =
+            repeated.route == page.route && repeated.link == link
 
         url : String
         url =
@@ -223,46 +243,88 @@ addBrokenLink page ( ref, problem ) found =
     in
     if List.any isSame found then
         List.map
-            (\link ->
-                if isSame link && link.lastUrl /= url then
-                    { link | lastUrl = url, pages = link.pages + 1 }
+            (\repeated ->
+                if isSame repeated && repeated.lastUrl /= url then
+                    { repeated | lastUrl = url, pages = repeated.pages + 1 }
 
                 else
-                    link
+                    repeated
             )
             found
 
     else
-        found ++ [ { route = page.route, routeName = page.routeName, ref = ref, problem = problem, firstUrl = url, lastUrl = url, pages = 1 } ]
+        found ++ [ { route = page.route, routeName = page.routeName, link = link, firstUrl = url, lastUrl = url, pages = 1 } ]
 
 
 {-| The diagnostic of a broken link, naming its page, or how many pages of its
 route have it.
 -}
-brokenLinkDiagnostic : BrokenLink -> Diagnostic
-brokenLinkDiagnostic link =
+brokenLinkDiagnostic : RepeatedLink -> Diagnostic
+brokenLinkDiagnostic repeated =
     let
         subject : String
         subject =
-            if link.pages == 1 then
-                "While rendering `" ++ link.firstUrl ++ "` from the route `" ++ link.routeName ++ "`,"
+            if repeated.pages == 1 then
+                "While rendering `" ++ repeated.firstUrl ++ "` from the route `" ++ repeated.routeName ++ "`,"
 
             else
                 "While rendering "
-                    ++ String.fromInt link.pages
+                    ++ String.fromInt repeated.pages
                     ++ " pages from the route `"
-                    ++ link.routeName
+                    ++ repeated.routeName
                     ++ "` (the first is `"
-                    ++ link.firstUrl
+                    ++ repeated.firstUrl
                     ++ "`),"
     in
-    linkDiagnostic
-        { subject = subject ++ " a `Sheaf.link` points to"
-        , sourcePath = Nothing
-        , span = Nothing
-        }
-        link.ref
-        link.problem
+    case repeated.link of
+        BrokenDocumentLink ref problem ->
+            linkDiagnostic
+                { subject = subject ++ " a `Sheaf.link` points to"
+                , sourcePath = Nothing
+                , span = Nothing
+                }
+                ref
+                problem
+
+        BrokenGroupLink link problem ->
+            groupLinkDiagnostic (subject ++ " a `Sheaf.groupLink` points to") link problem
+
+
+groupLinkDiagnostic : String -> GroupLink -> GroupLinkProblem -> Diagnostic
+groupLinkDiagnostic subject link problem =
+    let
+        target : String
+        target =
+            subject ++ " the group `" ++ link.value ++ "` of `" ++ link.pattern ++ "`"
+
+        diagnostic : String -> String -> Maybe String -> Diagnostic
+        diagnostic title message hint =
+            { severity = Error
+            , title = title
+            , message = message
+            , sourcePath = Nothing
+            , span = Nothing
+            , hint = hint
+            }
+    in
+    case problem of
+        NoGroupedRoute patterns ->
+            diagnostic "NO PAGE FOR LINK"
+                (target ++ ", but no `Route.groupedBy` route has that pattern.")
+                (Hint.didYouMean (\names -> "The `Route.groupedBy` patterns are " ++ names ++ ".") patterns link.pattern
+                    |> Maybe.withDefault "Add a `Route.groupedBy` route with this pattern."
+                    |> Just
+                )
+
+        ValueWithoutSlug ->
+            diagnostic "MISSING SLUG"
+                (target ++ ", but `" ++ link.value ++ "` has no slug.")
+                (Just "Group values must come from frontmatter as written; Sheaf computes their slugs before Elm runs.")
+
+        EmptyGroup ->
+            diagnostic "LINK TO EMPTY GROUP"
+                (target ++ ", but no published document is in it.")
+                (Just "Publish a document with this value, or remove the link. Drafts and future-dated documents are only built by `sheaf dev` and `sheaf build --drafts`.")
 
 
 

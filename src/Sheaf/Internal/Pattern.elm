@@ -28,18 +28,23 @@ import Sheaf.Internal.Path as Path
   - `Fixed`: one page at the pattern, as for `single` and `allItems`.
   - `Item`: a page for each document, at `:slug`.
   - `Listing`: page 1 at the pattern and page n under it, at `page/<n>/`.
+  - `Grouped`: a page for each group, at `:group`.
+  - `GroupedListing`: the pages of each group's listing, at `:group`.
 
 -}
 type Kind
     = Fixed
     | Item
     | Listing
+    | Grouped
+    | GroupedListing
 
 
 {-| A segment that a route replaces with a value of each page.
 -}
 type Placeholder
     = Slug
+    | Group
 
 
 {-| Why a pattern cannot be used by a kind of route.
@@ -121,7 +126,7 @@ placeholderProblem kind patternSegments =
 -}
 folderProblem : Kind -> String -> Maybe Problem
 folderProblem kind pattern =
-    if kind == Listing && not (String.endsWith "/" pattern) then
+    if (kind == Listing || kind == GroupedListing) && not (String.endsWith "/" pattern) then
         Just NotAFolder
 
     else
@@ -146,6 +151,12 @@ placeholderOf kind =
         Item ->
             Just Slug
 
+        Grouped ->
+            Just Group
+
+        GroupedListing ->
+            Just Group
+
         Fixed ->
             Nothing
 
@@ -158,6 +169,9 @@ name placeholder =
     case placeholder of
         Slug ->
             ":slug"
+
+        Group ->
+            ":group"
 
 
 {-| The pattern with each `placeholder` segment replaced by `value`.

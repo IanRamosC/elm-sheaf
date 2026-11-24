@@ -1,6 +1,6 @@
 module Sheaf.Internal.Html exposing
-    ( Html, Attribute, Url(..), HtmlProblem(..)
-    , text, node, attribute, booleanAttribute, sitePathAttribute, link
+    ( Html, Attribute, Url(..), GroupLink, HtmlProblem(..)
+    , text, node, attribute, booleanAttribute, sitePathAttribute, link, groupLink
     , urls, resolveUrls
     , toString, document, problems
     )
@@ -10,8 +10,8 @@ module Sheaf.Internal.Html exposing
 It is not exposed by the package so templates cannot build or inspect the tree
 directly.
 
-@docs Html, Attribute, Url, HtmlProblem
-@docs text, node, attribute, booleanAttribute, sitePathAttribute, link
+@docs Html, Attribute, Url, GroupLink, HtmlProblem
+@docs text, node, attribute, booleanAttribute, sitePathAttribute, link, groupLink
 @docs urls, resolveUrls
 @docs toString, document, problems
 
@@ -45,6 +45,16 @@ routes or its base path.
 type Url
     = DocumentUrl Ref
     | SitePath String
+    | GroupUrl GroupLink
+
+
+{-| The page of the group of `value` made by the `groupedBy` route with
+`pattern`.
+-}
+type alias GroupLink =
+    { pattern : String
+    , value : String
+    }
 
 
 {-| Something that makes a tree impossible to render faithfully.
@@ -102,6 +112,14 @@ sitePathAttribute name path =
 link : Ref -> List Html -> Html
 link ref =
     Link (DocumentUrl ref)
+
+
+{-| A link to the page of a group, resolved to an `<a href>` by
+[`resolveUrls`](#resolveUrls).
+-}
+groupLink : String -> String -> List Html -> Html
+groupLink pattern value =
+    Link (GroupUrl { pattern = pattern, value = value })
 
 
 

@@ -308,6 +308,25 @@ badRouteTests =
         , rejects "a page of all items fills no placeholder"
             (Route.allItems "/x/:slug/" posts (\_ -> page []))
             "has the placeholder `:slug`"
+        , rejects "a grouped route needs :group"
+            (Route.groupedBy "/tags/" { by = .tags, perPage = Nothing } posts (\_ _ -> page []))
+            "The route `/tags/` does not have the placeholder `:group`"
+        , rejects "a paginated grouped route must be a folder"
+            (Route.groupedBy "/tags/:group" { by = .tags, perPage = Just 2 } posts (\_ _ -> page []))
+            "The route `/tags/:group` does not end with `/`"
+        , rejects "a grouped route needs at least one item per page"
+            (Route.groupedBy "/tags/:group/" { by = .tags, perPage = Just 0 } posts (\_ _ -> page []))
+            "`perPage` must be at least 1"
+        , rejects "a page of all groups fills no placeholder"
+            (Route.allGroups "/tags/:group/" .tags posts (\_ -> page []))
+            "has the placeholder `:group`"
+        , test "says which routes fill a placeholder" <|
+            \_ ->
+                request [] []
+                    |> render [ Route.single "/x/:group/" (page []) ]
+                    |> .diagnostics
+                    |> List.map .hint
+                    |> Expect.equal [ Just "`Route.eachItem` fills `:slug` and `Route.groupedBy` fills `:group`, each in a segment of its own, as in `/posts/:slug/` or `/tags/:group/`." ]
         , test "says how a placeholder is written" <|
             \_ ->
                 request [ "posts" ] []

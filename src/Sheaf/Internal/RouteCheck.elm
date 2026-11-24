@@ -75,11 +75,15 @@ badRoute route =
 
                     BadPattern (Pattern.UnknownPlaceholder placeholder) ->
                         diagnostic ("has the placeholder `" ++ placeholder ++ "`, which this kind of route does not fill")
-                            (Just "Only `Route.eachItem` fills a placeholder, `:slug`, and a placeholder is a whole segment, as in `/posts/:slug/`.")
+                            (Just "`Route.eachItem` fills `:slug` and `Route.groupedBy` fills `:group`, each in a segment of its own, as in `/posts/:slug/` or `/tags/:group/`.")
 
                     BadPattern (Pattern.MissingPlaceholder Pattern.Slug) ->
                         diagnostic "does not have the placeholder `:slug`, which gives each document its own page"
                             (Just "Put `:slug` in a segment of its own, as in `/posts/:slug/`.")
+
+                    BadPattern (Pattern.MissingPlaceholder Pattern.Group) ->
+                        diagnostic "does not have the placeholder `:group`, which gives each group its own page"
+                            (Just "Put `:group` in a segment of its own, as in `/tags/:group/`.")
 
                     BadPattern Pattern.NotAFolder ->
                         diagnostic "does not end with `/`, but its later pages are written under it"

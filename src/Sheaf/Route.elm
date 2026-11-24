@@ -3,6 +3,7 @@ module Sheaf.Route exposing
     , single, notFound
     , eachItem
     , paginated, allItems, Listing, Pagination
+    , groupedBy, allGroups, Group
     )
 
 {-| Routes decide which pages a site has and where they are written.
@@ -40,6 +41,24 @@ the same date by slug. So every published document of a collection they list
 needs a date, from the `date` frontmatter key or the start of its file name.
 
 @docs paginated, allItems, Listing, Pagination
+
+
+# Documents grouped by a value
+
+Grouped routes group the published documents of a collection by values of
+their frontmatter, such as their tags. Values group together when they have
+the same slug, which Sheaf computes before Elm runs: `Elm`, `elm` and `Élm`
+are one group with the slug `elm`, and so are `open source` and
+`open-source`. A group is shown with its most common spelling.
+
+So the values must come from frontmatter as written: a value changed in Elm,
+such as by `String.toUpper`, has no slug and is reported. So are a value with
+no letters or digits, such as `+++`, and different words that share a slug,
+such as `C` and `C++`.
+
+Like listing routes, they order documents newest first, so each needs a date.
+
+@docs groupedBy, allGroups, Group
 
 -}
 
@@ -172,6 +191,91 @@ before and after it, with the site's base path, ready for an `href`:
 -}
 type alias Pagination =
     Site.Pagination
+
+
+{-| A page for each group, at a pattern where `:group` stands for the group's
+slug. The template gets the group's name and its documents.
+
+    Route.groupedBy "/tags/:group/" { by = .tags, perPage = Just 10 } posts Theme.Tag.view
+
+With `perPage = Nothing`, each group is on one page. With `Just n`, page `k`
+of a group is at `page/<k>/` under the group's first page, as in
+`/tags/elm/page/2/`. Link to a group's page with
+[`Sheaf.groupLink`](Sheaf#groupLink).
+
+-}
+groupedBy : String -> { by : meta -> List String, perPage : Maybe Int } -> Collection meta -> (String -> Listing meta -> Page) -> Route
+groupedBy pattern { by, perPage } collection template =
+    Site.GroupedBy
+        { pattern = pattern
+        , perPage = perPage
+        , grouping = groupingOf by collection
+        , templateFor =
+            \groupName pagination items ->
+                decodeAll collection items
+                    |> Result.map (\documents -> template groupName { items = documents, pagination = pagination })
+        }
+
+
+{-| One page with every group, ordered by slug, each with its documents.
+
+    Route.allGroups "/tags/" .tags posts Theme.Tags.view
+
+-}
+allGroups : String -> (meta -> List String) -> Collection meta -> (List (Group meta) -> Page) -> Route
+allGroups pattern by collection template =
+    Site.AllGroups
+        { pattern = pattern
+        , grouping = groupingOf by collection
+        , templateFor =
+            \groups ->
+                groups
+                    |> List.map (\group -> decodeAll collection group.items |> Result.map (Group group.name))
+                    |> combine
+                    |> Result.map template
+        }
+
+
+{-| A group's name, its most common spelling, and its published documents,
+newest first.
+-}
+type alias Group meta =
+    { name : String
+    , items : List (Document meta)
+    }
+
+
+groupingOf : (meta -> List String) -> Collection meta -> Site.Grouping
+groupingOf by (Site.Collection collection) =
+    { collection = collection.name
+    , valuesOf =
+        \document ->
+            Frontmatter.decode collection.frontmatter
+                { values = document.frontmatter, positions = document.frontmatterPositions }
+                |> Result.map by
+    }
+
+
+{-| Every value, or the problems of all that failed.
+-}
+combine : List (Result (List e) a) -> Result (List e) (List a)
+combine results =
+    case List.concatMap errorsOf results of
+        [] ->
+            Ok (List.filterMap Result.toMaybe results)
+
+        problems ->
+            Err problems
+
+
+errorsOf : Result (List e) a -> List e
+errorsOf result =
+    case result of
+        Ok _ ->
+            []
+
+        Err problems ->
+            problems
 
 
 

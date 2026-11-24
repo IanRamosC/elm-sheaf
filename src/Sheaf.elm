@@ -1,4 +1,4 @@
-module Sheaf exposing (Site, Metadata, site, withRoutes, withFeeds, link)
+module Sheaf exposing (Site, Metadata, site, withRoutes, withFeeds, link, groupLink)
 
 {-| Sheaf is a static site generator whose templates are written in Elm.
 
@@ -56,7 +56,7 @@ from `content/posts/`, with one reference per document:
         , body = [ article [] (h1 [] [ text document.meta.title ] :: document.body) ]
         }
 
-@docs Site, Metadata, site, withRoutes, withFeeds, link
+@docs Site, Metadata, site, withRoutes, withFeeds, link, groupLink
 
 -}
 
@@ -115,3 +115,20 @@ such as a draft, is reported when the site is built.
 link : Ref -> List Html -> Html
 link =
     Html.link
+
+
+{-| A link to the page of a group made by a
+[`Route.groupedBy`](Sheaf-Route#groupedBy) route, given the route's pattern
+and a value as written in frontmatter:
+
+    Sheaf.groupLink "/tags/:group/" "Elm" [ text "Elm" ]
+
+Any spelling of the value with the same slug finds the same group, so `"Élm"`
+links to the posts tagged `elm`. A pattern no `groupedBy` route has, a value
+not written in any frontmatter, and a group with no published documents are
+reported when the site is built.
+
+-}
+groupLink : String -> String -> List Html -> Html
+groupLink =
+    Html.groupLink

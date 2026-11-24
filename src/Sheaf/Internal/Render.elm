@@ -10,17 +10,19 @@ It takes the request as JSON, so that tests drive it exactly as the host does.
 
 import Dict exposing (Dict)
 import Json.Decode as Decode
+import Set exposing (Set)
 import Sheaf.Html exposing (Html)
-import Sheaf.Internal.Check as Check exposing (CheckedPage, LinkProblem(..), Location(..), UncheckedPage)
+import Sheaf.Internal.Check as Check exposing (CheckedPage, GroupLinkProblem(..), LinkProblem(..), Location(..), UncheckedPage)
+import Sheaf.Internal.Group as Group exposing (Group)
 import Sheaf.Internal.Hint as Hint
-import Sheaf.Internal.Html as Html exposing (Url(..))
+import Sheaf.Internal.Html as Html exposing (GroupLink, Url(..))
 import Sheaf.Internal.Listing as Listing exposing (Body)
 import Sheaf.Internal.Markdown as Markdown
 import Sheaf.Internal.Path as Path
 import Sheaf.Internal.Pattern as Pattern
-import Sheaf.Internal.Protocol as Protocol exposing (Diagnostic, Document, Request, Response, Severity(..))
+import Sheaf.Internal.Protocol as Protocol exposing (Diagnostic, Document, GroupSlug, Request, Response, Severity(..))
 import Sheaf.Internal.RouteCheck as RouteCheck
-import Sheaf.Internal.Site as Site exposing (Page, Route(..), Site(..))
+import Sheaf.Internal.Site as Site exposing (FrontmatterProblems, Grouping, ListedDocument, Page, Route(..), Site(..))
 import Sheaf.Ref as Ref exposing (Ref)
 
 
@@ -60,6 +62,7 @@ type alias Context =
 
     -- The pattern of the first item route of each collection.
     , itemPatterns : Dict String String
+    , slugs : Dict String GroupSlug
     }
 
 
@@ -77,6 +80,7 @@ renderSite (Site site) request =
                     |> List.filterMap Site.itemPattern
                     |> List.reverse
                     |> Dict.fromList
+            , slugs = request.slugs
             }
 
         used : List String
@@ -91,26 +95,41 @@ renderSite (Site site) request =
         bodies =
             List.map (\document -> ( document, renderBody context document )) published
 
-        made : List (Result (List Diagnostic) UncheckedPage)
-        made =
-            -- A bad route makes no pages; its error ends the build.
+        -- A bad route makes no pages; its error ends the build.
+        goodRoutes : List ( Int, Route )
+        goodRoutes =
             site.routes
                 |> List.indexedMap Tuple.pair
                 |> List.filter (\( _, route ) -> RouteCheck.badRoute route == Nothing)
-                |> List.concatMap (\( index, route ) -> pagesOf context bodies index route)
+
+        made : List (Result (List Diagnostic) UncheckedPage)
+        made =
+            List.concatMap (\( index, route ) -> pagesOf context bodies index route) goodRoutes
 
         ( written, duplicates ) =
             withoutDuplicates (List.filterMap Result.toMaybe made)
 
+        groupPages : Dict String (Set String)
+        groupPages =
+            groupPagesOf context bodies (List.map Tuple.second goodRoutes)
+
         checked : List CheckedPage
         checked =
-            List.map (Check.check { origin = context.origin, basePath = context.basePath, linkProblem = linkTarget context >> errorOf }) written
+            List.map
+                (Check.check
+                    { origin = context.origin
+                    , basePath = context.basePath
+                    , linkProblem = linkTarget context >> errorOf
+                    , groupLinkProblem = groupLinkTarget context groupPages >> errorOf
+                    }
+                )
+                written
     in
     { site = site.metadata
     , pages =
         checked
             |> List.filter (\page -> List.isEmpty page.brokenLinks && List.isEmpty page.problems)
-            |> List.map (write context site.metadata.language)
+            |> List.map (write (urlTarget context groupPages) site.metadata.language)
     , feeds = []
     , sitemap = []
     , diagnostics =
@@ -119,6 +138,7 @@ renderSite (Site site) request =
             , unknownCollections used request.collections
             , Listing.missingDates (unique (List.filterMap Site.listedCollection site.routes)) published
             , List.concatMap (Tuple.second >> errors) bodies
+            , groupProblems context bodies (List.map Tuple.second goodRoutes)
 
             -- Two routes over one collection decode its frontmatter twice.
             , unique (List.concatMap errors made)
@@ -227,14 +247,37 @@ linkTarget context ref =
                         Err (ToCollectionWithoutPages document.collection)
 
 
+{-| Where a link to a group points: the group's page of the first `groupedBy`
+route with the link's pattern, given the slugs of the groups it has pages for.
+-}
+groupLinkTarget : Context -> Dict String (Set String) -> GroupLink -> Result GroupLinkProblem String
+groupLinkTarget context groupPages link =
+    case ( Dict.get link.pattern groupPages, Dict.get link.value context.slugs ) of
+        ( Nothing, _ ) ->
+            Err (NoGroupedRoute (Dict.keys groupPages))
+
+        ( Just _, Nothing ) ->
+            Err ValueWithoutSlug
+
+        ( Just slugs, Just { slug } ) ->
+            if Set.member slug slugs then
+                Ok (Path.join context.basePath (Pattern.fill Pattern.Group slug link.pattern))
+
+            else
+                Err EmptyGroup
+
+
 {-| Where a URL left to the renderer points. A site path that is not valid is
 reported by `Html.problems`, and its page is not written.
 -}
-urlTarget : Context -> Url -> Maybe String
-urlTarget context url =
+urlTarget : Context -> Dict String (Set String) -> Url -> Maybe String
+urlTarget context groupPages url =
     case url of
         DocumentUrl ref ->
             Result.toMaybe (linkTarget context ref)
+
+        GroupUrl link ->
+            Result.toMaybe (groupLinkTarget context groupPages link)
 
         SitePath path ->
             Just (Path.join context.basePath path)
@@ -335,6 +378,135 @@ pagesOf context bodies index route =
             [ Result.map (madeAt listing.pattern) (listing.templateFor items) ]
                 |> Listing.whole complete
 
+        GroupedBy grouped ->
+            let
+                grouping : Grouped
+                grouping =
+                    groupedDocuments context bodies grouped.grouping
+            in
+            grouping.groups
+                |> List.concatMap
+                    (\group ->
+                        Listing.paginate
+                            { basePath = context.basePath
+                            , pattern = Pattern.fill Pattern.Group group.slug grouped.pattern
+
+                            -- A group has at least one document, so its one page is never cut into pieces of none.
+                            , perPage = Maybe.withDefault (List.length group.items) grouped.perPage
+                            }
+                            group.items
+                            |> List.map (\page -> Result.map (madeAt page.url) (grouped.templateFor group.name page.pagination page.items))
+                    )
+                |> wholeGrouping grouping
+
+        AllGroups all ->
+            let
+                grouping : Grouped
+                grouping =
+                    groupedDocuments context bodies all.grouping
+            in
+            [ Result.map (madeAt all.pattern) (all.templateFor (List.map (\group -> { name = group.name, items = group.items }) grouping.groups)) ]
+                |> wholeGrouping grouping
+
+
+
+-- GROUPS
+
+
+{-| The groups of a grouping route's documents, and what keeps it from being
+written: as for a listing, a document that cannot be listed, a frontmatter
+that does not decode, or a value that cannot be grouped.
+-}
+type alias Grouped =
+    { groups : List (Group ListedDocument)
+    , problems : List Group.Problem
+    , complete : Bool
+    , invalid : List FrontmatterProblems
+    }
+
+
+groupedDocuments : Context -> List Body -> Grouping -> Grouped
+groupedDocuments context bodies grouping =
+    let
+        ( items, complete ) =
+            Listing.listOf grouping.collection bodies
+
+        ( valued, invalid ) =
+            List.foldr
+                (\item ( ok, failed ) ->
+                    case grouping.valuesOf item.document of
+                        Ok values ->
+                            ( ( item, values ) :: ok, failed )
+
+                        Err frontmatterProblems ->
+                            ( ok, { document = item.document, problems = frontmatterProblems } :: failed )
+                )
+                ( [], [] )
+                items
+
+        { groups, problems } =
+            Group.group context.slugs valued
+    in
+    { groups = groups, problems = problems, complete = complete, invalid = invalid }
+
+
+{-| A grouping route's problems with values are reported by `groupProblems`,
+once for all the routes that find them.
+-}
+wholeGrouping : Grouped -> List (Result (List FrontmatterProblems) UncheckedPage) -> List (Result (List Diagnostic) UncheckedPage)
+wholeGrouping grouping pages =
+    let
+        undecoded : List (Result (List FrontmatterProblems) UncheckedPage)
+        undecoded =
+            if List.isEmpty grouping.invalid then
+                []
+
+            else
+                [ Err grouping.invalid ]
+    in
+    Listing.whole (grouping.complete && List.isEmpty grouping.problems) (undecoded ++ pages)
+
+
+{-| The problems of the values routes group by. Routes grouping the same
+documents by the same values find the same problems, so each is reported once,
+naming the first route that found it.
+-}
+groupProblems : Context -> List Body -> List Route -> List Diagnostic
+groupProblems context bodies routes =
+    routes
+        |> List.concatMap
+            (\route ->
+                case Site.groupingOf route of
+                    Just grouping ->
+                        List.map (Tuple.pair (Site.nameOf route)) (groupedDocuments context bodies grouping).problems
+
+                    Nothing ->
+                        []
+            )
+        |> List.foldl
+            (\( routeName, problem ) found ->
+                if List.any (\( _, seen ) -> seen == problem) found then
+                    found
+
+                else
+                    found ++ [ ( routeName, problem ) ]
+            )
+            []
+        |> List.map (\( routeName, problem ) -> Group.diagnostic routeName problem)
+
+
+{-| The slugs of the groups each `groupedBy` pattern has pages for, from the
+first route with that pattern, as links to groups use.
+-}
+groupPagesOf : Context -> List Body -> List Route -> Dict String (Set String)
+groupPagesOf context bodies routes =
+    routes
+        |> List.filterMap Site.groupedPattern
+        |> List.map (\( pattern, grouping ) -> ( pattern, Set.fromList (List.map .slug (groupedDocuments context bodies grouping).groups) ))
+        -- Reversed, because `Dict.fromList` keeps the last.
+        |> List.reverse
+        |> Dict.fromList
+
 
 {-| A pattern ending in `/` is a folder, written as its `index.html`.
 -}
@@ -391,13 +563,13 @@ duplicate path first second =
 
 {-| Resolve a page's URLs and render it.
 -}
-write : Context -> String -> CheckedPage -> Protocol.Page
-write context language { unchecked, head } =
+write : (Url -> Maybe String) -> String -> CheckedPage -> Protocol.Page
+write resolve language { unchecked, head } =
     { path = pathOf unchecked.location
     , html =
         Html.document
             { lang = language
             , head = head
-            , body = List.map (Html.resolveUrls (urlTarget context)) unchecked.page.body
+            , body = List.map (Html.resolveUrls resolve) unchecked.page.body
             }
     }
