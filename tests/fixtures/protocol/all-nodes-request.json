@@ -1,5 +1,5 @@
 {
-  "protocolVersion": 2,
+  "protocolVersion": 3,
   "build": {
     "siteUrl": "https://example.com",
     "origin": "https://example.com",
@@ -40,8 +40,9 @@
           "b"
         ]
       },
-      "frontmatterPositions": {
-        "": {
+      "frontmatterPositions": [
+        {
+          "path": "",
           "value": {
             "start": {
               "line": 2,
@@ -53,7 +54,8 @@
             }
           }
         },
-        "title": {
+        {
+          "path": "title",
           "key": {
             "start": {
               "line": 2,
@@ -75,7 +77,8 @@
             }
           }
         },
-        "tags": {
+        {
+          "path": "tags",
           "key": {
             "start": {
               "line": 3,
@@ -97,7 +100,8 @@
             }
           }
         },
-        "tags.0": {
+        {
+          "path": "tags.0",
           "value": {
             "start": {
               "line": 3,
@@ -109,7 +113,8 @@
             }
           }
         },
-        "tags.1": {
+        {
+          "path": "tags.1",
           "value": {
             "start": {
               "line": 3,
@@ -121,7 +126,7 @@
             }
           }
         }
-      },
+      ],
       "tree": {
         "type": "root",
         "position": {

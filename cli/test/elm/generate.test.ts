@@ -16,7 +16,7 @@ function documentAt(collection: string, slug: string): SourceDocument {
     draft: false,
     excluded: false,
     frontmatter: {},
-    frontmatterPositions: {},
+    frontmatterPositions: [],
     body: "",
     bodyStartLine: 1,
   };

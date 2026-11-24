@@ -48,7 +48,7 @@ describe("encodeRequest", () => {
   for (const name of ["minimal-request", "all-nodes-request"]) {
     test(`produces the ${name} fixture`, () => {
       const expected = fixture(name) as Request;
-      expect(PROTOCOL_VERSION).toBe(2);
+      expect(PROTOCOL_VERSION).toBe(3);
       expect(
         encodeRequest(
           expected.build,
@@ -89,7 +89,7 @@ describe("the all-nodes fixture tree", () => {
       draft: false,
       excluded: false,
       frontmatter: {},
-      frontmatterPositions: {},
+      frontmatterPositions: [],
       body: readFileSync(join(FIXTURES, "all-nodes.md"), "utf8"),
       bodyStartLine: 1,
     };

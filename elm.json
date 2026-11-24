@@ -15,7 +15,6 @@
         "Sheaf.Head",
         "Sheaf.Html",
         "Sheaf.Html.Attributes",
-        "Sheaf.Markdown",
         "Sheaf.Program",
         "Sheaf.Ref",
         "Sheaf.Route"

@@ -1,5 +1,5 @@
 {
-  "protocolVersion": 2,
+  "protocolVersion": 3,
   "build": {
     "siteUrl": "https://example.com",
     "origin": "https://example.com",
@@ -39,10 +39,12 @@
         "tags": [
           "a",
           "b"
-        ]
+        ],
+        "hasOwnProperty": "yes"
       },
-      "frontmatterPositions": {
-        "": {
+      "frontmatterPositions": [
+        {
+          "path": "",
           "value": {
             "start": {
               "line": 2,
@@ -54,7 +56,8 @@
             }
           }
         },
-        "title": {
+        {
+          "path": "title",
           "key": {
             "start": {
               "line": 2,
@@ -76,7 +79,8 @@
             }
           }
         },
-        "tags": {
+        {
+          "path": "tags",
           "key": {
             "start": {
               "line": 3,
@@ -98,7 +102,8 @@
             }
           }
         },
-        "tags.0": {
+        {
+          "path": "tags.0",
           "value": {
             "start": {
               "line": 3,
@@ -110,7 +115,8 @@
             }
           }
         },
-        "tags.1": {
+        {
+          "path": "tags.1",
           "value": {
             "start": {
               "line": 3,
@@ -121,8 +127,31 @@
               "column": 12
             }
           }
+        },
+        {
+          "path": "hasOwnProperty",
+          "key": {
+            "start": {
+              "line": 4,
+              "column": 1
+            },
+            "end": {
+              "line": 4,
+              "column": 15
+            }
+          },
+          "value": {
+            "start": {
+              "line": 4,
+              "column": 17
+            },
+            "end": {
+              "line": 4,
+              "column": 20
+            }
+          }
         }
-      },
+      ],
       "tree": {
         "type": "root",
         "position": {

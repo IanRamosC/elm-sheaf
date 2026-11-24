@@ -107,10 +107,15 @@ requestTests =
         , test "rejects another protocol version" <|
             \_ ->
                 ProtocolFixtures.minimalRequest
-                    |> String.replace "\"protocolVersion\": 2" "\"protocolVersion\": 1"
+                    |> String.replace "\"protocolVersion\": 3" "\"protocolVersion\": 2"
                     |> decodeRequest
                     |> Result.mapError (always ())
                     |> Expect.equal (Err ())
+        , test "finds the position of a field named after an object property" <|
+            \_ ->
+                decodeRequest ProtocolFixtures.minimalRequest
+                    |> Result.map (.documents >> List.map (.frontmatterPositions >> Dict.get "hasOwnProperty"))
+                    |> Expect.equal (Ok [ Just { key = Just (span 4 1 15), value = span 4 17 20 } ])
         ]
 
 

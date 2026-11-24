@@ -1,11 +1,11 @@
-module Sheaf.Internal.Markdown exposing (Body, LinkProblem, fromNode, render)
+module Sheaf.Internal.Markdown exposing (Body, Context, Problem(..), fromNode, render)
 
-{-| The Markdown body behind `Sheaf.Markdown`, and its renderer.
+{-| A document's Markdown body, and its renderer.
 
 It is not exposed by the package so that only the host's decoded documents can
 become a `Body`.
 
-@docs Body, LinkProblem, fromNode, render
+@docs Body, Context, Problem, fromNode, render
 
 -}
 
@@ -23,12 +23,24 @@ type Body
     = Body Node
 
 
-{-| A link to a document that has no URL, where it was written.
+{-| What rendering needs from the rest of the site. `resolve` gives the URL of
+a document, or `Nothing` when it has no page.
 -}
-type alias LinkProblem =
-    { span : Span
-    , id : String
+type alias Context =
+    { resolve : Ref -> Maybe String
     }
+
+
+{-| Why a body could not be rendered, and where in it.
+
+An `UnresolvedLink` is a link to a document that has no page; `id` is the
+target as `"<collection>/<slug>"`. The caller knows why there is no page, so it
+writes the diagnostic. A `Located` problem is already a whole diagnostic.
+
+-}
+type Problem
+    = UnresolvedLink { span : Span, id : String }
+    | Located { span : Span, title : String, message : String, hint : Maybe String }
 
 
 {-| A body from the root of a decoded tree.
@@ -38,7 +50,10 @@ fromNode =
     Body
 
 
-type alias Context =
+{-| The context, with the footnotes of the whole document, because a
+reference anywhere may point to any of them.
+-}
+type alias Scope =
     { resolve : Ref -> Maybe String
     , footnotes : Dict String Footnote
     }
@@ -57,19 +72,24 @@ type alias Footnote =
 
 
 type alias Rendered =
-    Result (List LinkProblem) (List Html)
+    Result (List Problem) (List Html)
 
 
-{-| Turn a body into HTML. See `Sheaf.Markdown.render`.
+{-| Turn a body into HTML, or every problem in it, not just the first.
+
+Code blocks become `pre > code.language-<lang>`, headings get their `id`,
+task-list items get a disabled checkbox and footnotes are laid out as GitHub
+does.
+
 -}
-render : (Ref -> Maybe String) -> Body -> Result (List LinkProblem) (List Html)
-render resolve (Body tree) =
+render : Context -> Body -> Result (List Problem) (List Html)
+render context (Body tree) =
     let
-        context : Context
-        context =
-            { resolve = resolve, footnotes = footnotesOf tree }
+        scope : Scope
+        scope =
+            { resolve = context.resolve, footnotes = footnotesOf tree }
     in
-    merge (renderNode context tree) (renderFootnotes context)
+    merge (renderNode scope tree) (renderFootnotes scope)
 
 
 
@@ -77,7 +97,7 @@ render resolve (Body tree) =
 
 
 {-| Joins two renderings, keeping the problems of both so that one pass
-reports every broken link.
+reports every problem.
 -}
 merge : Rendered -> Rendered -> Rendered
 merge left right =
@@ -100,9 +120,9 @@ combine =
     List.foldl (\next soFar -> merge soFar next) (Ok [])
 
 
-renderNodes : Context -> List Node -> Rendered
-renderNodes context nodes =
-    combine (List.map (renderNode context) nodes)
+renderNodes : Scope -> List Node -> Rendered
+renderNodes scope nodes =
+    combine (List.map (renderNode scope) nodes)
 
 
 {-| An element around rendered children.
@@ -116,29 +136,29 @@ element make children =
 -- NODES
 
 
-renderNode : Context -> Node -> Rendered
-renderNode context node =
+renderNode : Scope -> Node -> Rendered
+renderNode scope node =
     case node of
         Root container ->
-            renderNodes context container.children
+            renderNodes scope container.children
 
         Paragraph container ->
-            element (Html.p []) (renderNodes context container.children)
+            element (Html.p []) (renderNodes scope container.children)
 
         Heading heading ->
-            element (headingElement heading.depth [ Attributes.id heading.id ]) (renderNodes context heading.children)
+            element (headingElement heading.depth [ Attributes.id heading.id ]) (renderNodes scope heading.children)
 
         Text text ->
             Ok [ Html.text text.value ]
 
         Emphasis container ->
-            element (Html.em []) (renderNodes context container.children)
+            element (Html.em []) (renderNodes scope container.children)
 
         Strong container ->
-            element (Html.strong []) (renderNodes context container.children)
+            element (Html.strong []) (renderNodes scope container.children)
 
         Delete container ->
-            element (Html.del []) (renderNodes context container.children)
+            element (Html.del []) (renderNodes scope container.children)
 
         InlineCode code ->
             Ok [ Html.code [] [ Html.text code.value ] ]
@@ -147,13 +167,13 @@ renderNode context node =
             Ok [ codeBlock block.lang block.value ]
 
         Blockquote container ->
-            element (Html.blockquote []) (renderNodes context container.children)
+            element (Html.blockquote []) (renderNodes scope container.children)
 
         ListBlock list ->
-            element (listElement list) (combine (List.map (renderListItem context list.spread) list.children))
+            element (listElement list) (combine (List.map (renderListItem scope list.spread) list.children))
 
         ListItem item ->
-            renderListItem context True (ListItem item)
+            renderListItem scope True (ListItem item)
 
         ThematicBreak _ ->
             Ok [ Html.hr [] [] ]
@@ -162,28 +182,28 @@ renderNode context node =
             Ok [ Html.br [] [] ]
 
         Link link ->
-            element (Html.a (withTitle link.title [ Attributes.href link.url ])) (renderNodes context link.children)
+            element (Html.a (withTitle link.title [ Attributes.href link.url ])) (renderNodes scope link.children)
 
         SheafLink link ->
-            renderSheafLink context link
+            renderSheafLink scope link
 
         Image image ->
             Ok [ Html.img (withTitle image.title [ Attributes.src image.url, Attributes.alt image.alt ]) [] ]
 
         Table table ->
-            renderTable context table.align table.children
+            renderTable scope table.align table.children
 
         TableRow container ->
-            element (Html.tr []) (renderNodes context container.children)
+            element (Html.tr []) (renderNodes scope container.children)
 
         TableCell container ->
-            element (Html.td []) (renderNodes context container.children)
+            element (Html.td []) (renderNodes scope container.children)
 
         FootnoteDefinition _ ->
             Ok []
 
         FootnoteReference reference ->
-            Ok [ footnoteReference context reference ]
+            Ok [ footnoteReference scope reference ]
 
 
 headingElement : Int -> List Html.Attribute -> List Html -> Html
@@ -232,23 +252,23 @@ codeBlock language source =
 
 
 renderSheafLink :
-    Context
+    Scope
     -> { a | position : Span, collection : String, slug : String, fragment : Maybe String, title : Maybe String, children : List Node }
     -> Rendered
-renderSheafLink context link =
+renderSheafLink scope link =
     let
         id : String
         id =
             link.collection ++ "/" ++ link.slug
     in
-    case context.resolve (Ref.fromId id) of
+    case scope.resolve (Ref.fromId id) of
         Just url ->
             element
                 (Html.a (withTitle link.title [ Attributes.href (url ++ fragmentSuffix link.fragment) ]))
-                (renderNodes context link.children)
+                (renderNodes scope link.children)
 
         Nothing ->
-            Err [ { span = link.position, id = id } ]
+            Err [ UnresolvedLink { span = link.position, id = id } ]
 
 
 fragmentSuffix : Maybe String -> String
@@ -285,18 +305,18 @@ listElement list =
 
 {-| In a tight list the items hold their text directly, not in paragraphs.
 -}
-renderListItem : Context -> Bool -> Node -> Rendered
-renderListItem context spread node =
+renderListItem : Scope -> Bool -> Node -> Rendered
+renderListItem scope spread node =
     case node of
         ListItem item ->
             let
                 content : Rendered
                 content =
                     if spread then
-                        renderNodes context item.children
+                        renderNodes scope item.children
 
                     else
-                        combine (List.map (renderTightBlock context) item.children)
+                        combine (List.map (renderTightBlock scope) item.children)
             in
             case item.checked of
                 Just isChecked ->
@@ -307,17 +327,17 @@ renderListItem context spread node =
                     element (Html.li []) content
 
         other ->
-            renderNode context other
+            renderNode scope other
 
 
-renderTightBlock : Context -> Node -> Rendered
-renderTightBlock context node =
+renderTightBlock : Scope -> Node -> Rendered
+renderTightBlock scope node =
     case node of
         Paragraph container ->
-            renderNodes context container.children
+            renderNodes scope container.children
 
         other ->
-            renderNode context other
+            renderNode scope other
 
 
 checkbox : Bool -> Html
@@ -329,14 +349,14 @@ checkbox isChecked =
 -- TABLES
 
 
-renderTable : Context -> List (Maybe Alignment) -> List Node -> Rendered
-renderTable context alignments rows =
+renderTable : Scope -> List (Maybe Alignment) -> List Node -> Rendered
+renderTable scope alignments rows =
     case rows of
         header :: body ->
             let
                 head : Rendered
                 head =
-                    element (Html.thead []) (renderRow context Html.th alignments header)
+                    element (Html.thead []) (renderRow scope Html.th alignments header)
 
                 bodyRows : Rendered
                 bodyRows =
@@ -344,7 +364,7 @@ renderTable context alignments rows =
                         Ok []
 
                     else
-                        element (Html.tbody []) (combine (List.map (renderRow context Html.td alignments) body))
+                        element (Html.tbody []) (combine (List.map (renderRow scope Html.td alignments) body))
             in
             element (Html.table []) (merge head bodyRows)
 
@@ -352,30 +372,30 @@ renderTable context alignments rows =
             element (Html.table []) (Ok [])
 
 
-renderRow : Context -> (List Html.Attribute -> List Html -> Html) -> List (Maybe Alignment) -> Node -> Rendered
-renderRow context cellElement alignments row =
+renderRow : Scope -> (List Html.Attribute -> List Html -> Html) -> List (Maybe Alignment) -> Node -> Rendered
+renderRow scope cellElement alignments row =
     case row of
         TableRow container ->
             element (Html.tr [])
                 (combine
                     (List.indexedMap
-                        (\column cell -> renderCell context cellElement (alignmentOf column alignments) cell)
+                        (\column cell -> renderCell scope cellElement (alignmentOf column alignments) cell)
                         container.children
                     )
                 )
 
         other ->
-            renderNode context other
+            renderNode scope other
 
 
-renderCell : Context -> (List Html.Attribute -> List Html -> Html) -> Maybe Alignment -> Node -> Rendered
-renderCell context cellElement alignment cell =
+renderCell : Scope -> (List Html.Attribute -> List Html -> Html) -> Maybe Alignment -> Node -> Rendered
+renderCell scope cellElement alignment cell =
     case cell of
         TableCell container ->
-            element (cellElement (alignmentStyle alignment)) (renderNodes context container.children)
+            element (cellElement (alignmentStyle alignment)) (renderNodes scope container.children)
 
         other ->
-            renderNode context other
+            renderNode scope other
 
 
 alignmentOf : Int -> List (Maybe Alignment) -> Maybe Alignment
@@ -551,9 +571,9 @@ childrenOf node =
             []
 
 
-footnoteReference : Context -> { position : Span, identifier : String } -> Html
-footnoteReference context reference =
-    case Dict.get (footnoteId reference.identifier) context.footnotes of
+footnoteReference : Scope -> { position : Span, identifier : String } -> Html
+footnoteReference scope reference =
+    case Dict.get (footnoteId reference.identifier) scope.footnotes of
         Just footnote ->
             -- Later references to the same footnote must not repeat the id,
             -- so the back link always returns to the first.
@@ -576,16 +596,16 @@ footnoteReference context reference =
             Html.text ("[^" ++ reference.identifier ++ "]")
 
 
-renderFootnotes : Context -> Rendered
-renderFootnotes context =
-    if Dict.isEmpty context.footnotes then
+renderFootnotes : Scope -> Rendered
+renderFootnotes scope =
+    if Dict.isEmpty scope.footnotes then
         Ok []
 
     else
-        context.footnotes
+        scope.footnotes
             |> Dict.values
             |> List.sortBy .number
-            |> List.map (renderFootnote context)
+            |> List.map (renderFootnote scope)
             |> combine
             |> element
                 (\items ->
@@ -597,8 +617,8 @@ renderFootnotes context =
 
 {-| The back link goes at the end of the last paragraph, as on GitHub.
 -}
-renderFootnote : Context -> Footnote -> Rendered
-renderFootnote context footnote =
+renderFootnote : Scope -> Footnote -> Rendered
+renderFootnote scope footnote =
     let
         backLink : List Html
         backLink =
@@ -616,10 +636,10 @@ renderFootnote context footnote =
             case List.reverse footnote.content of
                 (Paragraph last) :: before ->
                     merge
-                        (renderNodes context (List.reverse before))
-                        (element (Html.p []) (Result.map (\inner -> inner ++ backLink) (renderNodes context last.children)))
+                        (renderNodes scope (List.reverse before))
+                        (element (Html.p []) (Result.map (\inner -> inner ++ backLink) (renderNodes scope last.children)))
 
                 _ ->
-                    merge (renderNodes context footnote.content) (Ok [ Html.p [] backLink ])
+                    merge (renderNodes scope footnote.content) (Ok [ Html.p [] backLink ])
     in
     element (Html.li [ Attributes.id ("user-content-fn-" ++ footnote.id) ]) content

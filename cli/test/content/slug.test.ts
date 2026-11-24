@@ -11,7 +11,7 @@ function documentWith(frontmatter: Record<string, unknown>): SourceDocument {
     draft: false,
     excluded: false,
     frontmatter,
-    frontmatterPositions: {},
+    frontmatterPositions: [],
     body: "",
     bodyStartLine: 1,
   };

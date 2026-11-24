@@ -19,7 +19,7 @@ function documentAt(
     draft: false,
     excluded: false,
     frontmatter: {},
-    frontmatterPositions: {},
+    frontmatterPositions: [],
     body: "",
     bodyStartLine: 1,
   };

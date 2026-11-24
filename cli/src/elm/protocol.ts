@@ -7,7 +7,7 @@ import type { Node } from "../markdown/tree";
 import { err, ok, type Result } from "../result";
 
 /** Bumped whenever the JSON exchanged with the Elm worker changes shape. */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 export type BuildInfo = {
   siteUrl: string;

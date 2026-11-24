@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { splitFrontmatter } from "../../src/content/frontmatter";
+import {
+  type FieldPosition,
+  splitFrontmatter,
+} from "../../src/content/frontmatter";
 
 const sourcePath = "content/posts/a.md";
 
@@ -30,6 +33,10 @@ function split(source: string) {
   return result.value;
 }
 
+function positionAt(positions: FieldPosition[], path: string) {
+  return positions.find((position) => position.path === path);
+}
+
 function problems(source: string) {
   const result = splitFrontmatter(source, sourcePath);
   if (result.ok) throw new Error("expected frontmatter to be rejected");
@@ -52,22 +59,43 @@ describe("splitFrontmatter", () => {
   test("locates keys and values in file lines and columns", () => {
     const { positions } = split(post);
 
-    expect(positions[""]).toEqual({ value: span(1, 1, 1, 4) });
-    expect(positions.tags).toEqual({
+    expect(positionAt(positions, "")).toEqual({
+      path: "",
+      value: span(1, 1, 1, 4),
+    });
+    expect(positionAt(positions, "tags")).toEqual({
+      path: "tags",
       key: span(3, 1, 3, 5),
       value: span(3, 7, 3, 16),
     });
-    expect(positions["tags.1"]).toEqual({ value: span(3, 13, 3, 15) });
-    expect(positions["author.name"]).toEqual({
+    expect(positionAt(positions, "tags.1")).toEqual({
+      path: "tags.1",
+      value: span(3, 13, 3, 15),
+    });
+    expect(positionAt(positions, "author.name")).toEqual({
+      path: "author.name",
       key: span(5, 3, 5, 7),
       value: span(5, 9, 5, 12),
     });
   });
 
+  test("locates keys that are names of object properties", () => {
+    const { positions } = split(
+      "---\nhasOwnProperty: a\n__proto__: b\n---\nBody\n",
+    );
+
+    expect(positionAt(positions, "hasOwnProperty")?.key).toEqual(
+      span(2, 1, 2, 15),
+    );
+    expect(positionAt(positions, "__proto__")?.key).toEqual(span(3, 1, 3, 10));
+  });
+
   test("keeps the root position on the opening fence when a key is empty", () => {
     const result = split('---\n"": value\n---\nBody\n');
 
-    expect(result.positions[""]).toEqual({ value: span(1, 1, 1, 4) });
+    expect(result.positions.filter(({ path }) => path === "")).toEqual([
+      { path: "", value: span(1, 1, 1, 4) },
+    ]);
   });
 
   test("treats a file without frontmatter as all body", () => {
@@ -76,7 +104,7 @@ describe("splitFrontmatter", () => {
     expect(result.data).toEqual({});
     expect(result.body).toBe("Just text.\n");
     expect(result.bodyStartLine).toBe(1);
-    expect(result.positions[""]).toEqual({ value: span(1, 1, 1, 1) });
+    expect(result.positions).toEqual([{ path: "", value: span(1, 1, 1, 1) }]);
   });
 
   test("accepts empty frontmatter", () => {

@@ -648,7 +648,7 @@ badRequestTests =
                 Encode.object [ ( "protocolVersion", Encode.int 1 ) ]
                     |> render []
                     |> .diagnostics
-                    |> List.map (.message >> (\message -> String.contains "protocol version 1" message && String.contains "speaks 2" message))
+                    |> List.map (.message >> (\message -> String.contains "protocol version 1" message && String.contains "speaks 3" message))
                     |> Expect.equal [ True ]
         ]
 

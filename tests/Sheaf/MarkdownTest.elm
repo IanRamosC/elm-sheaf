@@ -4,16 +4,15 @@ import Expect
 import Json.Decode as Decode
 import ProtocolFixtures
 import Sheaf.Html as Html
-import Sheaf.Internal.Markdown as Internal
+import Sheaf.Internal.Markdown as Markdown exposing (Problem(..))
 import Sheaf.Internal.Protocol as Protocol exposing (Alignment(..), Node(..))
-import Sheaf.Markdown as Markdown
 import Sheaf.Ref as Ref exposing (Ref)
 import Test exposing (Test, describe, test)
 
 
 suite : Test
 suite =
-    describe "Sheaf.Markdown"
+    describe "Sheaf.Internal.Markdown"
         [ blockTests
         , inlineTests
         , listTests
@@ -78,10 +77,10 @@ helloWorldAt url ref =
 -- RENDERING
 
 
-renderWith : (Ref -> Maybe String) -> Node -> Result (List Markdown.LinkProblem) String
+renderWith : (Ref -> Maybe String) -> Node -> Result (List Problem) String
 renderWith resolve node =
-    Internal.fromNode node
-        |> Markdown.render resolve
+    Markdown.fromNode node
+        |> Markdown.render { resolve = resolve }
         |> Result.map (List.map Html.toString >> String.concat)
 
 
@@ -298,7 +297,7 @@ linkTests =
             \_ ->
                 renderWith noLinks
                     (root [ paragraph [ sheafLink { collection = "posts", slug = "gone", fragment = Nothing } ] ])
-                    |> Expect.equal (Err [ { span = at 3, id = "posts/gone" } ])
+                    |> Expect.equal (Err [ UnresolvedLink { span = at 3, id = "posts/gone" } ])
         , test "every unresolvable link is reported" <|
             \_ ->
                 renderWith noLinks
@@ -307,8 +306,12 @@ linkTests =
                         , Blockquote { position = at 1, children = [ paragraph [ sheafLink { collection = "posts", slug = "two", fragment = Nothing } ] ] }
                         ]
                     )
-                    |> Result.mapError (List.map .id)
-                    |> Expect.equal (Err [ "posts/one", "posts/two" ])
+                    |> Expect.equal
+                        (Err
+                            [ UnresolvedLink { span = at 3, id = "posts/one" }
+                            , UnresolvedLink { span = at 3, id = "posts/two" }
+                            ]
+                        )
         ]
 
 

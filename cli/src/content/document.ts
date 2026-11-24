@@ -22,7 +22,7 @@ export type SourceDocument = {
   imageSource?: string;
   /** The user's own fields: every key except the reserved ones. */
   frontmatter: Record<string, unknown>;
-  frontmatterPositions: Record<string, FieldPosition>;
+  frontmatterPositions: FieldPosition[];
   body: string;
   /** The 1-based file line on which `body` begins. */
   bodyStartLine: number;

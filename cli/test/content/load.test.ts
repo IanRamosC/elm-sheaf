@@ -115,7 +115,10 @@ describe("loadContent documents", () => {
   test("keeps the frontmatter positions for the host protocol", () => {
     const [doc] = documents([file("content/posts/a.md", "title: Hi")]);
 
-    expect(doc?.frontmatterPositions.title?.key?.start).toEqual({
+    const title = doc?.frontmatterPositions.find(
+      (position) => position.path === "title",
+    );
+    expect(title?.key?.start).toEqual({
       line: 2,
       column: 1,
     });

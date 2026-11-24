@@ -136,12 +136,13 @@ function loadDocument(
     if (!(key in data)) return undefined;
     const parsed = parse(data[key]);
     if (parsed.ok) return parsed.value;
+    const keySpan = positions.find((position) => position.path === key)?.key;
     problems.push({
       severity: "error",
       title: "BAD FRONTMATTER",
       message: `The \`${key}\` field is not valid. ${parsed.error}`,
       sourcePath: path,
-      ...(positions[key]?.key && { span: positions[key].key }),
+      ...(keySpan && { span: keySpan }),
     });
     return undefined;
   };

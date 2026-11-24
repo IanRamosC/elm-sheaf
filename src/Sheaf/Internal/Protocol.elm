@@ -125,7 +125,7 @@ type alias FieldPosition =
 -}
 protocolVersion : Int
 protocolVersion =
-    2
+    3
 
 
 {-| Decodes the host's request, which must speak this protocol version.
@@ -201,7 +201,7 @@ documentDecoder =
         |> andMap (Decode.field "draft" Decode.bool)
         |> andMap (Decode.field "excluded" Decode.bool)
         |> andMap (Decode.field "frontmatter" Decode.value)
-        |> andMap (Decode.field "frontmatterPositions" (Decode.dict fieldPositionDecoder))
+        |> andMap (Decode.field "frontmatterPositions" fieldPositionsDecoder)
         |> andMap (Decode.field "tree" nodeDecoder)
 
 
@@ -306,11 +306,18 @@ isLeapYear year =
     (modBy 4 year == 0 && modBy 100 year /= 0) || modBy 400 year == 0
 
 
-fieldPositionDecoder : Decoder FieldPosition
-fieldPositionDecoder =
-    Decode.map2 FieldPosition
-        (optionalField "key" spanDecoder)
-        (Decode.field "value" spanDecoder)
+{-| The host sends a list, not an object keyed by path, because `Decode.dict`
+fails on a key named `hasOwnProperty`.
+-}
+fieldPositionsDecoder : Decoder (Dict String FieldPosition)
+fieldPositionsDecoder =
+    Decode.list
+        (Decode.map3 (\path key value -> ( path, { key = key, value = value } ))
+            (Decode.field "path" Decode.string)
+            (optionalField "key" spanDecoder)
+            (Decode.field "value" spanDecoder)
+        )
+        |> Decode.map Dict.fromList
 
 
 spanDecoder : Decoder Span

@@ -10,22 +10,24 @@ import type { Diagnostic, Position, Span } from "../diagnostics/diagnostic";
 import { err, ok, type Result } from "../result";
 
 /**
- * Where a frontmatter value sits in its file. `key` is absent for list items,
- * which have no key; an error about a value underlines `value`, and one about
- * a key (an unknown field, say) underlines `key`.
+ * Where a frontmatter value sits in its file. `path` is dotted (`tags`,
+ * `tags.1`, `author.name`). `key` is absent for list items, which have no key;
+ * an error about a value underlines `value`, and one about a key (an unknown
+ * field, say) underlines `key`.
  */
-export type FieldPosition = { key?: Span; value: Span };
+export type FieldPosition = { path: string; key?: Span; value: Span };
 
 /** A Markdown file taken apart into its frontmatter and body. */
 export type SplitSource = {
   data: Record<string, unknown>;
   /**
-   * Keyed by dotted path (`tags`, `tags.1`, `author.name`), in file lines and
-   * columns. The root path `""` is always present so that a missing field
-   * still has somewhere to point: the opening fence, or an empty span at 1:1
-   * when the file has no frontmatter, which Elm mentions in its hint.
+   * In file lines and columns. A list rather than an object keyed by path,
+   * because a frontmatter key may be `hasOwnProperty` or `__proto__`. The root
+   * path `""` always comes first so that a missing field still has somewhere
+   * to point: the opening fence, or an empty span at 1:1 when the file has no
+   * frontmatter, which Elm mentions in its hint.
    */
-  positions: Record<string, FieldPosition>;
+  positions: FieldPosition[];
   body: string;
   /** The 1-based file line on which `body` begins. */
   bodyStartLine: number;
@@ -53,7 +55,7 @@ export function splitFrontmatter(
   if (!isFence(lines[0] ?? "")) {
     return ok({
       data: {},
-      positions: { "": { value: span(1, 1, 1, 1) } },
+      positions: [{ path: "", value: span(1, 1, 1, 1) }],
       body: lines.join("\n"),
       bodyStartLine: 1,
     });
@@ -80,7 +82,11 @@ export function splitFrontmatter(
 
   return ok({
     data: parsed.value.data,
-    positions: { ...parsed.value.positions, "": { value: openingFence } },
+    positions: [
+      { path: "", value: openingFence },
+      // A YAML key `""` would otherwise claim the root path.
+      ...parsed.value.positions.filter(({ path }) => path !== ""),
+    ],
     body: lines.slice(closingIndex + 1).join("\n"),
     bodyStartLine: closingIndex + 2,
   });
@@ -113,7 +119,7 @@ function parseYaml(
   }
 
   const root = document.contents;
-  if (root === null) return ok({ data: {}, positions: {} });
+  if (root === null) return ok({ data: {}, positions: [] });
   if (!isMap(root)) {
     const [start, end] = root.range ?? [0, 0];
     return err([
@@ -125,13 +131,14 @@ function parseYaml(
     ]);
   }
 
-  const positions: Record<string, FieldPosition> = {};
+  const positions: FieldPosition[] = [];
   const record = (path: string, key: Node | null, value: Node | null) => {
     if (value?.range) {
-      positions[path] = {
+      positions.push({
+        path,
         ...(key?.range && { key: fileSpan(key.range[0], key.range[1]) }),
         value: fileSpan(value.range[0], value.range[1]),
-      };
+      });
     }
   };
   const walk = (node: unknown, path: string) => {

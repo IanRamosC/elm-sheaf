@@ -12,7 +12,7 @@ function documentWith(body: string, bodyStartLine = 1): SourceDocument {
     draft: false,
     excluded: false,
     frontmatter: {},
-    frontmatterPositions: {},
+    frontmatterPositions: [],
     body,
     bodyStartLine,
   };

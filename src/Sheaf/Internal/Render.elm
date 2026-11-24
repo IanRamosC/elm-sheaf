@@ -17,7 +17,7 @@ import Sheaf.Internal.Grouping as Grouping exposing (GroupPages, Grouped)
 import Sheaf.Internal.Hint as Hint
 import Sheaf.Internal.Html as Html exposing (Url(..))
 import Sheaf.Internal.Listing as Listing exposing (Body)
-import Sheaf.Internal.Markdown as Markdown
+import Sheaf.Internal.Markdown as Markdown exposing (Problem(..))
 import Sheaf.Internal.Output as Output exposing (Output(..))
 import Sheaf.Internal.Path as Path
 import Sheaf.Internal.Pattern as Pattern
@@ -270,27 +270,39 @@ urlTarget context groupPages url =
 -}
 renderBody : Context -> Document -> Result (List Diagnostic) (List Html)
 renderBody context document =
-    Markdown.render (linkTarget context >> Result.toMaybe) (Markdown.fromNode document.tree)
-        |> Result.mapError
-            (List.filterMap
-                (\problem ->
-                    let
-                        ref : Ref
-                        ref =
-                            Ref.fromId problem.id
-                    in
-                    linkTarget context ref
-                        |> Results.error
-                        |> Maybe.map
-                            (Check.linkDiagnostic
-                                { subject = "This document links to"
-                                , sourcePath = Just document.sourcePath
-                                , span = Just problem.span
-                                }
-                                ref
-                            )
-                )
-            )
+    Markdown.render { resolve = linkTarget context >> Result.toMaybe } (Markdown.fromNode document.tree)
+        |> Result.mapError (List.filterMap (bodyDiagnostic context document))
+
+
+bodyDiagnostic : Context -> Document -> Markdown.Problem -> Maybe Diagnostic
+bodyDiagnostic context document problem =
+    case problem of
+        UnresolvedLink link ->
+            let
+                ref : Ref
+                ref =
+                    Ref.fromId link.id
+            in
+            linkTarget context ref
+                |> Results.error
+                |> Maybe.map
+                    (Check.linkDiagnostic
+                        { subject = "This document links to"
+                        , sourcePath = Just document.sourcePath
+                        , span = Just link.span
+                        }
+                        ref
+                    )
+
+        Located located ->
+            Just
+                { severity = Error
+                , title = located.title
+                , message = located.message
+                , sourcePath = Just document.sourcePath
+                , span = Just located.span
+                , hint = located.hint
+                }
 
 
 

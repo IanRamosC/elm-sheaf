@@ -167,7 +167,7 @@ requestWithSlugs slugs =
 requestWith : { basePath : String, slugs : List ( String, String, String ) } -> List String -> List Source -> Value
 requestWith { basePath, slugs } collections sources =
     Encode.object
-        [ ( "protocolVersion", Encode.int 2 )
+        [ ( "protocolVersion", Encode.int 3 )
         , ( "build"
           , Encode.object
                 [ ( "siteUrl", Encode.string ("https://example.com" ++ basePath) )
@@ -204,7 +204,7 @@ encodeSource source =
         , ( "draft", Encode.bool source.excluded )
         , ( "excluded", Encode.bool source.excluded )
         , ( "frontmatter", Encode.object source.frontmatter )
-        , ( "frontmatterPositions", Encode.object (List.map (\( path, at ) -> ( path, Encode.object [ ( "value", encodeSpan at ) ] )) source.positions) )
+        , ( "frontmatterPositions", Encode.list (\( path, at ) -> Encode.object [ ( "path", Encode.string path ), ( "value", encodeSpan at ) ]) source.positions )
         , ( "tree", markdownNode "root" [ ( "children", Encode.list identity source.body ) ] )
         ]
 
