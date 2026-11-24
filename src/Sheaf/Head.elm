@@ -86,15 +86,19 @@ canonical =
 
 {-| The Open Graph tags that link previews read: `og:title`,
 `og:description`, `og:image`, `og:url` (this page's absolute URL, left out on
-the `Route.notFound` page, as for `canonical`) and `og:type`. An article also gets `article:published_time` and
-`article:modified_time`, in UTC.
+the `Route.notFound` page, as for `canonical`) and `og:type`. An article also
+gets `article:published_time` and `article:modified_time`, in UTC.
 
-    Head.openGraph
-        { title = post.meta.title
-        , description = Just post.meta.summary
-        , image = Just "/covers/hello.png"
-        , kind = Head.Article { published = date, modified = post.updated }
-        }
+For a post whose `summary` is a `String`, given the date it was published:
+
+    articlePreview : Date -> Document PostMeta -> Head.Tag
+    articlePreview published post =
+        Head.openGraph
+            { title = post.meta.title
+            , description = Just post.meta.summary
+            , image = Just "/covers/hello.png"
+            , kind = Head.Article { published = published, modified = post.updated }
+            }
 
 -}
 openGraph : { title : String, description : Maybe String, image : Maybe String, kind : Kind } -> Tag

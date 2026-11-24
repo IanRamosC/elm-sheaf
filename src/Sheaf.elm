@@ -126,8 +126,11 @@ and a value as written in frontmatter:
 
     Sheaf.groupLink "/tags/:group/" "Elm" [ text "Elm" ]
 
-Any spelling of the value with the same slug finds the same group, so `"Élm"`
-links to the posts tagged `elm`. A pattern no `groupedBy` route has, a value
+A spelling that differs only in case, accents or separators finds the same
+group, as long as some document's frontmatter writes it that way: if one post
+is tagged `Élm` and another `elm`, both spellings link to the same page. Two
+values whose slugs merely match, such as `C` and `C++`, are different groups
+and are reported as a collision. A pattern no `groupedBy` route has, a value
 not written in any frontmatter, and a group with no published documents are
 reported when the site is built.
 

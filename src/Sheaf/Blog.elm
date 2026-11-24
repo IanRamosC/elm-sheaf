@@ -69,13 +69,21 @@ Git does not keep empty folders, so commit an empty `.gitkeep` file in it.
             (article []
                 (h1 [] [ text document.meta.title ]
                     :: document.body
-                    ++ [ ul [] (List.map (\name -> li [] [ Blog.tagLink name [ text name ] ]) document.meta.tags) ]
+                    ++ [ ul []
+                            (List.map
+                                (\name -> li [] [ Blog.tagLink name [ text name ] ])
+                                document.meta.tags
+                            )
+                       ]
                 )
             )
 
     tags : List (Group PostMeta) -> Page
     tags groups =
-        layout "Tags" (ul [] (List.map (\group -> li [] [ Blog.tagLink group.name [ text group.name ] ]) groups))
+        layout "Tags"
+            (ul []
+                (List.map (\group -> li [] [ Blog.tagLink group.name [ text group.name ] ]) groups)
+            )
 
     postList : Listing PostMeta -> Html
     postList { items, pagination } =
@@ -97,7 +105,13 @@ Git does not keep empty folders, so commit an empty `.gitkeep` file in it.
     layout title content =
         { title = title
         , head = [ Head.canonical, Head.stylesheet "/style.css" ]
-        , body = [ nav [] [ a [ siteHref "/" ] [ text "Home" ], a [ siteHref "/archive/" ] [ text "Archive" ] ], content ]
+        , body =
+            [ nav []
+                [ a [ siteHref "/" ] [ text "Home" ]
+                , a [ siteHref "/archive/" ] [ text "Archive" ]
+                ]
+            , content
+            ]
         }
 
 Every layout's head also gets links to the RSS feed at `/feed.xml` and the
@@ -238,8 +252,9 @@ tagPattern =
 
 Sheaf computes slugs only for values written in some document's frontmatter,
 so the tag must be spelled exactly as some document spells it: if every post
-writes `elm`, `Blog.tagLink "Elm"` is reported as `MISSING SLUG`. So templates
-normally link to the tags of a post's frontmatter:
+writes `elm`, `Blog.tagLink "Elm"` is reported as `MISSING SLUG`. A tag whose
+only posts are drafts has no page, so a link to it fails the build too. So
+templates normally link to the tags of a post's frontmatter:
 
     List.map (\name -> Blog.tagLink name [ text name ]) post.meta.tags
 
