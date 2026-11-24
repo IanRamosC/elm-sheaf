@@ -59,8 +59,8 @@ describe("writeSite", () => {
     writeFileSync(join(root, "static/fonts/a.txt"), "font");
 
     await writeSite(root, [
-      { path: "index.html", html: "home" },
-      { path: "posts/one/index.html", html: "one" },
+      { path: "index.html", content: "home" },
+      { path: "posts/one/index.html", content: "one" },
     ]);
 
     expect(existsSync(join(root, "dist/stale.html"))).toBe(false);
@@ -77,7 +77,7 @@ describe("writeSite", () => {
   test("works without a static folder", async () => {
     const root = siteRoot();
 
-    await writeSite(root, [{ path: "index.html", html: "home" }]);
+    await writeSite(root, [{ path: "index.html", content: "home" }]);
 
     expect(readdirSync(join(root, "dist"))).toEqual(["index.html"]);
   });
@@ -88,14 +88,52 @@ describe("writeSite", () => {
     writeFileSync(join(root, "dist/previous.html"), "kept");
 
     await expect(
-      writeSite(root, [{ path: "../escape.html", html: "" }]),
+      writeSite(root, [{ path: "../escape.html", content: "" }]),
     ).rejects.toThrow("../escape.html");
     await expect(
       writeSite(root, [
-        { path: "fine.html", html: "" },
-        { path: "/etc/passwd", html: "" },
+        { path: "fine.html", content: "" },
+        { path: "/etc/passwd", content: "" },
       ]),
     ).rejects.toThrow("/etc/passwd");
+    expect(readFileSync(join(root, "dist/previous.html"), "utf8")).toBe("kept");
+  });
+
+  test("writes feeds and the sitemap next to the pages", async () => {
+    const root = siteRoot();
+
+    await writeSite(root, [
+      { path: "index.html", content: "home" },
+      { path: "feed.xml", content: "<rss/>" },
+      { path: "atom.xml", content: "<feed/>" },
+      { path: "sitemap.xml", content: "<urlset/>" },
+    ]);
+
+    expect(readdirSync(join(root, "dist")).sort()).toEqual([
+      "atom.xml",
+      "feed.xml",
+      "index.html",
+      "sitemap.xml",
+    ]);
+  });
+
+  test("throws on clashing paths before touching dist", async () => {
+    const root = siteRoot();
+    mkdirSync(join(root, "dist"));
+    writeFileSync(join(root, "dist/previous.html"), "kept");
+
+    await expect(
+      writeSite(root, [
+        { path: "feed.xml", content: "" },
+        { path: "feed.xml/index.html", content: "" },
+      ]),
+    ).rejects.toThrow("feed.xml");
+    await expect(
+      writeSite(root, [
+        { path: "About/index.html", content: "" },
+        { path: "about/index.html", content: "" },
+      ]),
+    ).rejects.toThrow("about/index.html");
     expect(readFileSync(join(root, "dist/previous.html"), "utf8")).toBe("kept");
   });
 });

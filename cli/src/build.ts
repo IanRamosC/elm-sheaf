@@ -13,9 +13,15 @@ import type { Diagnostic } from "./diagnostics/diagnostic";
 import { compileElm, findElm } from "./elm/compile";
 import { generateElm } from "./elm/generate";
 import { assignValueNames } from "./elm/names";
-import { encodeRequest, type ParsedDocument } from "./elm/protocol";
+import {
+  encodeRequest,
+  type ParsedDocument,
+  type Response,
+} from "./elm/protocol";
 import { runElm } from "./elm/run";
-import { writeGenerated, writeSite } from "./emit/write";
+import { atomFeed, rssFeed } from "./emit/feeds";
+import { sitemapXml } from "./emit/sitemap";
+import { type OutputFile, writeGenerated, writeSite } from "./emit/write";
 import { checkLinks } from "./markdown/links";
 import { parseMarkdown } from "./markdown/parse";
 import { collect, err, ok, type Result } from "./result";
@@ -93,16 +99,50 @@ export async function build(
   const ran = await runElm(compiled.value, request);
   if (!ran.ok) return ran;
 
-  const { pages, diagnostics } = ran.value.response;
+  const { response } = ran.value;
+  const { pages, diagnostics } = response;
   if (diagnostics.some(({ severity }) => severity === "error")) {
     return err(diagnostics);
   }
-  if (options.write) await writeSite(siteRoot, pages);
+  if (options.write) {
+    await writeSite(siteRoot, outputFiles(response, config.value, options.now));
+  }
   return ok({
     pages: pages.length,
     warnings: diagnostics,
     output: ran.value.output,
   });
+}
+
+function outputFiles(
+  response: Response,
+  config: Config,
+  now: Date,
+): OutputFile[] {
+  // `siteUrl.href` may lack the trailing slash that relative feed paths need.
+  const site = config.siteUrl.origin + config.basePath;
+  const files: OutputFile[] = response.pages.map(({ path, html }) => ({
+    path,
+    content: html,
+  }));
+  for (const feed of response.feeds) {
+    const render = (path: string) => ({
+      site,
+      feed: new URL(path, site).href,
+    });
+    files.push(
+      {
+        path: feed.rss,
+        content: rssFeed(feed, render(feed.rss), response.site, now),
+      },
+      {
+        path: feed.atom,
+        content: atomFeed(feed, render(feed.atom), response.site, now),
+      },
+    );
+  }
+  files.push({ path: "sitemap.xml", content: sitemapXml(response.sitemap) });
+  return files;
 }
 
 async function readConfig(
