@@ -12,9 +12,11 @@ import Dict exposing (Dict)
 import Json.Decode as Decode
 import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Frontmatter as Frontmatter
+import Sheaf.Internal.Head as Head
 import Sheaf.Internal.Hint as Hint
-import Sheaf.Internal.Html as Html exposing (HtmlProblem(..))
+import Sheaf.Internal.Html as Html exposing (HtmlProblem(..), Url(..))
 import Sheaf.Internal.Markdown as Markdown
+import Sheaf.Internal.Path as Path
 import Sheaf.Internal.Protocol as Protocol exposing (Diagnostic, Document, Request, Response, Severity(..))
 import Sheaf.Internal.Site exposing (Page, Route(..), Site(..))
 import Sheaf.Ref as Ref exposing (Ref)
@@ -50,7 +52,8 @@ render ((Site { metadata }) as site) json =
 
 
 type alias Context =
-    { basePath : String
+    { origin : String
+    , basePath : String
     , documents : Dict String Document
 
     -- The pattern of the first item route of each collection.
@@ -63,7 +66,8 @@ renderSite (Site site) request =
     let
         context : Context
         context =
-            { basePath = request.build.basePath
+            { origin = request.build.origin
+            , basePath = request.build.basePath
             , documents = Dict.fromList (List.map (\document -> ( document.id, document )) request.documents)
             , itemPatterns =
                 -- Reversed, because `Dict.fromList` keeps the last.
@@ -194,7 +198,7 @@ patternProblem pattern =
     else
         -- A trailing `/` makes the pattern a folder, so its empty last
         -- segment is allowed.
-        segmentProblem (String.split "/" (dropTrailingSlash (String.dropLeft 1 pattern)))
+        segmentProblem (String.split "/" (Path.dropTrailingSlash (String.dropLeft 1 pattern)))
 
 
 segmentProblem : List String -> Maybe PatternProblem
@@ -310,35 +314,23 @@ linkTarget context ref =
             else
                 case Dict.get document.collection context.itemPatterns of
                     Just pattern ->
-                        Ok (joinPath context.basePath (fillSlug document.slug pattern))
+                        Ok (Path.join context.basePath (fillSlug document.slug pattern))
 
                     Nothing ->
                         Err (ToCollectionWithoutPages document.collection)
 
 
-{-| Join two URL paths without doubling the slash between them.
+{-| Where a URL left to the renderer points. A site path that is not valid is
+reported by `Html.problems`, and its page is not written.
 -}
-joinPath : String -> String -> String
-joinPath base path =
-    dropTrailingSlash base ++ "/" ++ dropLeadingSlash path
+urlTarget : Context -> Url -> Maybe String
+urlTarget context url =
+    case url of
+        DocumentUrl ref ->
+            Result.toMaybe (linkTarget context ref)
 
-
-dropTrailingSlash : String -> String
-dropTrailingSlash path =
-    if String.endsWith "/" path then
-        String.dropRight 1 path
-
-    else
-        path
-
-
-dropLeadingSlash : String -> String
-dropLeadingSlash path =
-    if String.startsWith "/" path then
-        String.dropLeft 1 path
-
-    else
-        path
+        SitePath path ->
+            Just (Path.join context.basePath path)
 
 
 fillSlug : String -> String -> String
@@ -491,7 +483,7 @@ pathOf url =
     let
         relative : String
         relative =
-            dropLeadingSlash url
+            Path.dropLeadingSlash url
     in
     if relative == "" || String.endsWith "/" relative then
         relative ++ "index.html"
@@ -547,7 +539,7 @@ duplicate path first second =
         }
 
 
-{-| Resolve a page's links, check its HTML and render it.
+{-| Resolve a page's URLs, check its HTML and render it.
 -}
 finish : Context -> String -> UncheckedPage -> Result (List Diagnostic) Protocol.Page
 finish context language { pattern, url, page } =
@@ -558,40 +550,53 @@ finish context language { pattern, url, page } =
 
         head : List Html
         head =
-            [ Html.node "title" [] [ Html.text page.title ] ]
-
-        body : List Html
-        body =
-            List.map (Html.resolveLinks (linkTarget context >> Result.toMaybe)) page.body
+            Html.node "title" [] [ Html.text page.title ]
+                :: List.concatMap (Head.toHtml { origin = context.origin, basePath = context.basePath, url = url }) page.head
 
         linkProblems : List Diagnostic
         linkProblems =
             page.body
-                |> List.concatMap Html.links
+                |> List.concatMap Html.urls
                 |> List.filterMap
-                    (\ref ->
-                        linkTarget context ref
-                            |> errorOf
-                            |> Maybe.map
-                                (linkDiagnostic
-                                    { subject = subject ++ " a `Sheaf.link` points to"
-                                    , sourcePath = Nothing
-                                    , span = Nothing
-                                    }
-                                    ref
-                                )
+                    (\target ->
+                        case target of
+                            DocumentUrl ref ->
+                                linkTarget context ref
+                                    |> errorOf
+                                    |> Maybe.map
+                                        (linkDiagnostic
+                                            { subject = subject ++ " a `Sheaf.link` points to"
+                                            , sourcePath = Nothing
+                                            , span = Nothing
+                                            }
+                                            ref
+                                        )
+
+                            SitePath _ ->
+                                Nothing
                     )
 
+        -- Checked before resolving, which would hide a bad site path.
         htmlProblems : List Diagnostic
         htmlProblems =
-            List.concatMap Html.problems (head ++ body)
+            List.concatMap Html.problems (head ++ page.body)
                 |> List.map (invalidHtml subject)
+
+        headProblems : List Diagnostic
+        headProblems =
+            List.concatMap Head.problems page.head
+                |> List.map (invalidHeadPath subject)
     in
-    case linkProblems ++ htmlProblems of
+    case linkProblems ++ htmlProblems ++ headProblems of
         [] ->
             Ok
                 { path = pathOf url
-                , html = Html.document { lang = language, head = head, body = body }
+                , html =
+                    Html.document
+                        { lang = language
+                        , head = head
+                        , body = List.map (Html.resolveUrls (urlTarget context)) page.body
+                        }
                 }
 
         problems ->
@@ -621,3 +626,24 @@ invalidHtml subject problem =
         RawTextElement tag ->
             diagnostic ("made a `<" ++ tag ++ ">` element, whose content cannot be escaped.")
                 (Just "Put styles and scripts in files under `static/` and link to them instead.")
+
+        InvalidSitePath { tag, name, path } ->
+            diagnostic ("gave a `<" ++ tag ++ ">` element the site path `" ++ path ++ "` for its `" ++ name ++ "`, but a site path starts with a single `/`.")
+                (Just "Write a site path from the root of the site, such as `/archive/`. The base path is added for you. For a URL on another host, use `href` or `src`.")
+
+
+invalidHeadPath : String -> Head.PathProblem -> Diagnostic
+invalidHeadPath subject { function, path } =
+    { severity = Error
+    , title = "INVALID HTML"
+    , message =
+        subject
+            ++ " the template gave `"
+            ++ function
+            ++ "` the path `"
+            ++ path
+            ++ "`, but a path in the head is either a site path, which starts with a single `/`, or a full `http://` or `https://` URL."
+    , sourcePath = Nothing
+    , span = Nothing
+    , hint = Just "Write a site path from the root of the site, such as `/style.css`. The base path is added for you."
+    }

@@ -105,8 +105,9 @@ toString =
 
 {-| Render a whole page, starting with the doctype.
 
-The `head` is preceded by `<meta charset="utf-8">`, so templates do not need
-to add it.
+The `head` is preceded by `<meta charset="utf-8">` and
+`<meta name="viewport" content="width=device-width, initial-scale=1">`, so
+templates do not need to add them.
 
 -}
 document : { lang : String, head : List Html, body : List Html } -> String

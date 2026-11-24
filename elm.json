@@ -11,6 +11,7 @@
         "Sheaf.Document",
         "Sheaf.Feed",
         "Sheaf.Frontmatter",
+        "Sheaf.Head",
         "Sheaf.Html",
         "Sheaf.Html.Attributes",
         "Sheaf.Markdown",

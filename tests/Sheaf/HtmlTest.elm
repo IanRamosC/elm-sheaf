@@ -3,7 +3,7 @@ module Sheaf.HtmlTest exposing (suite)
 import Expect
 import Fuzz
 import Sheaf.Html as Html exposing (div, img, p, text)
-import Sheaf.Html.Attributes as Attributes exposing (attribute, class, src)
+import Sheaf.Html.Attributes as Attributes exposing (attribute, class, siteHref, siteSrc, src)
 import Sheaf.Internal.Html exposing (HtmlProblem(..), problems)
 import Test exposing (Test, describe, fuzz, test)
 
@@ -94,6 +94,22 @@ problemTests =
             \_ ->
                 problems (div [] [ p [] [ Html.node "1x" [] [] ] ])
                     |> Expect.equal [ InvalidTagName "1x" ]
+        , test "accepts a site path that starts with a single slash" <|
+            \_ ->
+                problems (Html.a [ siteHref "/archive/" ] [ img [ siteSrc "/cover.png" ] [] ])
+                    |> Expect.equal []
+        , test "reports a site path that does not start with a slash" <|
+            \_ ->
+                problems (Html.a [ siteHref "archive/" ] [])
+                    |> Expect.equal [ InvalidSitePath { tag = "a", name = "href", path = "archive/" } ]
+        , test "reports a site path that starts with two slashes, which a browser reads as another host" <|
+            \_ ->
+                problems (img [ siteSrc "//cdn.example.com/x" ] [])
+                    |> Expect.equal [ InvalidSitePath { tag = "img", name = "src", path = "//cdn.example.com/x" } ]
+        , test "toString leaves out a site path that is not resolved" <|
+            \_ ->
+                Html.toString (Html.a [ siteHref "/archive/", class "a" ] [])
+                    |> Expect.equal "<a class=\"a\"></a>"
         , test "toString leaves out an invalid attribute" <|
             \_ ->
                 Html.toString (div [ attribute "on click" "x", class "a" ] [])
@@ -108,12 +124,12 @@ problemTests =
 documentTests : Test
 documentTests =
     describe "document"
-        [ test "wraps head and body with doctype, language and UTF-8 charset" <|
+        [ test "wraps head and body with doctype, language, UTF-8 charset and viewport" <|
             \_ ->
                 Html.document
                     { lang = "en"
                     , head = [ Html.node "title" [] [ text "Hi" ] ]
                     , body = [ p [] [ text "x" ] ]
                     }
-                    |> Expect.equal "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Hi</title></head><body><p>x</p></body></html>"
+                    |> Expect.equal "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Hi</title></head><body><p>x</p></body></html>"
         ]

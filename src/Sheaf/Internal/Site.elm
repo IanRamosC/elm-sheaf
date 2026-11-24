@@ -9,6 +9,7 @@ module Sheaf.Internal.Site exposing (Site(..), Metadata, Feed, Route(..), Collec
 
 import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Frontmatter exposing (Frontmatter, Problem)
+import Sheaf.Internal.Head as Head
 import Sheaf.Internal.Protocol as Protocol
 
 
@@ -58,9 +59,11 @@ type Route
         }
 
 
-{-| What a template returns for one page.
+{-| What a template returns for one page: its title, the tags of its `<head>`
+and the content of its `<body>`.
 -}
 type alias Page =
     { title : String
+    , head : List Head.Tag
     , body : List Html
     }

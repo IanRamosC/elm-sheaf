@@ -1,7 +1,7 @@
 module Sheaf.Internal.Html exposing
-    ( Html, Attribute, HtmlProblem(..)
-    , text, node, attribute, booleanAttribute, link
-    , links, resolveLinks
+    ( Html, Attribute, Url(..), HtmlProblem(..)
+    , text, node, attribute, booleanAttribute, sitePathAttribute, link
+    , urls, resolveUrls
     , toString, document, problems
     )
 
@@ -10,30 +10,41 @@ module Sheaf.Internal.Html exposing
 It is not exposed by the package so templates cannot build or inspect the tree
 directly.
 
-@docs Html, Attribute, HtmlProblem
-@docs text, node, attribute, booleanAttribute, link
-@docs links, resolveLinks
+@docs Html, Attribute, Url, HtmlProblem
+@docs text, node, attribute, booleanAttribute, sitePathAttribute, link
+@docs urls, resolveUrls
 @docs toString, document, problems
 
 -}
 
+import Sheaf.Internal.Path as Path
 import Sheaf.Ref exposing (Ref)
 
 
-{-| A piece of a page: text, an element, or a link to a document whose URL is
-not known until the whole site is rendered.
+{-| A piece of a page: text, an element, or a link whose URL is not known
+until the whole site is rendered.
 -}
 type Html
     = Text String
     | Element String (List Attribute) (List Html)
-    | Link Ref (List Html)
+    | Link Url (List Html)
 
 
-{-| An attribute of an element.
+{-| An attribute of an element. A `Deferred` value is a URL that is not known
+until the whole site is rendered.
 -}
 type Attribute
     = Valued String String
     | Flag String Bool
+    | Deferred String Url
+
+
+{-| A URL that only the renderer can write, because it depends on the site's
+routes or its base path.
+-}
+type Url
+    = DocumentUrl Ref
+    | SitePath String
 
 
 {-| Something that makes a tree impossible to render faithfully.
@@ -46,6 +57,7 @@ type HtmlProblem
     = InvalidTagName String
     | InvalidAttributeName { tag : String, name : String }
     | RawTextElement String
+    | InvalidSitePath { tag : String, name : String, path : String }
 
 
 {-| Plain text, escaped when rendered.
@@ -76,52 +88,85 @@ booleanAttribute =
     Flag
 
 
+{-| An attribute whose value is a path from the root of the site, given the
+base path by [`resolveUrls`](#resolveUrls).
+-}
+sitePathAttribute : String -> String -> Attribute
+sitePathAttribute name path =
+    Deferred name (SitePath path)
+
+
 {-| A link to a document, resolved to an `<a href>` by
-[`resolveLinks`](#resolveLinks).
+[`resolveUrls`](#resolveUrls).
 -}
 link : Ref -> List Html -> Html
-link =
-    Link
+link ref =
+    Link (DocumentUrl ref)
 
 
 
--- LINKS
+-- URLS
 
 
-{-| Every document the tree links to, in document order.
+{-| Every URL the tree leaves to the renderer, in document order.
 -}
-links : Html -> List Ref
-links html =
+urls : Html -> List Url
+urls html =
     case html of
         Text _ ->
             []
 
-        Element _ _ children ->
-            List.concatMap links children
+        Element _ attributes children ->
+            List.filterMap deferredUrl attributes ++ List.concatMap urls children
 
-        Link ref children ->
-            ref :: List.concatMap links children
+        Link url children ->
+            url :: List.concatMap urls children
 
 
-{-| Turn each link to a document into an `<a href>`. A link whose document has
-no URL is left as it is.
+deferredUrl : Attribute -> Maybe Url
+deferredUrl attr =
+    case attr of
+        Deferred _ url ->
+            Just url
+
+        _ ->
+            Nothing
+
+
+{-| Write every URL the tree leaves to the renderer, in one pass, so that
+links and site paths cannot disagree about how a URL is found. A URL that
+`resolve` cannot write is left as it is.
 -}
-resolveLinks : (Ref -> Maybe String) -> Html -> Html
-resolveLinks resolve html =
+resolveUrls : (Url -> Maybe String) -> Html -> Html
+resolveUrls resolve html =
     case html of
         Text _ ->
             html
 
         Element tag attributes children ->
-            Element tag attributes (List.map (resolveLinks resolve) children)
+            Element tag
+                (List.map (resolveAttribute resolve) attributes)
+                (List.map (resolveUrls resolve) children)
 
-        Link ref children ->
-            case resolve ref of
-                Just url ->
-                    Element "a" [ Valued "href" url ] (List.map (resolveLinks resolve) children)
+        Link url children ->
+            case resolve url of
+                Just href ->
+                    Element "a" [ Valued "href" href ] (List.map (resolveUrls resolve) children)
 
                 Nothing ->
-                    Link ref (List.map (resolveLinks resolve) children)
+                    Link url (List.map (resolveUrls resolve) children)
+
+
+resolveAttribute : (Url -> Maybe String) -> Attribute -> Attribute
+resolveAttribute resolve attr =
+    case attr of
+        Deferred name url ->
+            resolve url
+                |> Maybe.map (Valued name)
+                |> Maybe.withDefault attr
+
+        _ ->
+            attr
 
 
 
@@ -158,11 +203,20 @@ problems html =
 
 attributeProblem : String -> Attribute -> Maybe HtmlProblem
 attributeProblem tag attr =
-    if isValidAttributeName (attributeName attr) then
-        Nothing
+    if not (isValidAttributeName (attributeName attr)) then
+        Just (InvalidAttributeName { tag = tag, name = attributeName attr })
 
     else
-        Just (InvalidAttributeName { tag = tag, name = attributeName attr })
+        case attr of
+            Deferred name (SitePath path) ->
+                if Path.isSitePath path then
+                    Nothing
+
+                else
+                    Just (InvalidSitePath { tag = tag, name = name, path = path })
+
+            _ ->
+                Nothing
 
 
 attributeName : Attribute -> String
@@ -172,6 +226,9 @@ attributeName attr =
             name
 
         Flag name _ ->
+            name
+
+        Deferred name _ ->
             name
 
 
@@ -216,8 +273,8 @@ isVoidElement tag =
 
 {-| Render a tree as HTML.
 
-Parts that [`problems`](#problems) reports are left out, and a link that was
-not resolved has no `href`.
+Parts that [`problems`](#problems) reports are left out, and so is a URL that
+was not resolved: a link has no `href`, and a site path has no attribute.
 
 -}
 toString : Html -> String
@@ -266,16 +323,19 @@ renderAttribute attr =
             Flag _ False ->
                 ""
 
+            Deferred _ _ ->
+                ""
 
-{-| A complete page. The charset comes first so every page is UTF-8 without
-each template having to remember it.
+
+{-| A complete page. The charset and the viewport come first so every page is
+UTF-8 and fits a phone's screen without each template having to remember them.
 -}
 document : { lang : String, head : List Html, body : List Html } -> String
 document page =
     String.concat
         [ "<!DOCTYPE html><html lang=\""
         , escape page.lang
-        , "\"><head><meta charset=\"utf-8\">"
+        , "\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
         , renderAll page.head
         , "</head><body>"
         , renderAll page.body

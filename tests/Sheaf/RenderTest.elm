@@ -7,6 +7,7 @@ import Sheaf.Collection as Collection exposing (Collection)
 import Sheaf.Date as Date
 import Sheaf.Document exposing (Document)
 import Sheaf.Frontmatter as Frontmatter exposing (Frontmatter)
+import Sheaf.Head as Head
 import Sheaf.Html as Html
 import Sheaf.Html.Attributes as Attributes
 import Sheaf.Internal.Protocol exposing (Diagnostic, Response, Severity(..), Span)
@@ -21,6 +22,7 @@ suite : Test
 suite =
     describe "Sheaf.Internal.Render"
         [ pageTests
+        , headTests
         , linkTests
         , frontmatterTests
         , collectionTests
@@ -58,6 +60,7 @@ posts =
 postPage : Document PostMeta -> Page
 postPage document =
     { title = document.meta.title
+    , head = []
     , body = [ Html.article [] (Html.h1 [] [ Html.text document.meta.title ] :: document.body) ]
     }
 
@@ -69,7 +72,7 @@ postRoute =
 
 page : List Html.Html -> Page
 page body =
-    { title = "Home", body = body }
+    { title = "Home", head = [], body = body }
 
 
 render : List Route -> Value -> Response
@@ -232,15 +235,27 @@ titles response =
 {-| What is between `<body>` and `</body>` on the page at `path`.
 -}
 bodyAt : String -> Response -> Maybe String
-bodyAt path response =
+bodyAt =
+    between "<body>" "</body>"
+
+
+{-| What is between `<head>` and `</head>` on the page at `path`.
+-}
+headAt : String -> Response -> Maybe String
+headAt =
+    between "<head>" "</head>"
+
+
+between : String -> String -> String -> Response -> Maybe String
+between start end path response =
     response.pages
         |> List.filter (\written -> written.path == path)
         |> List.head
         |> Maybe.andThen
             (\written ->
-                case String.split "<body>" written.html of
+                case String.split start written.html of
                     [ _, rest ] ->
-                        List.head (String.split "</body>" rest)
+                        List.head (String.split end rest)
 
                     _ ->
                         Nothing
@@ -273,7 +288,7 @@ pageTests =
                         { site = metadata
                         , pages =
                             [ { path = "posts/hello-world/index.html"
-                              , html = "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>hello-world</title></head><body><article><h1>hello-world</h1><p>Hi</p></article></body></html>"
+                              , html = "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>hello-world</title></head><body><article><h1>hello-world</h1><p>Hi</p></article></body></html>"
                               }
                             ]
                         , feeds = []
@@ -343,6 +358,55 @@ pageTests =
 
 
 
+-- HEAD
+
+
+headTests : Test
+headTests =
+    describe "head"
+        [ test "every page starts its head with the charset, the viewport and the title" <|
+            \_ ->
+                request [] []
+                    |> render [ Route.single "/" { title = "Home", head = [ Head.description "A site." ], body = [] } ]
+                    |> headAt "index.html"
+                    |> Expect.equal
+                        (Just
+                            (String.concat
+                                [ "<meta charset=\"utf-8\">"
+                                , "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                                , "<title>Home</title>"
+                                , "<meta name=\"description\" content=\"A site.\">"
+                                ]
+                            )
+                        )
+        , test "the canonical URL and the Open Graph image are absolute, under the base path" <|
+            \_ ->
+                request [ "posts" ] [ post "a" ]
+                    |> render
+                        [ Route.eachItem "/posts/:slug/"
+                            posts
+                            (\document ->
+                                { title = document.meta.title
+                                , head =
+                                    [ Head.canonical
+                                    , Head.openGraph { title = document.meta.title, description = Nothing, image = Just "/cover.png", kind = Head.Website }
+                                    ]
+                                , body = []
+                                }
+                            )
+                        ]
+                    |> headAt "posts/a/index.html"
+                    |> Maybe.map
+                        (\head ->
+                            ( String.contains "<link rel=\"canonical\" href=\"https://example.com/blog/posts/a/\">" head
+                            , String.contains "<meta property=\"og:image\" content=\"https://example.com/blog/cover.png\">" head
+                            )
+                        )
+                    |> Expect.equal (Just ( True, True ))
+        ]
+
+
+
 -- LINKS
 
 
@@ -381,6 +445,12 @@ linkTests =
                         ]
                     |> bodyAt "index.html"
                     |> Expect.equal (Just "<a href=\"/blog/posts/hello-world/\">Hello</a>")
+        , test "a site path in an attribute gets the base path" <|
+            \_ ->
+                request [] []
+                    |> render [ Route.single "/" (page [ Html.a [ Attributes.siteHref "/archive/" ] [ Html.img [ Attributes.siteSrc "/cover.png" ] [] ] ]) ]
+                    |> bodyAt "index.html"
+                    |> Expect.equal (Just "<a href=\"/blog/archive/\"><img src=\"/blog/cover.png\"></a>")
         , test "Sheaf.Html.toString renders a link that is not resolved without an href" <|
             \_ ->
                 Sheaf.link (Ref.fromId "posts/hello-world") [ Html.text "Hello" ]
@@ -639,7 +709,54 @@ invalidHtmlTests =
                         [ error "INVALID HTML" "While rendering `/about/` from the route `/about/`, the template made an element named `my element`, which is not a valid tag name."
                         , error "INVALID HTML" "While rendering `/about/` from the route `/about/`, the template gave a `<div>` element an attribute named `on click`, which is not a valid attribute name."
                         ]
+        , test "a site path that does not start with a single slash is reported and its page is not written" <|
+            \_ ->
+                request [] []
+                    |> render
+                        [ Route.single "/"
+                            (page
+                                [ Html.a [ Attributes.siteHref "archive/" ] []
+                                , Html.img [ Attributes.siteSrc "//cdn.example.com/x" ] []
+                                ]
+                            )
+                        ]
+                    |> Expect.all
+                        [ paths >> Expect.equal []
+                        , .diagnostics
+                            >> Expect.equal
+                                [ sitePathError "While rendering `/` from the route `/`, the template gave a `<a>` element the site path `archive/` for its `href`, but a site path starts with a single `/`."
+                                , sitePathError "While rendering `/` from the route `/`, the template gave a `<img>` element the site path `//cdn.example.com/x` for its `src`, but a site path starts with a single `/`."
+                                ]
+                        ]
+        , test "a path in the head that is neither a site path nor a full URL is reported" <|
+            \_ ->
+                request [] []
+                    |> render [ Route.single "/" { title = "Home", head = [ Head.stylesheet "style.css" ], body = [] } ]
+                    |> Expect.all
+                        [ paths >> Expect.equal []
+                        , .diagnostics
+                            >> Expect.equal
+                                [ { severity = Error
+                                  , title = "INVALID HTML"
+                                  , message = "While rendering `/` from the route `/`, the template gave `Head.stylesheet` the path `style.css`, but a path in the head is either a site path, which starts with a single `/`, or a full `http://` or `https://` URL."
+                                  , sourcePath = Nothing
+                                  , span = Nothing
+                                  , hint = Just "Write a site path from the root of the site, such as `/style.css`. The base path is added for you."
+                                  }
+                                ]
+                        ]
         ]
+
+
+sitePathError : String -> Diagnostic
+sitePathError message =
+    { severity = Error
+    , title = "INVALID HTML"
+    , message = message
+    , sourcePath = Nothing
+    , span = Nothing
+    , hint = Just "Write a site path from the root of the site, such as `/archive/`. The base path is added for you. For a URL on another host, use `href` or `src`."
+    }
 
 
 

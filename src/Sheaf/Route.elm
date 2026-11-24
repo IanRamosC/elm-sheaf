@@ -14,7 +14,6 @@ the files do not, because the host serves them from there.
 import Sheaf.Collection exposing (Collection)
 import Sheaf.Date exposing (Date)
 import Sheaf.Document exposing (Document)
-import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Date as InternalDate
 import Sheaf.Internal.Frontmatter as Frontmatter
 import Sheaf.Internal.Site as Site
@@ -27,12 +26,14 @@ type alias Route =
     Site.Route
 
 
-{-| What a template returns: the page's title and the content of its `body`.
+{-| What a template returns: the page's title, the tags of its `<head>` (see
+[`Sheaf.Head`](Sheaf-Head)) and the content of its `<body>`.
+
+    { title = "About", head = [ Head.canonical ], body = [ p [] [ text "Hi" ] ] }
+
 -}
 type alias Page =
-    { title : String
-    , body : List Html
-    }
+    Site.Page
 
 
 {-| A single page at a fixed pattern.

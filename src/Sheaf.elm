@@ -45,12 +45,14 @@ from `content/posts/`, with one reference per document:
     home : Page
     home =
         { title = "Home"
+        , head = []
         , body = [ p [] [ Sheaf.link Content.Posts.helloWorld [ text "Hello, world" ] ] ]
         }
 
     post : Document PostMeta -> Page
     post document =
         { title = document.meta.title
+        , head = []
         , body = [ article [] (h1 [] [ text document.meta.title ] :: document.body) ]
         }
 

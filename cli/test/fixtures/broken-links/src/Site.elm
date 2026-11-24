@@ -30,7 +30,7 @@ site =
         , routes =
             [ Route.eachItem "/posts/:slug/"
                 posts
-                (\post -> { title = post.meta.title, body = post.body })
+                (\post -> { title = post.meta.title, head = [], body = post.body })
             ]
         , feeds = []
         }

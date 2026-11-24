@@ -1,5 +1,6 @@
 module Sheaf.Html.Attributes exposing
     ( attribute
+    , siteHref, siteSrc
     , class, id, href, src, alt, title, lang, rel, type_, name, content, charset, datetime
     , width, height
     , checked, disabled
@@ -8,6 +9,26 @@ module Sheaf.Html.Attributes exposing
 {-| Attributes for `Sheaf.Html`, with the names of `elm/html`.
 
 @docs attribute
+
+
+# Paths in the site
+
+A site may be served from a base path, such as `/blog/` on
+`https://example.com/blog/`. `siteHref` and `siteSrc` take a path from the
+root of the site, starting with a single `/`, and the base path is put in front
+when the page is built:
+
+    a [ siteHref "/archive/" ] [ text "Archive" ]
+
+renders `<a href="/blog/archive/">Archive</a>` under `/blog/`. Any other path
+is reported when the page is built. Use `href` and `src` for URLs on other
+hosts.
+
+@docs siteHref, siteSrc
+
+
+# Attributes
+
 @docs class, id, href, src, alt, title, lang, rel, type_, name, content, charset, datetime
 @docs width, height
 @docs checked, disabled
@@ -26,6 +47,22 @@ A name that is not valid is reported when the page is built.
 attribute : String -> String -> Attribute
 attribute =
     Internal.attribute
+
+
+{-| The `href` attribute, for a path from the root of the site such as
+`/archive/`. It gets the base path in front.
+-}
+siteHref : String -> Attribute
+siteHref =
+    Internal.sitePathAttribute "href"
+
+
+{-| The `src` attribute, for a path from the root of the site such as
+`/cover.png`. It gets the base path in front.
+-}
+siteSrc : String -> Attribute
+siteSrc =
+    Internal.sitePathAttribute "src"
 
 
 {-| The `class` attribute.
