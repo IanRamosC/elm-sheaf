@@ -17,7 +17,7 @@ import type { SourceDocument } from "./document";
 function foldCase(value: string): string {
   return value
     .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .normalize("NFC")
     .toLowerCase()
     .replace(/ς/g, "σ")

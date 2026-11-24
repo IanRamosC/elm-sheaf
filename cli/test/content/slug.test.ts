@@ -59,6 +59,7 @@ describe("foldOf", () => {
     expect(foldOf("Web  Dev")).toBe(foldOf("Web Dev"));
     expect(foldOf("open source")).toBe(foldOf("open-source"));
     expect(foldOf("open_source")).toBe(foldOf("open-source"));
+    expect(foldOf("-x_")).toBe("x");
   });
 });
 
