@@ -152,22 +152,23 @@ renderSite (Site site) request =
     , feeds = List.filterMap Result.toMaybe feeds
     , sitemap = List.filterMap (sitemapEntry context) good
     , diagnostics =
-        List.concat
-            [ unique (List.filterMap RouteCheck.badRoute site.routes)
-            , List.concatMap errors feeds
-            , unknownCollections used request.collections
-            , Listing.missingDates (unique (List.filterMap Site.listedCollection site.routes ++ feedCollections)) published
-            , List.concatMap (Tuple.second >> errors) bodies
-            , Grouping.diagnostics goodRoutes groupings
-
-            -- Two routes over one collection decode its frontmatter twice.
-            , unique (List.concatMap errors made)
-            , Check.brokenLinkDiagnostics checked
-            , List.concatMap .problems checked
-
-            -- A third route with the same pattern as the second repeats its message.
-            , unique clashes
-            ]
+        -- A problem is found as often as it is decoded or checked: by a feed
+        -- and a route that share a collection's frontmatter, by two routes
+        -- over one collection, or by a third route clashing with the second.
+        unique
+            (List.concat
+                [ List.filterMap RouteCheck.badRoute site.routes
+                , List.concatMap errors feeds
+                , unknownCollections used request.collections
+                , Listing.missingDates (unique (List.filterMap Site.listedCollection site.routes ++ feedCollections)) published
+                , List.concatMap (Tuple.second >> errors) bodies
+                , Grouping.diagnostics goodRoutes groupings
+                , List.concatMap errors made
+                , Check.brokenLinkDiagnostics checked
+                , List.concatMap .problems checked
+                , clashes
+                ]
+            )
     }
 
 

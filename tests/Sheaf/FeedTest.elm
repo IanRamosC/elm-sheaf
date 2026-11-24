@@ -4,7 +4,9 @@ import Expect
 import Json.Encode exposing (Value)
 import RenderFixtures exposing (Source, bodyAt, draft, footnoteDefinition, footnoteReference, image, link, markdownLink, page, paragraph, paths, post, postRoute, posts, renderWithFeeds, request, requestUnder, span, textNode, titles)
 import Sheaf
+import Sheaf.Collection as Collection
 import Sheaf.Feed as Feed exposing (Feed)
+import Sheaf.Frontmatter as Frontmatter
 import Sheaf.Internal.Protocol exposing (FeedItem, Response, SitemapEntry)
 import Sheaf.Internal.Render as Render
 import Sheaf.Ref as Ref
@@ -224,6 +226,37 @@ feedProblemTests =
                     |> .diagnostics
                     |> List.map .message
                     |> Expect.equal [ "The Atom feed `atom.xml` does not start with `/`, so it could not be written." ]
+        , test "a document the feed cannot describe fails the build, naming the document" <|
+            \_ ->
+                let
+                    summarized : Feed
+                    summarized =
+                        Feed.fromCollection { rss = "/feed.xml", atom = "/atom.xml" }
+                            (Collection.named "posts"
+                                (Frontmatter.succeed (\title summary -> { title = title, summary = Just summary })
+                                    |> Frontmatter.required "title" Frontmatter.string
+                                    |> Frontmatter.required "summary" Frontmatter.string
+                                )
+                            )
+                            identity
+                in
+                request [ "posts" ] [ dated "a" "2026-11-01" ]
+                    |> renderWithFeeds [ postRoute ] [ summarized ]
+                    |> Expect.all
+                        [ .diagnostics >> List.map (\diagnostic -> ( diagnostic.title, diagnostic.sourcePath )) >> Expect.equal [ ( "MISSING FIELD", Just "content/posts/a.md" ) ]
+                        , .feeds >> Expect.equal []
+                        ]
+        , test "a problem the feed and an item route both find is reported once" <|
+            \_ ->
+                let
+                    untitled : Source
+                    untitled =
+                        dated "a" "2026-11-01"
+                in
+                request [ "posts" ] [ { untitled | frontmatter = [] } ]
+                    |> renderWithFeeds [ postRoute ] [ feed ]
+                    |> titles
+                    |> Expect.equal [ "MISSING FIELD" ]
         , test "a feed orders its collection by date" <|
             \_ ->
                 request [ "posts" ] [ post "undated" ]

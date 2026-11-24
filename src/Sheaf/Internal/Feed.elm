@@ -32,10 +32,10 @@ type alias Context a =
 
 {-| A feed with its items, newest first.
 
-A feed with a problem is not written. Its bad files and a collection with no
-item route are reported here. A document that keeps it from being complete,
-such as one without a date, is reported on its own, and so is a frontmatter
-problem, by the item route.
+A feed with a problem is not written. Its bad files, a collection with no item
+route and the frontmatter problems of its documents are reported here. A
+document that keeps it from being complete, such as one without a date, is
+reported on its own.
 
 -}
 render : Context a -> List Body -> Feed -> Result (List Diagnostic) Protocol.Feed
@@ -48,12 +48,17 @@ render context bodies (Feed feed) =
                         ( listed, complete ) =
                             Listing.listOf feed.collection bodies
                     in
-                    case ( complete, allOf (List.map (itemOf context pattern feed.describe) listed) ) of
-                        ( True, Just items ) ->
-                            Ok { rss = Path.dropLeadingSlash feed.rss, atom = Path.dropLeadingSlash feed.atom, items = items }
+                    case combine (List.map (itemOf context pattern feed.describe) listed) of
+                        Ok dated ->
+                            case ( complete, allOf dated ) of
+                                ( True, Just items ) ->
+                                    Ok { rss = Path.dropLeadingSlash feed.rss, atom = Path.dropLeadingSlash feed.atom, items = items }
 
-                        _ ->
-                            Err []
+                                _ ->
+                                    Err []
+
+                        Err problems ->
+                            Err problems
 
                 Nothing ->
                     Err [ noPageForFeed feed ]
@@ -72,35 +77,63 @@ outputs (Feed feed) =
         |> List.map (\( format, path ) -> FeedFile format path)
 
 
-itemOf : Context a -> String -> (Protocol.Document -> Result (List Problem) Description) -> ListedDocument -> Maybe Protocol.FeedItem
+{-| A document's item, or nothing if it has no date, which is reported on its
+own. A feed may describe a collection with other frontmatter than its item
+route does, so it reports its own frontmatter problems.
+-}
+itemOf : Context a -> String -> (Protocol.Document -> Result (List Problem) Description) -> ListedDocument -> Result (List Diagnostic) (Maybe Protocol.FeedItem)
 itemOf context pattern describe { document, body } =
-    Maybe.map2
-        (\date description ->
-            let
-                path : String
-                path =
-                    Path.join context.basePath (Pattern.fill Pattern.Slug document.slug pattern)
+    describe document
+        |> Result.mapError (List.map (Listing.frontmatterDiagnostic document))
+        |> Result.map
+            (\description ->
+                Maybe.map
+                    (\date ->
+                        let
+                            path : String
+                            path =
+                                Path.join context.basePath (Pattern.fill Pattern.Slug document.slug pattern)
 
-                absolute : String -> String
-                absolute =
-                    AbsoluteUrl.resolve { origin = context.origin, path = path }
-            in
-            { documentId = document.id
-            , url = context.origin ++ path
-            , title = description.title
-            , summary = description.summary
-            , html = String.concat (List.map (Html.rewriteUrls absolute >> Html.toString) body)
-            , date = date.posix
-            , updated = (Maybe.withDefault date document.updated).posix
-            }
-        )
-        document.date
-        (Result.toMaybe (describe document))
+                            absolute : String -> String
+                            absolute =
+                                AbsoluteUrl.resolve { origin = context.origin, path = path }
+                        in
+                        { documentId = document.id
+                        , url = context.origin ++ path
+                        , title = description.title
+                        , summary = description.summary
+                        , html = String.concat (List.map (Html.rewriteUrls absolute >> Html.toString) body)
+                        , date = date.posix
+                        , updated = (Maybe.withDefault date document.updated).posix
+                        }
+                    )
+                    document.date
+            )
 
 
 allOf : List (Maybe a) -> Maybe (List a)
 allOf =
     List.foldr (Maybe.map2 (::)) (Just [])
+
+
+combine : List (Result (List e) a) -> Result (List e) (List a)
+combine results =
+    case List.concatMap errors results of
+        [] ->
+            Ok (List.filterMap Result.toMaybe results)
+
+        problems ->
+            Err problems
+
+
+errors : Result (List e) a -> List e
+errors result =
+    case result of
+        Ok _ ->
+            []
+
+        Err problems ->
+            problems
 
 
 noPageForFeed : { a | rss : String, collection : String } -> Diagnostic
