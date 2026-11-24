@@ -91,11 +91,15 @@ type alias Document =
     }
 
 
-{-| A moment, and the calendar date as the author wrote it.
+{-| A moment, and the calendar date as the author wrote it (`isoDate`, with its
+parts), which is not necessarily the day of the moment in UTC.
 -}
 type alias Date =
     { posix : Time.Posix
     , isoDate : String
+    , year : Int
+    , month : Time.Month
+    , day : Int
     }
 
 
@@ -208,9 +212,98 @@ andMap =
 
 dateDecoder : Decoder Date
 dateDecoder =
-    Decode.map2 Date
+    Decode.map2 Tuple.pair
         (Decode.map Time.millisToPosix (Decode.field "posixMillis" Decode.int))
         (Decode.field "isoDate" Decode.string)
+        |> Decode.andThen
+            (\( posix, isoDate ) ->
+                case parseIsoDate isoDate of
+                    Just ( year, month, day ) ->
+                        Decode.succeed { posix = posix, isoDate = isoDate, year = year, month = month, day = day }
+
+                    Nothing ->
+                        Decode.fail ("`" ++ isoDate ++ "` is not a calendar date written as YYYY-MM-DD")
+            )
+
+
+parseIsoDate : String -> Maybe ( Int, Time.Month, Int )
+parseIsoDate isoDate =
+    case String.split "-" isoDate of
+        [ yearText, monthText, dayText ] ->
+            if String.length yearText == 4 && String.length monthText == 2 && String.length dayText == 2 then
+                Maybe.map3 (\year monthNumber day -> ( year, monthNumber, day ))
+                    (String.toInt yearText)
+                    (String.toInt monthText)
+                    (String.toInt dayText)
+                    |> Maybe.andThen validDate
+
+            else
+                Nothing
+
+        _ ->
+            Nothing
+
+
+validDate : ( Int, Int, Int ) -> Maybe ( Int, Time.Month, Int )
+validDate ( year, monthNumber, day ) =
+    monthFromNumber monthNumber
+        |> Maybe.andThen
+            (\month ->
+                if day >= 1 && day <= daysInMonth year month then
+                    Just ( year, month, day )
+
+                else
+                    Nothing
+            )
+
+
+monthFromNumber : Int -> Maybe Time.Month
+monthFromNumber number =
+    List.head (List.drop (number - 1) months)
+        |> Maybe.andThen
+            (\month ->
+                if number >= 1 then
+                    Just month
+
+                else
+                    Nothing
+            )
+
+
+months : List Time.Month
+months =
+    [ Time.Jan, Time.Feb, Time.Mar, Time.Apr, Time.May, Time.Jun, Time.Jul, Time.Aug, Time.Sep, Time.Oct, Time.Nov, Time.Dec ]
+
+
+daysInMonth : Int -> Time.Month -> Int
+daysInMonth year month =
+    case month of
+        Time.Feb ->
+            if isLeapYear year then
+                29
+
+            else
+                28
+
+        Time.Apr ->
+            30
+
+        Time.Jun ->
+            30
+
+        Time.Sep ->
+            30
+
+        Time.Nov ->
+            30
+
+        _ ->
+            31
+
+
+isLeapYear : Int -> Bool
+isLeapYear year =
+    (modBy 4 year == 0 && modBy 100 year /= 0) || modBy 400 year == 0
 
 
 fieldPositionDecoder : Decoder FieldPosition

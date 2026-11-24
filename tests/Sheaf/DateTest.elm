@@ -40,19 +40,25 @@ suite =
 
 novemberThirtieth : Date
 novemberThirtieth =
-    dateOf 1795993200000 "2026-11-30"
+    dateOf 1795993200000 "2026-11-30" ( 2026, Time.Nov, 30 )
 
 
 earlier : Date
 earlier =
-    dateOf 1793491200000 "2026-11-01"
+    dateOf 1793491200000 "2026-11-01" ( 2026, Time.Nov, 1 )
 
 
 later : Date
 later =
-    dateOf 1796083200000 "2026-12-01"
+    dateOf 1796083200000 "2026-12-01" ( 2026, Time.Dec, 1 )
 
 
-dateOf : Int -> String -> Date
-dateOf millis isoDate =
-    Internal.fromProtocol { posix = Time.millisToPosix millis, isoDate = isoDate }
+dateOf : Int -> String -> ( Int, Time.Month, Int ) -> Date
+dateOf millis isoDate ( year, month, day ) =
+    Internal.fromProtocol
+        { posix = Time.millisToPosix millis
+        , isoDate = isoDate
+        , year = year
+        , month = month
+        , day = day
+        }

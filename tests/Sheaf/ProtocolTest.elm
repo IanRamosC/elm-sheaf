@@ -64,7 +64,7 @@ requestTests =
                         (Ok
                             [ { id = "posts/hello-world"
                               , slug = "hello-world"
-                              , date = Just { posix = Time.millisToPosix 1767225600000, isoDate = "2026-01-01" }
+                              , date = Just { posix = Time.millisToPosix 1767225600000, isoDate = "2026-01-01", year = 2026, month = Time.Jan, day = 1 }
                               , updated = Nothing
                               }
                             ]

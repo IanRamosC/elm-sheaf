@@ -749,6 +749,11 @@ badRouteTests =
 
 badRequestTests : Test
 badRequestTests =
+    let
+        dated : Source
+        dated =
+            post "hello-world"
+    in
     describe "bad requests"
         [ test "a request that does not decode is reported, with no pages" <|
             \_ ->
@@ -758,6 +763,22 @@ badRequestTests =
                         [ titles >> Expect.equal [ "BAD REQUEST" ]
                         , paths >> Expect.equal []
                         ]
+        , test "rejects a date that is not on the calendar" <|
+            \_ ->
+                [ "2026-13-05", "2026-00-05", "2026-02-30", "2025-02-29", "2026-1-5", "soon" ]
+                    |> List.map
+                        (\isoDate ->
+                            request [ "posts" ] [ { dated | date = Just isoDate } ]
+                                |> render [ postRoute ]
+                                |> titles
+                        )
+                    |> Expect.equal (List.repeat 6 [ "BAD REQUEST" ])
+        , test "accepts the last day of a leap February" <|
+            \_ ->
+                request [ "posts" ] [ { dated | date = Just "2028-02-29" } ]
+                    |> render [ postRoute ]
+                    |> titles
+                    |> Expect.equal []
         , test "names a protocol version mismatch" <|
             \_ ->
                 Encode.object [ ( "protocolVersion", Encode.int 1 ) ]

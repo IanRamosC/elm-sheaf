@@ -18,35 +18,14 @@ a different day in different timezones, and `2026-11-30` is the 30th everywhere.
 
 -}
 type Date
-    = Date
-        { posix : Time.Posix
-        , isoDate : String
-        , year : Int
-        , month : Time.Month
-        , day : Int
-        }
+    = Date Protocol.Date
 
 
-{-| Read the calendar parts from the ISO date the host sends.
-
-The host only sends dates that are valid, so the instant is the fallback only
-to keep this total.
-
+{-| The decoder has already checked the ISO date, so this only wraps it.
 -}
 fromProtocol : Protocol.Date -> Date
-fromProtocol { posix, isoDate } =
-    case List.map String.toInt (String.split "-" isoDate) of
-        [ Just year, Just month, Just day ] ->
-            Date { posix = posix, isoDate = isoDate, year = year, month = monthFromNumber month, day = day }
-
-        _ ->
-            Date
-                { posix = posix
-                , isoDate = isoDate
-                , year = Time.toYear Time.utc posix
-                , month = Time.toMonth Time.utc posix
-                , day = Time.toDay Time.utc posix
-                }
+fromProtocol =
+    Date
 
 
 {-| The instant in UTC, for the `<meta>` tags that want a timestamp.
@@ -82,46 +61,6 @@ compareNewestFirst (Date a) (Date b) =
 pad : Int -> Int -> String
 pad width number =
     String.padLeft width '0' (String.fromInt number)
-
-
-monthFromNumber : Int -> Time.Month
-monthFromNumber number =
-    case number of
-        1 ->
-            Time.Jan
-
-        2 ->
-            Time.Feb
-
-        3 ->
-            Time.Mar
-
-        4 ->
-            Time.Apr
-
-        5 ->
-            Time.May
-
-        6 ->
-            Time.Jun
-
-        7 ->
-            Time.Jul
-
-        8 ->
-            Time.Aug
-
-        9 ->
-            Time.Sep
-
-        10 ->
-            Time.Oct
-
-        11 ->
-            Time.Nov
-
-        _ ->
-            Time.Dec
 
 
 monthNumber : Time.Month -> Int
