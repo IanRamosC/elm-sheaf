@@ -21,6 +21,7 @@ import Dict exposing (Dict)
 import Json.Decode as Decode exposing (Decoder, Value)
 import Sheaf.Internal.Hint as Hint
 import Sheaf.Internal.Protocol exposing (FieldPosition, Span)
+import Sheaf.Internal.Results as Results
 
 
 
@@ -422,22 +423,8 @@ decode (Frontmatter declaration) { values, positions } =
                                 Err found ->
                                     List.map (fieldProblem positions) found
                     in
-                    Err (List.sortBy sortKey (unique (unknown ++ failures)))
-
-
-{-| Declaring a key twice would otherwise report each of its problems twice.
--}
-unique : List a -> List a
-unique =
-    List.foldl
-        (\item kept ->
-            if List.member item kept then
-                kept
-
-            else
-                kept ++ [ item ]
-        )
-        []
+                    -- Declaring a key twice would otherwise report each of its problems twice.
+                    Err (List.sortBy sortKey (Results.unique (unknown ++ failures)))
 
 
 notAnObject : Problem

@@ -18,6 +18,7 @@ import Sheaf.Internal.Frontmatter as Frontmatter
 import Sheaf.Internal.Path as Path
 import Sheaf.Internal.Pattern as Pattern
 import Sheaf.Internal.Protocol exposing (Diagnostic, Document, Severity(..))
+import Sheaf.Internal.Results as Results
 import Sheaf.Internal.Site exposing (FrontmatterProblems, ListedDocument, Pagination)
 
 
@@ -113,7 +114,7 @@ reported either way.
 -}
 whole : Bool -> List (Result (List FrontmatterProblems) page) -> List (Result (List Diagnostic) page)
 whole complete made =
-    case List.concatMap errors made of
+    case List.concatMap Results.errors made of
         [] ->
             if complete then
                 List.map Ok (List.filterMap Result.toMaybe made)
@@ -123,16 +124,6 @@ whole complete made =
 
         invalid ->
             [ Err (List.concatMap (\{ document, problems } -> List.map (frontmatterDiagnostic document) problems) invalid) ]
-
-
-errors : Result (List e) a -> List e
-errors result =
-    case result of
-        Ok _ ->
-            []
-
-        Err problems ->
-            problems
 
 
 {-| A frontmatter problem, in the document's file. Item routes report theirs

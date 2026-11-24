@@ -69,6 +69,7 @@ import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Date as InternalDate
 import Sheaf.Internal.Frontmatter as Frontmatter exposing (Problem)
 import Sheaf.Internal.Protocol as Protocol
+import Sheaf.Internal.Results as Results
 import Sheaf.Internal.Site as Site exposing (FrontmatterProblems, ListedDocument)
 import Sheaf.Ref as Ref
 
@@ -231,7 +232,7 @@ allGroups pattern by collection template =
             \groups ->
                 groups
                     |> List.map (\group -> decodeAll collection group.items |> Result.map (Group group.name))
-                    |> combine
+                    |> Results.combine
                     |> Result.map template
         }
 
@@ -254,28 +255,6 @@ groupingOf by (Site.Collection collection) =
                 { values = document.frontmatter, positions = document.frontmatterPositions }
                 |> Result.map by
     }
-
-
-{-| Every value, or the problems of all that failed.
--}
-combine : List (Result (List e) a) -> Result (List e) (List a)
-combine results =
-    case List.concatMap errorsOf results of
-        [] ->
-            Ok (List.filterMap Result.toMaybe results)
-
-        problems ->
-            Err problems
-
-
-errorsOf : Result (List e) a -> List e
-errorsOf result =
-    case result of
-        Ok _ ->
-            []
-
-        Err problems ->
-            problems
 
 
 
@@ -324,30 +303,11 @@ decode (Site.Collection collection) document =
 -}
 decodeAll : Collection meta -> List ListedDocument -> Result (List FrontmatterProblems) (List (Document meta))
 decodeAll collection items =
-    let
-        decoded : List (Result FrontmatterProblems (Document meta))
-        decoded =
-            List.map
-                (\item ->
-                    decode collection item.document
-                        |> Result.map (\toDocument -> toDocument item.body)
-                        |> Result.mapError (FrontmatterProblems item.document)
-                )
-                items
-    in
-    case List.filterMap problemsOf decoded of
-        [] ->
-            Ok (List.filterMap Result.toMaybe decoded)
-
-        problems ->
-            Err problems
-
-
-problemsOf : Result e a -> Maybe e
-problemsOf result =
-    case result of
-        Ok _ ->
-            Nothing
-
-        Err problems ->
-            Just problems
+    items
+        |> List.map
+            (\item ->
+                decode collection item.document
+                    |> Result.map (\toDocument -> toDocument item.body)
+                    |> Result.mapError (\problems -> [ FrontmatterProblems item.document problems ])
+            )
+        |> Results.combine

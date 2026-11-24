@@ -22,6 +22,7 @@ import Sheaf.Internal.Output as Output exposing (Output(..))
 import Sheaf.Internal.Path as Path
 import Sheaf.Internal.Pattern as Pattern
 import Sheaf.Internal.Protocol as Protocol exposing (Diagnostic, Document, GroupSlug, Request, Response, Severity(..), SitemapEntry)
+import Sheaf.Internal.Results as Results
 import Sheaf.Internal.RouteCheck as RouteCheck
 import Sheaf.Internal.Site as Site exposing (Feed(..), FrontmatterProblems, Page, Route(..), Site(..))
 import Sheaf.Ref as Ref exposing (Ref)
@@ -90,7 +91,7 @@ renderSite (Site site) request =
 
         used : List String
         used =
-            unique (List.filterMap Site.collectionOf site.routes ++ feedCollections)
+            Results.unique (List.filterMap Site.collectionOf site.routes ++ feedCollections)
 
         published : List Document
         published =
@@ -137,8 +138,8 @@ renderSite (Site site) request =
                 (Check.check
                     { origin = context.origin
                     , basePath = context.basePath
-                    , linkProblem = linkTarget context >> errorOf
-                    , groupLinkProblem = Grouping.linkTarget context groupPages >> errorOf
+                    , linkProblem = linkTarget context >> Results.error
+                    , groupLinkProblem = Grouping.linkTarget context groupPages >> Results.error
                     }
                 )
                 written
@@ -155,15 +156,15 @@ renderSite (Site site) request =
         -- A problem is found as often as it is decoded or checked: by a feed
         -- and a route that share a collection's frontmatter, by two routes
         -- over one collection, or by a third route clashing with the second.
-        unique
+        Results.unique
             (List.concat
                 [ List.filterMap RouteCheck.badRoute site.routes
-                , List.concatMap errors feeds
+                , List.concatMap Results.errors feeds
                 , unknownCollections used request.collections
-                , Listing.missingDates (unique (List.filterMap Site.listedCollection site.routes ++ feedCollections)) published
-                , List.concatMap (Tuple.second >> errors) bodies
+                , Listing.missingDates (Results.unique (List.filterMap Site.listedCollection site.routes ++ feedCollections)) published
+                , List.concatMap (Tuple.second >> Results.errors) bodies
                 , Grouping.diagnostics goodRoutes groupings
-                , List.concatMap errors made
+                , List.concatMap Results.errors made
                 , Check.brokenLinkDiagnostics checked
                 , List.concatMap .problems checked
                 , clashes
@@ -177,31 +178,6 @@ renderSite (Site site) request =
 collectionOfFeed : Feed -> String
 collectionOfFeed (Feed feed) =
     feed.collection
-
-
-errors : Result (List e) a -> List e
-errors result =
-    case result of
-        Ok _ ->
-            []
-
-        Err problems ->
-            problems
-
-
-{-| The first of each item, in order.
--}
-unique : List a -> List a
-unique =
-    List.foldl
-        (\item kept ->
-            if List.member item kept then
-                kept
-
-            else
-                kept ++ [ item ]
-        )
-        []
 
 
 
@@ -304,7 +280,7 @@ renderBody context document =
                             Ref.fromId problem.id
                     in
                     linkTarget context ref
-                        |> errorOf
+                        |> Results.error
                         |> Maybe.map
                             (Check.linkDiagnostic
                                 { subject = "This document links to"
@@ -315,16 +291,6 @@ renderBody context document =
                             )
                 )
             )
-
-
-errorOf : Result e a -> Maybe e
-errorOf result =
-    case result of
-        Ok _ ->
-            Nothing
-
-        Err problem ->
-            Just problem
 
 
 

@@ -15,6 +15,7 @@ import Sheaf.Internal.Output exposing (Output(..))
 import Sheaf.Internal.Path as Path
 import Sheaf.Internal.Pattern as Pattern
 import Sheaf.Internal.Protocol as Protocol exposing (Diagnostic, Severity(..))
+import Sheaf.Internal.Results as Results
 import Sheaf.Internal.RouteCheck as RouteCheck
 import Sheaf.Internal.Site exposing (Description, Feed(..), ListedDocument)
 
@@ -48,7 +49,7 @@ render context bodies (Feed feed) =
                         ( listed, complete ) =
                             Listing.listOf feed.collection bodies
                     in
-                    case combine (List.map (itemOf context pattern feed.describe) listed) of
+                    case Results.combine (List.map (itemOf context pattern feed.describe) listed) of
                         Ok dated ->
                             case ( complete, allOf dated ) of
                                 ( True, Just items ) ->
@@ -114,26 +115,6 @@ itemOf context pattern describe { document, body } =
 allOf : List (Maybe a) -> Maybe (List a)
 allOf =
     List.foldr (Maybe.map2 (::)) (Just [])
-
-
-combine : List (Result (List e) a) -> Result (List e) (List a)
-combine results =
-    case List.concatMap errors results of
-        [] ->
-            Ok (List.filterMap Result.toMaybe results)
-
-        problems ->
-            Err problems
-
-
-errors : Result (List e) a -> List e
-errors result =
-    case result of
-        Ok _ ->
-            []
-
-        Err problems ->
-            problems
 
 
 noPageForFeed : { a | rss : String, collection : String } -> Diagnostic

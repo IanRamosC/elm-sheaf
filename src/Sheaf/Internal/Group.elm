@@ -14,6 +14,7 @@ any of them writes no pages.
 import Dict exposing (Dict)
 import Json.Decode as Decode
 import Sheaf.Internal.Protocol exposing (Diagnostic, Document, GroupSlug, Severity(..), Span)
+import Sheaf.Internal.Results as Results
 
 
 {-| The items that have a value with this slug, in the order they were given,
@@ -56,7 +57,7 @@ group slugs valued =
     let
         placed : List (Result Problem ( String, Use { a | document : Document } ))
         placed =
-            List.concatMap (\( item, values ) -> List.map (place slugs item) (unique values)) valued
+            List.concatMap (\( item, values ) -> List.map (place slugs item) (Results.unique values)) valued
 
         bySlug : List ( String, List (Use { a | document : Document }) )
         bySlug =
@@ -68,7 +69,7 @@ group slugs valued =
     in
     { groups = List.map (\( slug, uses ) -> groupOf slug uses) bySlug
     , problems =
-        unique (List.filterMap problemOf placed)
+        Results.unique (List.filterMap Results.error placed)
             ++ List.filterMap (\( slug, uses ) -> collisionOf slug uses) bySlug
     }
 
@@ -97,7 +98,7 @@ groupOf slug uses =
 
 mostCommonSpelling : List (Use item) -> Maybe String
 mostCommonSpelling uses =
-    unique (List.map .value uses)
+    Results.unique (List.map .value uses)
         |> List.map (\spelling -> ( spelling, List.length (List.filter (\use -> use.value == spelling) uses) ))
         |> List.sortWith (\( a, countA ) ( b, countB ) -> compareBoth (compare countB countA) (byCodePoint a b))
         |> List.head
@@ -111,7 +112,7 @@ its most common spelling.
 -}
 collisionOf : String -> List (Use { a | document : Document }) -> Maybe Problem
 collisionOf slug uses =
-    case unique (List.map .folded uses) of
+    case Results.unique (List.map .folded uses) of
         (_ :: _ :: _) as folds ->
             Just
                 (Collision
@@ -126,7 +127,7 @@ collisionOf slug uses =
                                             List.filter (\use -> use.folded == fold) uses
                                     in
                                     ( Maybe.withDefault fold (mostCommonSpelling usesOfFold)
-                                    , unique (List.map (.item >> .document >> .sourcePath) usesOfFold)
+                                    , Results.unique (List.map (.item >> .document >> .sourcePath) usesOfFold)
                                     )
                                 )
                             |> List.sortWith (\( a, _ ) ( b, _ ) -> byCodePoint a b)
@@ -135,16 +136,6 @@ collisionOf slug uses =
 
         _ ->
             Nothing
-
-
-problemOf : Result Problem a -> Maybe Problem
-problemOf result =
-    case result of
-        Ok _ ->
-            Nothing
-
-        Err problem ->
-            Just problem
 
 
 compareBoth : Order -> Order -> Order
@@ -163,11 +154,6 @@ characters outside the Basic Multilingual Plane before others inside it.
 byCodePoint : String -> String -> Order
 byCodePoint a b =
     compare (List.map Char.toCode (String.toList a)) (List.map Char.toCode (String.toList b))
-
-
-unique : List a -> List a
-unique =
-    uniqueBy identity
 
 
 uniqueBy : (a -> key) -> List a -> List a
