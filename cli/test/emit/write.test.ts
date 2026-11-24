@@ -133,7 +133,9 @@ describe("writeSite", () => {
         { path: "About/index.html", content: "" },
         { path: "about/index.html", content: "" },
       ]),
-    ).rejects.toThrow("about/index.html");
+    ).rejects.toThrow(
+      "Two outputs share the path About/index.html and about/index.html",
+    );
     expect(readFileSync(join(root, "dist/previous.html"), "utf8")).toBe("kept");
   });
 });

@@ -2,7 +2,7 @@
 // they are dropped; a stray form feed in a post would otherwise make the
 // whole feed unparseable.
 // biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point
-const FORBIDDEN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g;
+const FORBIDDEN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g;
 
 const ESCAPES: Record<string, string> = {
   "&": "&amp;",

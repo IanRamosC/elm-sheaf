@@ -65,11 +65,14 @@ function assertInside(directory: string, path: string): void {
  * would silently merge them.
  */
 function assertNoClashes(paths: string[]): void {
-  const folded = new Set<string>();
+  const folded = new Map<string, string>();
   for (const path of paths) {
     const key = path.toLowerCase();
-    if (folded.has(key)) throw new Error(`Two outputs share the path ${path}`);
-    folded.add(key);
+    const first = folded.get(key);
+    if (first !== undefined) {
+      throw new Error(`Two outputs share the path ${first} and ${path}`);
+    }
+    folded.set(key, path);
   }
   for (const path of paths) {
     const parts = path.toLowerCase().split("/");

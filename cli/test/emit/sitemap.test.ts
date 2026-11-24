@@ -7,7 +7,9 @@ describe("escapeXml", () => {
     expect(escapeXml(`Tom & "Jerry" <3 ]]> 'x'`)).toBe(
       "Tom &amp; &quot;Jerry&quot; &lt;3 ]]&gt; &apos;x&apos;",
     );
-    expect(escapeXml("a\u0000b\u000cc\u001fd￾e\tf\ng")).toBe("abcde\tf\ng");
+    expect(escapeXml("a\u0000b\u000cc\u001fd\uFFFEe\tf\ng")).toBe(
+      "abcde\tf\ng",
+    );
   });
 });
 
