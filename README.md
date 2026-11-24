@@ -23,6 +23,26 @@ Run these in your site's folder:
 
 Both take `--drafts` to include drafts and documents dated in the future.
 
+## What works today
+
+- Markdown collections with typed frontmatter, checked links between documents,
+  and drafts and future-dated posts left out of production builds.
+- Routes for a single page, a page per document, paginated lists, pages grouped
+  by a frontmatter value such as tags, one page of every document or every
+  group, and the 404 page. Tags that differ only in case or accents share a
+  page, and links to tag pages are checked.
+- The `Sheaf.Blog` preset: posts, pages, a paginated index, tag pages, an
+  archive and a 404 page from a handful of layouts. It uses only the public
+  API, so a site can do the same without it, or add routes and feeds next to it.
+- RSS and Atom feeds with each post's full HTML and absolute links, and a
+  `sitemap.xml` of every page but the 404 page.
+- Head tags for search engines and link previews: description, canonical URL,
+  Open Graph, Twitter cards, stylesheets and feed links.
+- Sites served under a base path, such as `https://example.com/blog/`.
+
+Not yet: Markdown directives and components, syntax highlighting, images,
+`sheaf dev` and `sheaf init`.
+
 ## License
 
 Sites generated with Sheaf belong entirely to you. Sheaf puts no license, attribution
