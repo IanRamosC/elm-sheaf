@@ -1,19 +1,18 @@
 module Sheaf.RenderTest exposing (suite)
 
 import Expect
-import Json.Encode as Encode exposing (Value)
+import Json.Encode as Encode
+import RenderFixtures exposing (Source, bodyAt, draft, error, headAt, markdownLink, metadata, page, paragraph, paths, post, postMeta, postPage, postRoute, posts, render, request, span, titles)
 import Sheaf
-import Sheaf.Collection as Collection exposing (Collection)
+import Sheaf.Collection as Collection
 import Sheaf.Date as Date
-import Sheaf.Document exposing (Document)
-import Sheaf.Frontmatter as Frontmatter exposing (Frontmatter)
 import Sheaf.Head as Head
 import Sheaf.Html as Html
 import Sheaf.Html.Attributes as Attributes
-import Sheaf.Internal.Protocol exposing (Diagnostic, Response, Severity(..), Span)
+import Sheaf.Internal.Protocol exposing (Diagnostic, Severity(..))
 import Sheaf.Internal.Render as Render
 import Sheaf.Ref as Ref
-import Sheaf.Route as Route exposing (Page, Route)
+import Sheaf.Route as Route exposing (Route)
 import Test exposing (Test, describe, test)
 import Time
 
@@ -33,244 +32,6 @@ suite =
         , badRequestTests
         , siteTests
         ]
-
-
-
--- THE SITE
-
-
-type alias PostMeta =
-    { title : String
-    , tags : List String
-    }
-
-
-postMeta : Frontmatter PostMeta
-postMeta =
-    Frontmatter.succeed PostMeta
-        |> Frontmatter.required "title" Frontmatter.string
-        |> Frontmatter.withDefault "tags" [] (Frontmatter.list Frontmatter.string)
-
-
-posts : Collection PostMeta
-posts =
-    Collection.named "posts" postMeta
-
-
-postPage : Document PostMeta -> Page
-postPage document =
-    { title = document.meta.title
-    , head = []
-    , body = [ Html.article [] (Html.h1 [] [ Html.text document.meta.title ] :: document.body) ]
-    }
-
-
-postRoute : Route
-postRoute =
-    Route.eachItem "/posts/:slug/" posts postPage
-
-
-page : List Html.Html -> Page
-page body =
-    { title = "Home", head = [], body = body }
-
-
-render : List Route -> Value -> Response
-render routes =
-    Render.render (Sheaf.site { metadata = metadata, routes = routes, feeds = [] })
-
-
-metadata : Sheaf.Metadata
-metadata =
-    { title = "Example"
-    , description = "A site."
-    , author = { name = "Ada", email = Just "ada@example.com" }
-    , language = "en"
-    }
-
-
-
--- THE REQUEST
-
-
-type alias Source =
-    { collection : String
-    , slug : String
-    , date : Maybe String
-    , excluded : Bool
-    , frontmatter : List ( String, Value )
-    , positions : List ( String, Span )
-    , body : List Value
-    }
-
-
-post : String -> Source
-post slug =
-    { collection = "posts"
-    , slug = slug
-    , date = Nothing
-    , excluded = False
-    , frontmatter = [ ( "title", Encode.string slug ) ]
-    , positions = []
-    , body = [ paragraph [ textNode "Hi" ] ]
-    }
-
-
-draft : String -> Source
-draft slug =
-    let
-        published : Source
-        published =
-            post slug
-    in
-    { published | excluded = True }
-
-
-request : List String -> List Source -> Value
-request collections sources =
-    Encode.object
-        [ ( "protocolVersion", Encode.int 2 )
-        , ( "build"
-          , Encode.object
-                [ ( "siteUrl", Encode.string "https://example.com/blog/" )
-                , ( "origin", Encode.string "https://example.com" )
-                , ( "basePath", Encode.string "/blog/" )
-                , ( "mode", Encode.string "production" )
-                ]
-          )
-        , ( "slugs", Encode.list identity [] )
-        , ( "collections", Encode.list Encode.string collections )
-        , ( "documents", Encode.list encodeSource sources )
-        ]
-
-
-encodeSource : Source -> Value
-encodeSource source =
-    Encode.object
-        [ ( "id", Encode.string (source.collection ++ "/" ++ source.slug) )
-        , ( "collection", Encode.string source.collection )
-        , ( "sourcePath", Encode.string (sourcePathOf source) )
-        , ( "slug", Encode.string source.slug )
-        , ( "date"
-          , source.date
-                |> Maybe.map (\isoDate -> Encode.object [ ( "posixMillis", Encode.int 1795392000000 ), ( "isoDate", Encode.string isoDate ) ])
-                |> Maybe.withDefault Encode.null
-          )
-        , ( "updated", Encode.null )
-        , ( "draft", Encode.bool source.excluded )
-        , ( "excluded", Encode.bool source.excluded )
-        , ( "frontmatter", Encode.object source.frontmatter )
-        , ( "frontmatterPositions", Encode.object (List.map (\( path, at ) -> ( path, Encode.object [ ( "value", encodeSpan at ) ] )) source.positions) )
-        , ( "tree", markdownNode "root" [ ( "children", Encode.list identity source.body ) ] )
-        ]
-
-
-sourcePathOf : Source -> String
-sourcePathOf source =
-    "content/" ++ source.collection ++ "/" ++ source.slug ++ ".md"
-
-
-span : Int -> Int -> Int -> Span
-span line from to =
-    { start = { line = line, column = from }, end = { line = line, column = to } }
-
-
-encodeSpan : Span -> Value
-encodeSpan at =
-    let
-        position : { line : Int, column : Int } -> Value
-        position { line, column } =
-            Encode.object [ ( "line", Encode.int line ), ( "column", Encode.int column ) ]
-    in
-    Encode.object [ ( "start", position at.start ), ( "end", position at.end ) ]
-
-
-markdownNode : String -> List ( String, Value ) -> Value
-markdownNode type_ fields =
-    Encode.object (( "type", Encode.string type_ ) :: ( "position", encodeSpan (span 1 1 2) ) :: fields)
-
-
-paragraph : List Value -> Value
-paragraph children =
-    markdownNode "paragraph" [ ( "children", Encode.list identity children ) ]
-
-
-textNode : String -> Value
-textNode value =
-    markdownNode "text" [ ( "value", Encode.string value ) ]
-
-
-{-| A Markdown link to the document `id`, written at `at`.
--}
-markdownLink : String -> Span -> Value
-markdownLink id at =
-    case String.split "/" id of
-        [ collection, slug ] ->
-            Encode.object
-                [ ( "type", Encode.string "sheafLink" )
-                , ( "position", encodeSpan at )
-                , ( "collection", Encode.string collection )
-                , ( "slug", Encode.string slug )
-                , ( "children", Encode.list identity [ textNode "link" ] )
-                ]
-
-        _ ->
-            Encode.null
-
-
-
--- READING THE RESPONSE
-
-
-paths : Response -> List String
-paths response =
-    List.map .path response.pages
-
-
-titles : Response -> List String
-titles response =
-    List.map .title response.diagnostics
-
-
-{-| What is between `<body>` and `</body>` on the page at `path`.
--}
-bodyAt : String -> Response -> Maybe String
-bodyAt =
-    between "<body>" "</body>"
-
-
-{-| What is between `<head>` and `</head>` on the page at `path`.
--}
-headAt : String -> Response -> Maybe String
-headAt =
-    between "<head>" "</head>"
-
-
-between : String -> String -> String -> Response -> Maybe String
-between start end path response =
-    response.pages
-        |> List.filter (\written -> written.path == path)
-        |> List.head
-        |> Maybe.andThen
-            (\written ->
-                case String.split start written.html of
-                    [ _, rest ] ->
-                        List.head (String.split end rest)
-
-                    _ ->
-                        Nothing
-            )
-
-
-error : String -> String -> Diagnostic
-error title message =
-    { severity = Error
-    , title = title
-    , message = message
-    , sourcePath = Nothing
-    , span = Nothing
-    , hint = Nothing
-    }
 
 
 
@@ -776,20 +537,6 @@ duplicateTests =
                                 [ error "DUPLICATE PAGE" "The routes `/posts/hello-world/` and `/posts/:slug/` both make the page `posts/hello-world/index.html`." ]
                         , bodyAt "posts/hello-world/index.html" >> Expect.equal (Just "first")
                         ]
-        , test "an item route without :slug makes its page more than once" <|
-            \_ ->
-                request [ "posts" ] [ post "hello-world", post "goodbye", post "again" ]
-                    |> render [ Route.eachItem "/posts/" posts postPage ]
-                    |> .diagnostics
-                    |> Expect.equal
-                        [ { severity = Error
-                          , title = "DUPLICATE PAGE"
-                          , message = "The route `/posts/` makes the page `posts/index.html` more than once."
-                          , sourcePath = Nothing
-                          , span = Nothing
-                          , hint = Just "Put `:slug` in the pattern of an item route, so that each document gets its own page."
-                          }
-                        ]
         , test "two routes with the same pattern are two routes" <|
             \_ ->
                 let
@@ -846,7 +593,7 @@ badRouteTests =
                           , message = "The route `//` has an empty segment, so its pages could not be written."
                           , sourcePath = Nothing
                           , span = Nothing
-                          , hint = Just "A pattern starts with `/` and separates its segments with single slashes, as in `/posts/:slug/` or `/404.html`."
+                          , hint = Just "A pattern starts with `/` and separates its segments with single slashes, as in `/posts/:slug/` or `/humans.txt`."
                           }
                         ]
         , test "accepts the root, folders and files" <|

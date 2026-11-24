@@ -58,12 +58,13 @@ type FeedFormat
 
 
 {-| Where the page is: the site's origin and base path, and the page's URL
-without the base path.
+without the base path. The 404 page is served in place of any missing page, so
+it has no URL of its own.
 -}
 type alias Context =
     { origin : String
     , basePath : String
-    , url : String
+    , url : Maybe String
     }
 
 
@@ -89,12 +90,17 @@ toHtml context tag =
             [ metaNamed "description" description ]
 
         Canonical ->
-            [ Html.node "link"
-                [ Html.attribute "rel" "canonical"
-                , Html.attribute "href" (pageUrl context)
-                ]
-                []
-            ]
+            case pageUrl context of
+                Just url ->
+                    [ Html.node "link"
+                        [ Html.attribute "rel" "canonical"
+                        , Html.attribute "href" url
+                        ]
+                        []
+                    ]
+
+                Nothing ->
+                    []
 
         OpenGraph openGraph ->
             List.filterMap identity
@@ -103,7 +109,7 @@ toHtml context tag =
                 , openGraph.image
                     |> Maybe.andThen (resolve (absoluteUrl context))
                     |> Maybe.map (property "og:image")
-                , Just (property "og:url" (pageUrl context))
+                , Maybe.map (property "og:url") (pageUrl context)
                 ]
                 ++ openGraphType openGraph.type_
 
@@ -201,9 +207,9 @@ maybeToList maybe =
 
 {-| The page's own URL. Search engines and link previews need it absolute.
 -}
-pageUrl : Context -> String
+pageUrl : Context -> Maybe String
 pageUrl context =
-    absoluteUrl context context.url
+    Maybe.map (absoluteUrl context) context.url
 
 
 absoluteUrl : Context -> String -> String

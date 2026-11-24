@@ -1,9 +1,9 @@
-module Sheaf.Internal.Site exposing (Site(..), Metadata, Feed, Route(..), Collection(..), Page)
+module Sheaf.Internal.Site exposing (Site(..), Metadata, Feed, Route(..), Item, FrontmatterProblems, Pagination, Collection(..), Page)
 
 {-| The site a user declares, behind `Sheaf`, `Sheaf.Route` and
 `Sheaf.Collection`, which only expose ways to build it.
 
-@docs Site, Metadata, Feed, Route, Collection, Page
+@docs Site, Metadata, Feed, Route, Item, FrontmatterProblems, Pagination, Collection, Page
 
 -}
 
@@ -45,18 +45,61 @@ type Collection meta
         }
 
 
-{-| The routes of one site use collections with different `meta` types, so an
-item route keeps its collection's decoder and its template together in
-`templateFor`. It decodes a document's frontmatter, and gives the template
-waiting for the document's rendered body, which may never come.
+{-| The routes of one site use collections with different `meta` types, so a
+route over a collection keeps its collection's decoder and its template
+together, in `templateFor`.
+
+An item route decodes a document's frontmatter and gives the template waiting
+for the document's rendered body, which may never come. A listing route gets
+its documents with their bodies, already in order, and decodes them all.
+
 -}
 type Route
     = Single { pattern : String, page : Page }
+    | NotFound Page
     | EachItem
         { pattern : String
         , collection : String
         , templateFor : Protocol.Document -> Result (List Problem) (List Html -> Page)
         }
+    | Paginated
+        { pattern : String
+        , perPage : Int
+        , collection : String
+        , templateFor : Pagination -> List Item -> Result (List FrontmatterProblems) Page
+        }
+    | AllItems
+        { pattern : String
+        , collection : String
+        , templateFor : List Item -> Result (List FrontmatterProblems) Page
+        }
+
+
+{-| A published document and its rendered body, as a listing route gets it.
+-}
+type alias Item =
+    { document : Protocol.Document
+    , body : List Html
+    }
+
+
+{-| The problems of a document's frontmatter.
+-}
+type alias FrontmatterProblems =
+    { document : Protocol.Document
+    , problems : List Problem
+    }
+
+
+{-| Where a page of a listing is among its pages. `previous` and `next` are
+URLs with the base path, ready for an `href`.
+-}
+type alias Pagination =
+    { page : Int
+    , pages : Int
+    , previous : Maybe String
+    , next : Maybe String
+    }
 
 
 {-| What a template returns for one page: its title, the tags of its `<head>`

@@ -73,6 +73,11 @@ description =
 
 {-| `<link rel="canonical">`, the page's own absolute URL, such as
 `https://example.com/blog/posts/hello/`.
+
+On the [`Route.notFound`](Sheaf-Route#notFound) page it renders nothing,
+because that page is served in place of any missing page and has no URL of its
+own.
+
 -}
 canonical : Tag
 canonical =
@@ -80,8 +85,8 @@ canonical =
 
 
 {-| The Open Graph tags that link previews read: `og:title`,
-`og:description`, `og:image`, `og:url` (this page's absolute URL) and
-`og:type`. An article also gets `article:published_time` and
+`og:description`, `og:image`, `og:url` (this page's absolute URL, left out on
+the `Route.notFound` page, as for `canonical`) and `og:type`. An article also gets `article:published_time` and
 `article:modified_time`, in UTC.
 
     Head.openGraph

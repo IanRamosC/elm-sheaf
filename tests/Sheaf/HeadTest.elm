@@ -24,7 +24,7 @@ suite =
 -}
 render : Tag -> String
 render tag =
-    Internal.toHtml { origin = "https://example.com", basePath = "/blog/", url = "/posts/a/" } tag
+    Internal.toHtml { origin = "https://example.com", basePath = "/blog/", url = Just "/posts/a/" } tag
         |> List.map Html.toString
         |> String.concat
 
