@@ -336,14 +336,14 @@ groupingOf route =
             Nothing
 
 
-{-| The pattern of a route with a page for each group, which group links use,
-and how it groups.
+{-| The pattern of a route with a page for each group, which links to groups
+use.
 -}
-groupedPattern : Route -> Maybe ( String, Grouping )
+groupedPattern : Route -> Maybe String
 groupedPattern route =
     case route of
         GroupedBy grouped ->
-            Just ( grouped.pattern, grouped.grouping )
+            Just grouped.pattern
 
         Single _ ->
             Nothing

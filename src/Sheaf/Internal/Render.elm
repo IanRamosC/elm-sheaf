@@ -10,19 +10,18 @@ It takes the request as JSON, so that tests drive it exactly as the host does.
 
 import Dict exposing (Dict)
 import Json.Decode as Decode
-import Set exposing (Set)
 import Sheaf.Html exposing (Html)
-import Sheaf.Internal.Check as Check exposing (CheckedPage, GroupLinkProblem(..), LinkProblem(..), Location(..), UncheckedPage)
-import Sheaf.Internal.Group as Group exposing (Group)
+import Sheaf.Internal.Check as Check exposing (CheckedPage, LinkProblem(..), Location(..), UncheckedPage)
+import Sheaf.Internal.Grouping as Grouping exposing (GroupPages, Grouped)
 import Sheaf.Internal.Hint as Hint
-import Sheaf.Internal.Html as Html exposing (GroupLink, Url(..))
+import Sheaf.Internal.Html as Html exposing (Url(..))
 import Sheaf.Internal.Listing as Listing exposing (Body)
 import Sheaf.Internal.Markdown as Markdown
 import Sheaf.Internal.Path as Path
 import Sheaf.Internal.Pattern as Pattern
 import Sheaf.Internal.Protocol as Protocol exposing (Diagnostic, Document, GroupSlug, Request, Response, Severity(..))
 import Sheaf.Internal.RouteCheck as RouteCheck
-import Sheaf.Internal.Site as Site exposing (FrontmatterProblems, Grouping, ListedDocument, Page, Route(..), Site(..))
+import Sheaf.Internal.Site as Site exposing (FrontmatterProblems, Page, Route(..), Site(..))
 import Sheaf.Ref as Ref exposing (Ref)
 
 
@@ -102,16 +101,21 @@ renderSite (Site site) request =
                 |> List.indexedMap Tuple.pair
                 |> List.filter (\( _, route ) -> RouteCheck.badRoute route == Nothing)
 
+        -- Found once, because each finding decodes a whole collection.
+        groupings : Dict Int Grouped
+        groupings =
+            Grouping.groupRoutes context.slugs bodies goodRoutes
+
         made : List (Result (List Diagnostic) UncheckedPage)
         made =
-            List.concatMap (\( index, route ) -> pagesOf context bodies index route) goodRoutes
+            List.concatMap (\( index, route ) -> pagesOf context bodies groupings index route) goodRoutes
 
         ( written, duplicates ) =
             withoutDuplicates (List.filterMap Result.toMaybe made)
 
-        groupPages : Dict String (Set String)
+        groupPages : GroupPages
         groupPages =
-            groupPagesOf context bodies (List.map Tuple.second goodRoutes)
+            Grouping.groupPages goodRoutes groupings
 
         checked : List CheckedPage
         checked =
@@ -120,7 +124,7 @@ renderSite (Site site) request =
                     { origin = context.origin
                     , basePath = context.basePath
                     , linkProblem = linkTarget context >> errorOf
-                    , groupLinkProblem = groupLinkTarget context groupPages >> errorOf
+                    , groupLinkProblem = Grouping.linkTarget context groupPages >> errorOf
                     }
                 )
                 written
@@ -138,7 +142,7 @@ renderSite (Site site) request =
             , unknownCollections used request.collections
             , Listing.missingDates (unique (List.filterMap Site.listedCollection site.routes)) published
             , List.concatMap (Tuple.second >> errors) bodies
-            , groupProblems context bodies (List.map Tuple.second goodRoutes)
+            , Grouping.diagnostics goodRoutes groupings
 
             -- Two routes over one collection decode its frontmatter twice.
             , unique (List.concatMap errors made)
@@ -247,37 +251,17 @@ linkTarget context ref =
                         Err (ToCollectionWithoutPages document.collection)
 
 
-{-| Where a link to a group points: the group's page of the first `groupedBy`
-route with the link's pattern, given the slugs of the groups it has pages for.
--}
-groupLinkTarget : Context -> Dict String (Set String) -> GroupLink -> Result GroupLinkProblem String
-groupLinkTarget context groupPages link =
-    case ( Dict.get link.pattern groupPages, Dict.get link.value context.slugs ) of
-        ( Nothing, _ ) ->
-            Err (NoGroupedRoute (Dict.keys groupPages))
-
-        ( Just _, Nothing ) ->
-            Err ValueWithoutSlug
-
-        ( Just slugs, Just { slug } ) ->
-            if Set.member slug slugs then
-                Ok (Path.join context.basePath (Pattern.fill Pattern.Group slug link.pattern))
-
-            else
-                Err EmptyGroup
-
-
 {-| Where a URL left to the renderer points. A site path that is not valid is
 reported by `Html.problems`, and its page is not written.
 -}
-urlTarget : Context -> Dict String (Set String) -> Url -> Maybe String
+urlTarget : Context -> GroupPages -> Url -> Maybe String
 urlTarget context groupPages url =
     case url of
         DocumentUrl ref ->
             Result.toMaybe (linkTarget context ref)
 
         GroupUrl link ->
-            Result.toMaybe (groupLinkTarget context groupPages link)
+            Result.toMaybe (Grouping.linkTarget context groupPages link)
 
         SitePath path ->
             Just (Path.join context.basePath path)
@@ -331,12 +315,22 @@ errorOf result =
 {-| The pages a route makes. A document whose body has problems (reported
 once, by `renderSite`) gets no page, but its frontmatter is still checked.
 -}
-pagesOf : Context -> List Body -> Int -> Route -> List (Result (List Diagnostic) UncheckedPage)
-pagesOf context bodies index route =
+pagesOf : Context -> List Body -> Dict Int Grouped -> Int -> Route -> List (Result (List Diagnostic) UncheckedPage)
+pagesOf context bodies groupings index route =
     let
         madeAt : String -> Page -> UncheckedPage
         madeAt url page =
             { route = index, routeName = Site.nameOf route, location = At url, page = page }
+
+        groupedPages : (Grouped -> List (Result (List FrontmatterProblems) UncheckedPage)) -> List (Result (List Diagnostic) UncheckedPage)
+        groupedPages pagesFor =
+            -- `renderSite` groups the documents of every grouping route it asks pages of.
+            case Dict.get index groupings of
+                Just grouped ->
+                    Grouping.whole grouped (pagesFor grouped)
+
+                Nothing ->
+                    []
     in
     case route of
         Single single ->
@@ -379,133 +373,28 @@ pagesOf context bodies index route =
                 |> Listing.whole complete
 
         GroupedBy grouped ->
-            let
-                grouping : Grouped
-                grouping =
-                    groupedDocuments context bodies grouped.grouping
-            in
-            grouping.groups
-                |> List.concatMap
-                    (\group ->
-                        Listing.paginate
-                            { basePath = context.basePath
-                            , pattern = Pattern.fill Pattern.Group group.slug grouped.pattern
+            groupedPages
+                (\{ groups } ->
+                    List.concatMap
+                        (\group ->
+                            Listing.paginate
+                                { basePath = context.basePath
+                                , pattern = Pattern.fill Pattern.Group group.slug grouped.pattern
 
-                            -- A group has at least one document, so its one page is never cut into pieces of none.
-                            , perPage = Maybe.withDefault (List.length group.items) grouped.perPage
-                            }
-                            group.items
-                            |> List.map (\page -> Result.map (madeAt page.url) (grouped.templateFor group.name page.pagination page.items))
-                    )
-                |> wholeGrouping grouping
+                                -- A group has at least one document, so its one page is never cut into pieces of none.
+                                , perPage = Maybe.withDefault (List.length group.items) grouped.perPage
+                                }
+                                group.items
+                                |> List.map (\page -> Result.map (madeAt page.url) (grouped.templateFor group.name page.pagination page.items))
+                        )
+                        groups
+                )
 
         AllGroups all ->
-            let
-                grouping : Grouped
-                grouping =
-                    groupedDocuments context bodies all.grouping
-            in
-            [ Result.map (madeAt all.pattern) (all.templateFor (List.map (\group -> { name = group.name, items = group.items }) grouping.groups)) ]
-                |> wholeGrouping grouping
-
-
-
--- GROUPS
-
-
-{-| The groups of a grouping route's documents, and what keeps it from being
-written: as for a listing, a document that cannot be listed, a frontmatter
-that does not decode, or a value that cannot be grouped.
--}
-type alias Grouped =
-    { groups : List (Group ListedDocument)
-    , problems : List Group.Problem
-    , complete : Bool
-    , invalid : List FrontmatterProblems
-    }
-
-
-groupedDocuments : Context -> List Body -> Grouping -> Grouped
-groupedDocuments context bodies grouping =
-    let
-        ( items, complete ) =
-            Listing.listOf grouping.collection bodies
-
-        ( valued, invalid ) =
-            List.foldr
-                (\item ( ok, failed ) ->
-                    case grouping.valuesOf item.document of
-                        Ok values ->
-                            ( ( item, values ) :: ok, failed )
-
-                        Err frontmatterProblems ->
-                            ( ok, { document = item.document, problems = frontmatterProblems } :: failed )
+            groupedPages
+                (\{ groups } ->
+                    [ Result.map (madeAt all.pattern) (all.templateFor (List.map (\group -> { name = group.name, items = group.items }) groups)) ]
                 )
-                ( [], [] )
-                items
-
-        { groups, problems } =
-            Group.group context.slugs valued
-    in
-    { groups = groups, problems = problems, complete = complete, invalid = invalid }
-
-
-{-| A grouping route's problems with values are reported by `groupProblems`,
-once for all the routes that find them.
--}
-wholeGrouping : Grouped -> List (Result (List FrontmatterProblems) UncheckedPage) -> List (Result (List Diagnostic) UncheckedPage)
-wholeGrouping grouping pages =
-    let
-        undecoded : List (Result (List FrontmatterProblems) UncheckedPage)
-        undecoded =
-            if List.isEmpty grouping.invalid then
-                []
-
-            else
-                [ Err grouping.invalid ]
-    in
-    Listing.whole (grouping.complete && List.isEmpty grouping.problems) (undecoded ++ pages)
-
-
-{-| The problems of the values routes group by. Routes grouping the same
-documents by the same values find the same problems, so each is reported once,
-naming the first route that found it.
--}
-groupProblems : Context -> List Body -> List Route -> List Diagnostic
-groupProblems context bodies routes =
-    routes
-        |> List.concatMap
-            (\route ->
-                case Site.groupingOf route of
-                    Just grouping ->
-                        List.map (Tuple.pair (Site.nameOf route)) (groupedDocuments context bodies grouping).problems
-
-                    Nothing ->
-                        []
-            )
-        |> List.foldl
-            (\( routeName, problem ) found ->
-                if List.any (\( _, seen ) -> seen == problem) found then
-                    found
-
-                else
-                    found ++ [ ( routeName, problem ) ]
-            )
-            []
-        |> List.map (\( routeName, problem ) -> Group.diagnostic routeName problem)
-
-
-{-| The slugs of the groups each `groupedBy` pattern has pages for, from the
-first route with that pattern, as links to groups use.
--}
-groupPagesOf : Context -> List Body -> List Route -> Dict String (Set String)
-groupPagesOf context bodies routes =
-    routes
-        |> List.filterMap Site.groupedPattern
-        |> List.map (\( pattern, grouping ) -> ( pattern, Set.fromList (List.map .slug (groupedDocuments context bodies grouping).groups) ))
-        -- Reversed, because `Dict.fromList` keeps the last.
-        |> List.reverse
-        |> Dict.fromList
 
 
 {-| A pattern ending in `/` is a folder, written as its `index.html`.
