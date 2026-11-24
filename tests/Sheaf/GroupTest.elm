@@ -59,6 +59,7 @@ slugTable =
     , ( "Élm", "elm", "elm" )
     , ( "Tooling", "tooling", "tooling" )
     , ( "C", "c", "c" )
+    , ( "c", "c", "c" )
     , ( "C++", "c", "c++" )
     , ( "Secret", "secret", "secret" )
     , ( "日本", "日本", "日本" )
@@ -259,6 +260,17 @@ slugProblemTests =
                     |> Expect.all
                         [ .diagnostics >> Expect.equal [ collision ]
                         , paths >> Expect.equal []
+                        ]
+        , test "spellings of one word in a collision are that word" <|
+            \_ ->
+                request [ tagged "a" 1 [ "C" ], tagged "b" 2 [ "C++" ], tagged "c" 3 [ "c" ], tagged "d" 4 [ "C" ] ]
+                    |> render [ tagRoute ]
+                    |> .diagnostics
+                    |> List.map .message
+                    |> Expect.equal
+                        [ "The values `C` and `C++` have the same slug, `c`, but are different words, so they cannot share a group:\n\n"
+                            ++ "    `C` in content/posts/d.md, content/posts/c.md, content/posts/a.md\n"
+                            ++ "    `C++` in content/posts/b.md"
                         ]
         , test "a collision is reported once, however many routes group the values" <|
             \_ ->

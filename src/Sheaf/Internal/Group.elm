@@ -32,7 +32,7 @@ the same problems, which are reported once.
 type Problem
     = MissingSlug String
     | EmptySlug { value : String, sourcePath : String, span : Maybe Span }
-    | Collision { slug : String, spellings : List ( String, List String ) }
+    | Collision { slug : String, words : List ( String, List String ) }
 
 
 {-| One document using one value with a slug.
@@ -89,48 +89,47 @@ place slugs item value =
 
 groupOf : String -> List (Use { a | document : Document }) -> Group { a | document : Document }
 groupOf slug uses =
-    let
-        spellings : List ( String, Int )
-        spellings =
-            List.map (\spelling -> ( spelling, List.length (List.filter (\use -> use.value == spelling) uses) ))
-                (unique (List.map .value uses))
-
-        name : String
-        name =
-            spellings
-                |> List.sortWith (\( a, countA ) ( b, countB ) -> compareBoth (compare countB countA) (byCodePoint a b))
-                |> List.head
-                |> Maybe.map Tuple.first
-                |> Maybe.withDefault slug
-    in
     { slug = slug
-    , name = name
+    , name = Maybe.withDefault slug (mostCommonSpelling uses)
     , items = uniqueBy (.document >> .id) (List.map .item uses)
     }
 
 
+mostCommonSpelling : List (Use item) -> Maybe String
+mostCommonSpelling uses =
+    unique (List.map .value uses)
+        |> List.map (\spelling -> ( spelling, List.length (List.filter (\use -> use.value == spelling) uses) ))
+        |> List.sortWith (\( a, countA ) ( b, countB ) -> compareBoth (compare countB countA) (byCodePoint a b))
+        |> List.head
+        |> Maybe.map Tuple.first
+
+
 {-| The host folds case, accents, spaces, dashes and underscores the same way
 for both, so values with different folds share a slug only by accident of
-their other punctuation, as `C` and `C++` do.
+their other punctuation, as `C` and `C++` do. Each fold is one word, named by
+its most common spelling.
 -}
 collisionOf : String -> List (Use { a | document : Document }) -> Maybe Problem
 collisionOf slug uses =
     case unique (List.map .folded uses) of
-        _ :: _ :: _ ->
+        (_ :: _ :: _) as folds ->
             Just
                 (Collision
                     { slug = slug
-                    , spellings =
-                        unique (List.map .value uses)
-                            |> List.sortWith byCodePoint
+                    , words =
+                        folds
                             |> List.map
-                                (\spelling ->
-                                    ( spelling
-                                    , uses
-                                        |> List.filter (\use -> use.value == spelling)
-                                        |> List.map (.item >> .document >> .sourcePath)
+                                (\fold ->
+                                    let
+                                        usesOfFold : List (Use { a | document : Document })
+                                        usesOfFold =
+                                            List.filter (\use -> use.folded == fold) uses
+                                    in
+                                    ( Maybe.withDefault fold (mostCommonSpelling usesOfFold)
+                                    , unique (List.map (.item >> .document >> .sourcePath) usesOfFold)
                                     )
                                 )
+                            |> List.sortWith (\( a, _ ) ( b, _ ) -> byCodePoint a b)
                     }
                 )
 
@@ -214,16 +213,16 @@ diagnostic routeName problem =
             , hint = Just "Use a value with at least one letter or digit, or remove it."
             }
 
-        Collision { slug, spellings } ->
+        Collision { slug, words } ->
             { severity = Error
             , title = "GROUP COLLISION"
             , message =
                 "The values "
-                    ++ joinAnd (List.map (\( spelling, _ ) -> "`" ++ spelling ++ "`") spellings)
+                    ++ joinAnd (List.map (\( word, _ ) -> "`" ++ word ++ "`") words)
                     ++ " have the same slug, `"
                     ++ slug
                     ++ "`, but are different words, so they cannot share a group:\n\n"
-                    ++ String.join "\n" (List.map (\( spelling, paths ) -> "    `" ++ spelling ++ "` in " ++ String.join ", " paths) spellings)
+                    ++ String.join "\n" (List.map (\( word, paths ) -> "    `" ++ word ++ "` in " ++ String.join ", " paths) words)
             , sourcePath = Nothing
             , span = Nothing
             , hint = Just "Spell them the same way if they are the same thing, or rename one of them."
