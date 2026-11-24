@@ -56,8 +56,9 @@ type Problem
 
 {-| The first problem of a pattern for a kind of route, if it has one.
 
-The first four make a pattern that cannot be turned into a file path inside
-the output folder, or a URL that leads back to it.
+`NoLeadingSlash`, `QueryOrFragment`, `EmptySegment` and `DotSegment` make a
+pattern that cannot be turned into a file path inside the output folder, or a
+URL that leads back to it, whatever the kind of route.
 
 -}
 problem : Kind -> String -> Maybe Problem

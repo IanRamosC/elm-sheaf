@@ -12,6 +12,10 @@ A pattern ending in `/` is a folder, written as its `index.html`: `/` becomes
 file itself, as in `/humans.txt`. Links get the site's base path in front, but
 the files do not, because the host serves them from there.
 
+The page a server shows for a URL with no page is made by
+[`notFound`](#notFound), not by a `single` route at `/404.html`: it keeps that
+page out of the sitemap.
+
 A placeholder such as `:slug` is a whole segment of the pattern, and each kind
 of route fills only its own: `/posts/:slug/` is an item route's pattern, and
 `/about/:slug/` is not a single page's.
@@ -46,7 +50,7 @@ import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Date as InternalDate
 import Sheaf.Internal.Frontmatter as Frontmatter exposing (Problem)
 import Sheaf.Internal.Protocol as Protocol
-import Sheaf.Internal.Site as Site exposing (FrontmatterProblems, Item)
+import Sheaf.Internal.Site as Site exposing (FrontmatterProblems, ListedDocument)
 import Sheaf.Ref as Ref
 
 
@@ -214,7 +218,7 @@ decode (Site.Collection collection) document =
 
 {-| Every document of a listing, or the problems of each that does not decode.
 -}
-decodeAll : Collection meta -> List Item -> Result (List FrontmatterProblems) (List (Document meta))
+decodeAll : Collection meta -> List ListedDocument -> Result (List FrontmatterProblems) (List (Document meta))
 decodeAll collection items =
     let
         decoded : List (Result FrontmatterProblems (Document meta))

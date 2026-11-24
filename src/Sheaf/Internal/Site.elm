@@ -1,15 +1,24 @@
-module Sheaf.Internal.Site exposing (Site(..), Metadata, Feed, Route(..), Item, FrontmatterProblems, Pagination, Collection(..), Page)
+module Sheaf.Internal.Site exposing
+    ( Site(..), Metadata, Feed, Route(..), ListedDocument, FrontmatterProblems, Pagination, Collection(..), Page
+    , nameOf, patternOf, collectionOf, itemPattern, listedCollection, perPageOf
+    )
 
 {-| The site a user declares, behind `Sheaf`, `Sheaf.Route` and
 `Sheaf.Collection`, which only expose ways to build it.
 
-@docs Site, Metadata, Feed, Route, Item, FrontmatterProblems, Pagination, Collection, Page
+@docs Site, Metadata, Feed, Route, ListedDocument, FrontmatterProblems, Pagination, Collection, Page
+
+
+# What a route uses
+
+@docs nameOf, patternOf, collectionOf, itemPattern, listedCollection, perPageOf
 
 -}
 
 import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Frontmatter exposing (Frontmatter, Problem)
 import Sheaf.Internal.Head as Head
+import Sheaf.Internal.Pattern as Pattern
 import Sheaf.Internal.Protocol as Protocol
 
 
@@ -66,18 +75,18 @@ type Route
         { pattern : String
         , perPage : Int
         , collection : String
-        , templateFor : Pagination -> List Item -> Result (List FrontmatterProblems) Page
+        , templateFor : Pagination -> List ListedDocument -> Result (List FrontmatterProblems) Page
         }
     | AllItems
         { pattern : String
         , collection : String
-        , templateFor : List Item -> Result (List FrontmatterProblems) Page
+        , templateFor : List ListedDocument -> Result (List FrontmatterProblems) Page
         }
 
 
 {-| A published document and its rendered body, as a listing route gets it.
 -}
-type alias Item =
+type alias ListedDocument =
     { document : Protocol.Document
     , body : List Html
     }
@@ -110,3 +119,126 @@ type alias Page =
     , head : List Head.Tag
     , body : List Html
     }
+
+
+
+-- WHAT A ROUTE USES
+
+
+{-| How a route is named in messages: by its pattern, or by the function that
+makes the one route without a pattern.
+-}
+nameOf : Route -> String
+nameOf route =
+    case patternOf route of
+        Just ( _, pattern ) ->
+            pattern
+
+        Nothing ->
+            "Route.notFound"
+
+
+{-| A route's pattern, and the kind of route that checks it.
+-}
+patternOf : Route -> Maybe ( Pattern.Kind, String )
+patternOf route =
+    case route of
+        Single single ->
+            Just ( Pattern.Fixed, single.pattern )
+
+        NotFound _ ->
+            Nothing
+
+        EachItem item ->
+            Just ( Pattern.Item, item.pattern )
+
+        Paginated listing ->
+            Just ( Pattern.Listing, listing.pattern )
+
+        AllItems listing ->
+            Just ( Pattern.Fixed, listing.pattern )
+
+
+{-| The collection a route takes, if it takes one.
+-}
+collectionOf : Route -> Maybe String
+collectionOf route =
+    case route of
+        Single _ ->
+            Nothing
+
+        NotFound _ ->
+            Nothing
+
+        EachItem item ->
+            Just item.collection
+
+        Paginated listing ->
+            Just listing.collection
+
+        AllItems listing ->
+            Just listing.collection
+
+
+{-| The collection of an item route and its pattern, which links to the
+collection's documents use.
+-}
+itemPattern : Route -> Maybe ( String, String )
+itemPattern route =
+    case route of
+        EachItem item ->
+            Just ( item.collection, item.pattern )
+
+        Single _ ->
+            Nothing
+
+        NotFound _ ->
+            Nothing
+
+        Paginated _ ->
+            Nothing
+
+        AllItems _ ->
+            Nothing
+
+
+{-| The collection a route lists by date, if it lists one.
+-}
+listedCollection : Route -> Maybe String
+listedCollection route =
+    case route of
+        Paginated listing ->
+            Just listing.collection
+
+        AllItems listing ->
+            Just listing.collection
+
+        Single _ ->
+            Nothing
+
+        NotFound _ ->
+            Nothing
+
+        EachItem _ ->
+            Nothing
+
+
+{-| How many documents a route puts on each page, if it puts them on pages.
+-}
+perPageOf : Route -> Maybe Int
+perPageOf route =
+    case route of
+        Paginated listing ->
+            Just listing.perPage
+
+        Single _ ->
+            Nothing
+
+        NotFound _ ->
+            Nothing
+
+        EachItem _ ->
+            Nothing
+
+        AllItems _ ->
+            Nothing
