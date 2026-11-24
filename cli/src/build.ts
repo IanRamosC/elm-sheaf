@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type Config, parseConfig } from "./config/config";
 import type { SourceDocument } from "./content/document";
+import { type ContentFiles, listContentFiles } from "./content/files";
 import {
   type BuildMode,
   loadContent,
@@ -75,7 +76,10 @@ export async function build(
     generateElm(collections, documents.value, names.value),
   );
 
-  const parsed = parseDocuments(documents.value);
+  const parsed = parseDocuments(
+    documents.value,
+    await listContentFiles(siteRoot),
+  );
   if (!parsed.ok) return parsed;
 
   const elm = await findElm(siteRoot);
@@ -167,12 +171,13 @@ async function readConfig(
 
 function parseDocuments(
   documents: SourceDocument[],
+  files: ContentFiles,
 ): Result<ParsedDocument[], Diagnostic[]> {
   return collect(
     documents.map((source) => {
       const tree = parseMarkdown(source);
       if (!tree.ok) return tree;
-      const checked = checkLinks(tree.value, source, documents);
+      const checked = checkLinks(tree.value, source, documents, files);
       return checked.ok ? ok({ source, tree: checked.value }) : checked;
     }),
   );

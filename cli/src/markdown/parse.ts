@@ -3,6 +3,7 @@ import { definitions } from "mdast-util-definitions";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { gfm } from "micromark-extension-gfm";
+import { normalizeUri } from "micromark-util-sanitize-uri";
 import type { SourceDocument } from "../content/document";
 import type { Diagnostic, Span } from "../diagnostics/diagnostic";
 import { err, ok, type Result } from "../result";
@@ -166,13 +167,17 @@ export function parseMarkdown(
           {
             type: "footnoteDefinition",
             position,
-            identifier: node.identifier,
+            identifier: footnoteId(node.identifier),
             children: convertChildren(node),
           },
         ];
       case "footnoteReference":
         return [
-          { type: "footnoteReference", position, identifier: node.identifier },
+          {
+            type: "footnoteReference",
+            position,
+            identifier: footnoteId(node.identifier),
+          },
         ];
       case "html":
         errors.push({
@@ -207,6 +212,15 @@ export function parseMarkdown(
 function plainText(node: Nodes): string {
   if (node.type === "text" || node.type === "inlineCode") return node.value;
   return "children" in node ? node.children.map(plainText).join("") : "";
+}
+
+/**
+ * Footnote identifiers become `id`s and `#` links, so they are made URL-safe
+ * the way `mdast-util-to-hast` does. `normalizeUri` keeps existing escapes,
+ * so `[^é]` and `[^%C3%A9]` are the same footnote, as on GitHub.
+ */
+function footnoteId(identifier: string): string {
+  return normalizeUri(identifier.toLowerCase());
 }
 
 function missingPosition(node: Nodes): never {

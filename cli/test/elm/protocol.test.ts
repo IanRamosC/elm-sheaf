@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { embeddedFixtureModule } from "../../scripts/embed-protocol-fixtures";
 import type { SourceDocument } from "../../src/content/document";
+import { ContentFiles } from "../../src/content/files";
 import {
   decodeResponse,
   encodeRequest,
@@ -94,7 +95,12 @@ describe("the all-nodes fixture tree", () => {
     };
     const parsed = parseMarkdown(document);
     if (!parsed.ok) throw new Error("the sample does not parse");
-    const checked = checkLinks(parsed.value, document, [document]);
+    const checked = checkLinks(
+      parsed.value,
+      document,
+      [document],
+      new ContentFiles([document.sourcePath]),
+    );
     expect(checked).toEqual({ ok: true, value: fixtureDocument.tree });
   });
 });

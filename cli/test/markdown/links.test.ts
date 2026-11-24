@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { SourceDocument } from "../../src/content/document";
+import { ContentFiles } from "../../src/content/files";
 import { checkLinks } from "../../src/markdown/links";
 import { parseMarkdown } from "../../src/markdown/parse";
 import type { Node } from "../../src/markdown/tree";
@@ -30,15 +31,29 @@ const all = [
   documentAt("pages", "about"),
 ];
 
-function check(body: string) {
-  const document = documentAt("posts", "a", body);
+const files = new ContentFiles([
+  ...all.map(({ sourcePath }) => sourcePath),
+  "content/posts/a/notes.pdf",
+]);
+
+function check(
+  body: string,
+  document = documentAt("posts", "a", body),
+  documents = all,
+  contentFiles = files,
+) {
   const parsed = parseMarkdown(document);
   if (!parsed.ok) throw new Error("parse failed");
-  return checkLinks(parsed.value, document, all);
+  return checkLinks(parsed.value, document, documents, contentFiles);
 }
 
-function linkIn(body: string): Node {
-  const result = check(body);
+function linkIn(
+  body: string,
+  document = documentAt("posts", "a", body),
+  documents = all,
+  contentFiles = files,
+): Node {
+  const result = check(body, document, documents, contentFiles);
   if (!result.ok) throw new Error(JSON.stringify(result.error));
   const paragraph = result.value.type === "root" && result.value.children[0];
   if (!paragraph || !("children" in paragraph)) throw new Error("no paragraph");
@@ -47,8 +62,8 @@ function linkIn(body: string): Node {
   return link;
 }
 
-function errorsFor(body: string) {
-  const result = check(body);
+function errorsFor(body: string, document = documentAt("posts", "a", body)) {
+  const result = check(body, document);
   if (result.ok) throw new Error("expected errors");
   return result.error;
 }
@@ -88,7 +103,7 @@ describe("checkLinks", () => {
       message:
         "This document links to `posts:helo-world`, but no document in `posts` has that slug.",
       sourcePath: "content/posts/a.md",
-      span: { start: { line: 1, column: 1 }, end: { line: 1, column: 35 } },
+      span: { start: { line: 1, column: 18 }, end: { line: 1, column: 34 } },
       hint: "Did you mean one of these?\n\n    posts:hello-world",
     });
   });
@@ -134,7 +149,9 @@ describe("checkLinks", () => {
       "tel:+351000000",
       "#section",
       "/about/",
-      "photo.png",
+      "/notes.pdf",
+      "../b/",
+      "//example.com/readme.md",
     ]) {
       expect(linkIn(`[x](${url})`)).toMatchObject({ type: "link", url });
     }
@@ -175,6 +192,104 @@ describe("checkLinks", () => {
     expect(error?.span).toEqual({
       start: { line: 1, column: 5 },
       end: { line: 1, column: 11 },
+    });
+  });
+
+  test("locates a reference definition's link at its use", () => {
+    expect(errorsFor("[x]\n\n[x]: posts:helo\n")[0]?.span).toEqual({
+      start: { line: 1, column: 1 },
+      end: { line: 1, column: 4 },
+    });
+  });
+
+  test("underlines only the destination of an inline link", () => {
+    const body = "Intro.\n\nSee [the post](posts:helo) now.";
+    const document = { ...documentAt("posts", "a", body), bodyStartLine: 5 };
+    expect(errorsFor(body, document)[0]?.span).toEqual({
+      start: { line: 7, column: 16 },
+      end: { line: 7, column: 26 },
+    });
+  });
+
+  test("finds a destination on the line after the label", () => {
+    expect(errorsFor("[x](\n  posts:helo)")[0]?.span).toEqual({
+      start: { line: 2, column: 3 },
+      end: { line: 2, column: 13 },
+    });
+  });
+
+  test("finds the destination of an empty label", () => {
+    expect(errorsFor("[](posts:helo)")[0]?.span).toEqual({
+      start: { line: 1, column: 4 },
+      end: { line: 1, column: 14 },
+    });
+  });
+
+  test("underlines an angle-bracketed destination inside its brackets", () => {
+    expect(errorsFor("[y](<my fle.md>)")[0]?.span).toEqual({
+      start: { line: 1, column: 6 },
+      end: { line: 1, column: 15 },
+    });
+  });
+
+  test("underlines an autolink inside its angle brackets", () => {
+    expect(errorsFor("<posts:helo>")[0]?.span).toEqual({
+      start: { line: 1, column: 2 },
+      end: { line: 1, column: 12 },
+    });
+  });
+
+  test("reports a link to a local file that is not a document", () => {
+    const body = "[pdf](./notes.pdf)";
+    const document = {
+      ...documentAt("posts", "a", body),
+      sourcePath: "content/posts/a/index.md",
+    };
+    expect(errorsFor(body, document)).toEqual([
+      expect.objectContaining({
+        title: "LOCAL FILE LINK",
+        hint: "Move `notes.pdf` to `static/` and link to it with a path starting with `/`, such as `/notes.pdf`.",
+      }),
+    ]);
+  });
+
+  test("reports a relative link to a missing file", () => {
+    const [error] = errorsFor("[x](./missing.pdf)");
+    expect(error?.title).toBe("BROKEN LINK");
+    expect(error?.message).toContain("./missing.pdf");
+  });
+
+  test("resolves a root-relative .md link from content/", () => {
+    const body = "[a](/posts/a.md)";
+    expect(linkIn(body, documentAt("pages", "about", body))).toMatchObject({
+      type: "sheafLink",
+      collection: "posts",
+      slug: "a",
+    });
+  });
+
+  test("reports a link whose case differs from the file's", () => {
+    const [error] = errorsFor("[x](./Hello-World.md)");
+    expect(error).toMatchObject({
+      title: "CASE MISMATCH",
+      message:
+        "The file is `hello-world.md`, but this refers to `Hello-World.md`. Linux treats them as different files, so the site would fail to build there.",
+    });
+  });
+
+  test("finds a file stored in NFD from a link written in NFC", () => {
+    const body = "[x](./caf\u00e9.md)";
+    const document = documentAt("posts", "a", body);
+    const stored = documentAt("posts", "cafe\u0301");
+    const link = linkIn(
+      body,
+      document,
+      [document, stored],
+      new ContentFiles([document.sourcePath, stored.sourcePath]),
+    );
+    expect(link).toMatchObject({
+      type: "sheafLink",
+      slug: "cafe\u0301",
     });
   });
 });

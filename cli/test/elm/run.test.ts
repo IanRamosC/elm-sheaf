@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseConfig } from "../../src/config/config";
+import { listContentFiles } from "../../src/content/files";
 import { loadContent, readContentFiles } from "../../src/content/load";
 import { slugTable } from "../../src/content/slug";
 import { renderDiagnostic } from "../../src/diagnostics/render";
@@ -351,11 +352,12 @@ async function generateSite(siteRoot: string): Promise<Request> {
   );
   if (!loaded.ok) throw new Error("fixture content must load");
   const documents = loaded.value;
+  const contentFiles = await listContentFiles(siteRoot);
 
   const parsed: ParsedDocument[] = documents.map((source) => {
     const tree = parseMarkdown(source);
     if (!tree.ok) throw new Error("fixture Markdown must parse");
-    const checked = checkLinks(tree.value, source, documents);
+    const checked = checkLinks(tree.value, source, documents, contentFiles);
     if (!checked.ok) throw new Error("fixture links must resolve");
     return { source, tree: checked.value };
   });

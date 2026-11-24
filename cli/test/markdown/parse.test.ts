@@ -73,6 +73,13 @@ describe("parseMarkdown", () => {
     expect(firstOfType(tree, "footnoteDefinition").identifier).toBe("1");
   });
 
+  test("makes footnote identifiers URL-safe", () => {
+    const tree = parse("Text[^Ünïcode-Note].\n\n[^Ünïcode-Note]: Note.\n");
+    const identifier = "%C3%BCn%C3%AFcode-note";
+    expect(firstOfType(tree, "footnoteReference").identifier).toBe(identifier);
+    expect(firstOfType(tree, "footnoteDefinition").identifier).toBe(identifier);
+  });
+
   test("parses a literal autolink as a link", () => {
     expect(firstOfType(parse("see https://elm-lang.org now"), "link").url).toBe(
       "https://elm-lang.org",
