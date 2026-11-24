@@ -56,6 +56,9 @@ from `content/posts/`, with one reference per document:
         , body = [ article [] (h1 [] [ text document.meta.title ] :: document.body) ]
         }
 
+For a blog, [`Sheaf.Blog`](Sheaf-Blog) declares the usual routes and feeds
+from a few layouts, using only what this package exposes.
+
 @docs Site, Metadata, site, withRoutes, withFeeds, link, groupLink
 
 -}
