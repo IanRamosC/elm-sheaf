@@ -4,6 +4,7 @@ import Expect
 import Json.Encode as Encode exposing (Value)
 import Sheaf
 import Sheaf.Collection as Collection exposing (Collection)
+import Sheaf.Date as Date
 import Sheaf.Document exposing (Document)
 import Sheaf.Frontmatter as Frontmatter exposing (Frontmatter)
 import Sheaf.Html as Html
@@ -13,6 +14,7 @@ import Sheaf.Internal.Render as Render
 import Sheaf.Ref as Ref
 import Sheaf.Route as Route exposing (Page, Route)
 import Test exposing (Test, describe, test)
+import Time
 
 
 suite : Test
@@ -295,8 +297,8 @@ pageTests =
                                         (String.join " "
                                             [ Ref.id document.ref
                                             , document.slug
-                                            , Maybe.withDefault "" (Maybe.map .isoDate document.date)
-                                            , Maybe.withDefault "" (Maybe.map (.posixMillis >> String.fromInt) document.date)
+                                            , Maybe.withDefault "" (Maybe.map Date.toIsoDate document.date)
+                                            , Maybe.withDefault "" (Maybe.map (Date.toPosix >> Time.posixToMillis >> String.fromInt) document.date)
                                             ]
                                         )
                                     ]
@@ -304,6 +306,23 @@ pageTests =
                         ]
                     |> bodyAt "posts/hello-world/index.html"
                     |> Expect.equal (Just "posts/hello-world hello-world 2026-11-23 1795392000000")
+        , test "gives the template the date as the updated date when there is no updated key" <|
+            \_ ->
+                let
+                    dated : Source
+                    dated =
+                        post "hello-world"
+                in
+                request [ "posts" ] [ { dated | date = Just "2026-11-23" } ]
+                    |> render
+                        [ Route.eachItem "/posts/:slug/"
+                            posts
+                            (\document ->
+                                page [ Html.text (Maybe.withDefault "" (Maybe.map Date.toIsoDate document.updated)) ]
+                            )
+                        ]
+                    |> bodyAt "posts/hello-world/index.html"
+                    |> Expect.equal (Just "2026-11-23")
         , test "does not render excluded documents" <|
             \_ ->
                 request [ "posts" ] [ post "hello-world", draft "secret-plans" ]

@@ -12,13 +12,13 @@ the files do not, because the host serves them from there.
 -}
 
 import Sheaf.Collection exposing (Collection)
+import Sheaf.Date exposing (Date)
 import Sheaf.Document exposing (Document)
 import Sheaf.Html exposing (Html)
+import Sheaf.Internal.Date as InternalDate
 import Sheaf.Internal.Frontmatter as Frontmatter
-import Sheaf.Internal.Protocol as Protocol
 import Sheaf.Internal.Site as Site
 import Sheaf.Ref as Ref
-import Time
 
 
 {-| One or more pages of the site.
@@ -66,17 +66,28 @@ eachItem pattern (Site.Collection collection) template =
                     { values = document.frontmatter, positions = document.frontmatterPositions }
                     |> Result.map
                         (\meta body ->
+                            let
+                                date : Maybe Date
+                                date =
+                                    Maybe.map InternalDate.fromProtocol document.date
+
+                                -- The host sends `updated` only when the author wrote one.
+                                updated : Maybe Date
+                                updated =
+                                    case document.updated of
+                                        Just written ->
+                                            Just (InternalDate.fromProtocol written)
+
+                                        Nothing ->
+                                            date
+                            in
                             template
                                 { ref = Ref.fromId document.id
                                 , slug = document.slug
-                                , date = Maybe.map toDate document.date
+                                , date = date
+                                , updated = updated
                                 , meta = meta
                                 , body = body
                                 }
                         )
         }
-
-
-toDate : Protocol.Date -> Sheaf.Document.Date
-toDate date =
-    { posixMillis = Time.posixToMillis date.posix, isoDate = date.isoDate }
