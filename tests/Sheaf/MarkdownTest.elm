@@ -19,6 +19,7 @@ suite =
         , tableTests
         , footnoteTests
         , linkTests
+        , directiveTests
         , fixtureTests
         ]
 
@@ -362,16 +363,102 @@ linkTests =
         ]
 
 
+directiveTests : Test
+directiveTests =
+    let
+        callout : List Node -> Node
+        callout children =
+            ContainerDirective { position = at 4, name = "callout", attributes = [ ( "kind", "note" ) ], children = children }
+
+        unknownComponent : String -> String -> Problem
+        unknownComponent name example =
+            Located
+                { span = at 4
+                , title = "UNKNOWN COMPONENT"
+                , message = "This document uses a component named `" ++ name ++ "`, but the site has no component with that name."
+                , hint = Just ("Add it to the site's `components`, such as `" ++ example ++ "`.")
+                }
+    in
+    describe "directives"
+        [ test "a container is an unknown component" <|
+            \_ ->
+                renderWith noLinks (root [ callout [ paragraph [ text "Careful." ] ] ])
+                    |> Expect.equal (Err [ unknownComponent "callout" "Component.container \"callout\" …" ])
+        , test "a leaf is an unknown component" <|
+            \_ ->
+                renderWith noLinks (root [ LeafDirective { position = at 4, name = "youtube", attributes = [ ( "id", "intro" ) ] } ])
+                    |> Expect.equal (Err [ unknownComponent "youtube" "Component.leaf \"youtube\" …" ])
+        , test "a footnote referenced only inside a container is numbered" <|
+            \_ ->
+                -- The footnote's own problem shows that its definition is rendered.
+                renderWith noLinks
+                    (root
+                        [ callout [ paragraph [ reference "a" ] ]
+                        , definitionOf "a" [ sheafLink { collection = "posts", slug = "gone", fragment = Nothing } ]
+                        ]
+                    )
+                    |> Expect.equal
+                        (Err
+                            [ unknownComponent "callout" "Component.container \"callout\" …"
+                            , UnresolvedLink { span = at 3, id = "posts/gone" }
+                            ]
+                        )
+        ]
+
+
 fixtureTests : Test
 fixtureTests =
+    let
+        trees : Result Decode.Error (List Node)
+        trees =
+            Decode.decodeString Protocol.requestDecoder ProtocolFixtures.allNodesRequest
+                |> Result.map (.documents >> List.map .tree)
+    in
     describe "a decoded request"
-        [ test "every node type renders" <|
+        [ test "every node type but directives renders" <|
             \_ ->
-                Decode.decodeString Protocol.requestDecoder ProtocolFixtures.allNodesRequest
-                    |> Result.map (.documents >> List.map .tree)
-                    |> Result.map (List.map (renderWith (helloWorldAt "/blog/posts/hello-world/")))
+                trees
+                    |> Result.map (List.map (withoutDirectives >> renderWith (helloWorldAt "/blog/posts/hello-world/")))
                     |> Expect.equal (Ok [ Ok allNodesHtml ])
+        , test "directives are unknown components until the site has components" <|
+            \_ ->
+                trees
+                    |> Result.map (List.map (renderWith (helloWorldAt "/blog/posts/hello-world/") >> Result.mapError (List.map problemTitle)))
+                    |> Expect.equal (Ok [ Err [ "UNKNOWN COMPONENT", "UNKNOWN COMPONENT" ] ])
         ]
+
+
+withoutDirectives : Node -> Node
+withoutDirectives node =
+    case node of
+        Root container ->
+            Root { container | children = List.filter (not << isDirective) container.children }
+
+        other ->
+            other
+
+
+isDirective : Node -> Bool
+isDirective node =
+    case node of
+        ContainerDirective _ ->
+            True
+
+        LeafDirective _ ->
+            True
+
+        _ ->
+            False
+
+
+problemTitle : Problem -> String
+problemTitle problem =
+    case problem of
+        UnresolvedLink _ ->
+            "UNRESOLVED LINK"
+
+        Located located ->
+            located.title
 
 
 allNodesHtml : String

@@ -102,7 +102,7 @@ requestTests =
                     |> Result.map (.documents >> List.map (.tree >> nodeKinds))
                     |> Expect.equal
                         (Ok
-                            [ [ "heading", "paragraph", "code", "code", "blockquote", "list", "list", "thematicBreak", "table", "footnoteDefinition" ] ]
+                            [ [ "heading", "paragraph", "code", "code", "blockquote", "list", "list", "thematicBreak", "table", "containerDirective", "leafDirective", "footnoteDefinition" ] ]
                         )
         , test "rejects another protocol version" <|
             \_ ->
@@ -152,6 +152,12 @@ kind node =
 
         Table _ ->
             "table"
+
+        ContainerDirective _ ->
+            "containerDirective"
+
+        LeafDirective _ ->
+            "leafDirective"
 
         FootnoteDefinition _ ->
             "footnoteDefinition"

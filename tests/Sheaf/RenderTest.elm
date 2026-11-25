@@ -2,7 +2,7 @@ module Sheaf.RenderTest exposing (suite)
 
 import Expect
 import Json.Encode as Encode
-import RenderFixtures exposing (Source, bodyAt, draft, error, headAt, markdownLink, metadata, page, paragraph, paths, post, postMeta, postPage, postRoute, posts, render, request, span, titles)
+import RenderFixtures exposing (Source, bodyAt, draft, error, headAt, leafDirective, markdownLink, metadata, page, paragraph, paths, post, postMeta, postPage, postRoute, posts, render, request, span, titles)
 import Sheaf
 import Sheaf.Collection as Collection
 import Sheaf.Date as Date
@@ -26,6 +26,7 @@ suite =
         , frontmatterTests
         , collectionTests
         , linkProblemTests
+        , componentProblemTests
         , invalidHtmlTests
         , duplicateTests
         , badRouteTests
@@ -425,6 +426,35 @@ linkProblemTests =
                     |> .diagnostics
                     |> Expect.equal
                         [ error "BROKEN LINK" "While rendering `/` from the route `/`, a `Sheaf.link` points to `posts/nowhere`, but there is no such document." ]
+        ]
+
+
+
+-- COMPONENT PROBLEMS
+
+
+componentProblemTests : Test
+componentProblemTests =
+    describe "component problems"
+        [ test "a directive the site has no component for is located in its document" <|
+            \_ ->
+                let
+                    embedding : Source
+                    embedding =
+                        post "hello-world"
+                in
+                request [ "posts" ] [ { embedding | body = [ leafDirective "youtube" (span 4 1 18) ] } ]
+                    |> render [ postRoute ]
+                    |> .diagnostics
+                    |> Expect.equal
+                        [ { severity = Error
+                          , title = "UNKNOWN COMPONENT"
+                          , message = "This document uses a component named `youtube`, but the site has no component with that name."
+                          , sourcePath = Just "content/posts/hello-world.md"
+                          , span = Just (span 4 1 18)
+                          , hint = Just "Add it to the site's `components`, such as `Component.leaf \"youtube\" …`."
+                          }
+                        ]
         ]
 
 

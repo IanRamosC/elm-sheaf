@@ -8,6 +8,7 @@ module RenderFixtures exposing
     , footnoteReference
     , headAt
     , image
+    , leafDirective
     , link
     , markdownLink
     , metadata
@@ -324,6 +325,18 @@ link url =
 image : String -> Value
 image url =
     markdownNode "image" [ ( "url", Encode.string url ), ( "alt", Encode.string "" ) ]
+
+
+{-| A leaf directive without attributes, written at `at`.
+-}
+leafDirective : String -> Span -> Value
+leafDirective name at =
+    Encode.object
+        [ ( "type", Encode.string "leafDirective" )
+        , ( "position", encodeSpan at )
+        , ( "name", Encode.string name )
+        , ( "attributes", Encode.list identity [] )
+        ]
 
 
 footnoteReference : String -> Value

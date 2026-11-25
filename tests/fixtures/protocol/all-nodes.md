@@ -27,4 +27,10 @@ plain
 |:--|:-:|--:|---|
 | 1 | 2 | 3 | 4 |
 
+:::callout{kind="note" .wide}
+Inside a callout.
+:::
+
+::youtube{#intro}
+
 [^note]: The note.

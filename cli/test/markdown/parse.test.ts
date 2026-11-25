@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { SourceDocument } from "../../src/content/document";
+import type { Diagnostic } from "../../src/diagnostics/diagnostic";
 import { parseMarkdown } from "../../src/markdown/parse";
 import type { Node } from "../../src/markdown/tree";
 
@@ -196,5 +197,165 @@ describe("parseMarkdown", () => {
     const tree = parse("[text][missing]");
     expect(typesIn(tree)).toEqual(["root", "paragraph", "text"]);
     expect(firstOfType(tree, "text").value).toBe("[text][missing]");
+  });
+});
+
+describe("parseMarkdown directives", () => {
+  test("parses a container with its attributes in source order", () => {
+    const tree = parse(':::callout{kind="warning" .wide}\nTake care.\n:::\n');
+    const callout = firstOfType(tree, "containerDirective");
+    expect(callout.name).toBe("callout");
+    expect(callout.attributes).toEqual([
+      { name: "kind", value: "warning" },
+      { name: "class", value: "wide" },
+    ]);
+    expect(callout.children.map((child) => child.type)).toEqual(["paragraph"]);
+    expect(callout.position).toEqual({
+      start: { line: 1, column: 1 },
+      end: { line: 3, column: 4 },
+    });
+  });
+
+  test("parses a leaf, with `#x` as its id", () => {
+    const tree = parse("::youtube{#intro}\n");
+    expect(firstOfType(tree, "leafDirective")).toEqual({
+      type: "leafDirective",
+      position: { start: { line: 1, column: 1 }, end: { line: 1, column: 18 } },
+      name: "youtube",
+      attributes: [{ name: "id", value: "intro" }],
+    });
+  });
+
+  test("keeps the order of attributes that the parser gives as an object", () => {
+    const tree = parse("::x{b=1 #i a=2 open}\n");
+    expect(firstOfType(tree, "leafDirective").attributes).toEqual([
+      { name: "b", value: "1" },
+      { name: "id", value: "i" },
+      { name: "a", value: "2" },
+      { name: "open", value: "" },
+    ]);
+  });
+
+  test("joins every class into one attribute", () => {
+    const tree = parse("::x{.a .b}\n");
+    expect(firstOfType(tree, "leafDirective").attributes).toEqual([
+      { name: "class", value: "a b" },
+    ]);
+  });
+
+  test("nests containers", () => {
+    const tree = parse("::::outer\n:::inner\nText.\n:::\n::::\n");
+    const outer = firstOfType(tree, "containerDirective");
+    expect(outer.name).toBe("outer");
+    expect(outer.children).toMatchObject([
+      { type: "containerDirective", name: "inner" },
+    ]);
+  });
+
+  test("reports an attribute written twice", () => {
+    const errors = parseErrors("::youtube{id=a id=b}\n", 4);
+    expect(errors).toEqual([
+      {
+        severity: "error",
+        title: "DUPLICATE ATTRIBUTE",
+        message: "The `id` attribute is written twice.",
+        sourcePath: "content/posts/a.md",
+        span: {
+          start: { line: 4, column: 1 },
+          end: { line: 4, column: 21 },
+        },
+      },
+    ]);
+  });
+
+  test("counts `#x` as an id when looking for repeats", () => {
+    const errors = parseErrors("::youtube{#a id=b}\n");
+    expect(errors.map((error) => error.message)).toEqual([
+      "The `id` attribute is written twice.",
+    ]);
+  });
+
+  test("reports a container that is never closed at its opening fence", () => {
+    const errors = parseErrors(
+      'Before.\n\n:::callout{kind="note"}\nText.\n',
+      3,
+    );
+    expect(errors).toEqual([
+      {
+        severity: "error",
+        title: "UNCLOSED COMPONENT",
+        message:
+          "The `callout` component is never closed, so it would take in the rest of the document.",
+        sourcePath: "content/posts/a.md",
+        span: {
+          start: { line: 5, column: 1 },
+          end: { line: 5, column: 24 },
+        },
+        hint: "Close it with a line holding only `:::`.",
+      },
+    ]);
+  });
+
+  test("accepts a container closed on the last line of the file", () => {
+    const tree = parse(":::callout\nText.\n:::");
+    expect(firstOfType(tree, "containerDirective").name).toBe("callout");
+  });
+
+  test("reports an outer container left open after its inner one closes", () => {
+    const errors = parseErrors("::::outer\n:::inner\nText.\n:::\n");
+    expect(
+      errors.map((error) => [error.title, error.span?.start.line]),
+    ).toEqual([["UNCLOSED COMPONENT", 1]]);
+  });
+
+  for (const sample of ["12:30", "foo:bar", ":smile:", "see :ref[x]{a=1}"]) {
+    test(`gives back \`${sample}\` as the text it was written as`, () => {
+      const source = `At ${sample} today.`;
+      const paragraph = firstOfType(parse(source), "paragraph");
+      expect(paragraph.children).toEqual([
+        {
+          type: "text",
+          position: {
+            start: { line: 1, column: 1 },
+            end: { line: 1, column: source.length + 1 },
+          },
+          value: source,
+        },
+      ]);
+    });
+  }
+
+  test("keeps colons in heading ids and image descriptions", () => {
+    const tree = parse("# Meet at 12:30\n\n![Doors open at 18:00](a.png)\n");
+    expect(firstOfType(tree, "heading").id).toBe("meet-at-1230");
+    expect(firstOfType(tree, "image").alt).toBe("Doors open at 18:00");
+  });
+
+  test("keeps Markdown after a colon, as if directives did not exist", () => {
+    const tree = parse("see:docs[the guide](https://example.com)\n");
+    expect(firstOfType(tree, "link").url).toBe("https://example.com");
+  });
+
+  test("reports a label on a leaf or a container", () => {
+    const errors = parseErrors(
+      "::youtube[My video]{id=abc}\n\n:::note[Title]\nText.\n:::\n",
+    );
+    const expected: Diagnostic = {
+      severity: "error",
+      title: "DIRECTIVE LABEL",
+      message: "Components don't take a `[label]` in this version of Sheaf.",
+      sourcePath: "content/posts/a.md",
+      hint: 'Pass the text as an attribute instead, such as `::youtube{title="My video"}`.',
+    };
+    expect(errors).toEqual([
+      {
+        ...expected,
+        span: { start: { line: 1, column: 1 }, end: { line: 1, column: 28 } },
+      },
+      {
+        ...expected,
+        span: { start: { line: 3, column: 1 }, end: { line: 5, column: 4 } },
+      },
+    ]);
   });
 });

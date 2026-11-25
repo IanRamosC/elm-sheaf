@@ -380,6 +380,8 @@ type Node
     | TableCell Container
     | FootnoteDefinition { position : Span, identifier : String, children : List Node }
     | FootnoteReference { position : Span, identifier : String }
+    | ContainerDirective { position : Span, name : String, attributes : List ( String, String ), children : List Node }
+    | LeafDirective { position : Span, name : String, attributes : List ( String, String ) }
 
 
 {-| The fields of every node that only holds other nodes.
@@ -512,6 +514,19 @@ nodeOfType type_ =
                 positionField
                 (Decode.field "identifier" Decode.string)
 
+        "containerDirective" ->
+            Decode.map4 (\position name attributes children -> ContainerDirective { position = position, name = name, attributes = attributes, children = children })
+                positionField
+                (Decode.field "name" Decode.string)
+                attributesField
+                childrenField
+
+        "leafDirective" ->
+            Decode.map3 (\position name attributes -> LeafDirective { position = position, name = name, attributes = attributes })
+                positionField
+                (Decode.field "name" Decode.string)
+                attributesField
+
         _ ->
             Decode.fail ("Unknown Markdown node type \"" ++ type_ ++ "\"")
 
@@ -524,6 +539,17 @@ positionField =
 childrenField : Decoder (List Node)
 childrenField =
     Decode.field "children" (Decode.list (Decode.lazy (\_ -> nodeDecoder)))
+
+
+attributesField : Decoder (List ( String, String ))
+attributesField =
+    Decode.field "attributes"
+        (Decode.list
+            (Decode.map2 Tuple.pair
+                (Decode.field "name" Decode.string)
+                (Decode.field "value" Decode.string)
+            )
+        )
 
 
 containerDecoder : Decoder Container

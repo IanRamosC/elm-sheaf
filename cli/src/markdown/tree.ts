@@ -41,7 +41,20 @@ export type Node = { position: Span } & (
   | { type: "tableCell"; children: Node[] }
   | { type: "footnoteDefinition"; identifier: string; children: Node[] }
   | { type: "footnoteReference"; identifier: string }
+  | {
+      type: "containerDirective";
+      name: string;
+      attributes: DirectiveAttribute[];
+      children: Node[];
+    }
+  | { type: "leafDirective"; name: string; attributes: DirectiveAttribute[] }
 );
+
+/**
+ * An attribute of a directive, in the order they are written. `#x` is `id`,
+ * every `.y` is one `class` joined by spaces, and a bare name has value `""`.
+ */
+export type DirectiveAttribute = { name: string; value: string };
 
 /** How a table column is aligned; `null` when the column has no alignment marker. */
 export type TableAlignment = "left" | "right" | "center" | null;

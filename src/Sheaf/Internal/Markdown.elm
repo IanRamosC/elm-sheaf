@@ -209,6 +209,28 @@ renderNode scope node =
         FootnoteReference reference ->
             Ok [ footnoteReference scope reference ]
 
+        ContainerDirective directive ->
+            merge
+                (unknownComponent directive ("Component.container \"" ++ directive.name ++ "\" …"))
+                (renderNodes scope directive.children)
+
+        LeafDirective directive ->
+            unknownComponent directive ("Component.leaf \"" ++ directive.name ++ "\" …")
+
+
+{-| Sites have no components yet, so every directive names an unknown one.
+-}
+unknownComponent : { a | position : Span, name : String } -> String -> Rendered
+unknownComponent directive example =
+    Err
+        [ Located
+            { span = directive.position
+            , title = "UNKNOWN COMPONENT"
+            , message = "This document uses a component named `" ++ directive.name ++ "`, but the site has no component with that name."
+            , hint = Just ("Add it to the site's `components`, such as `" ++ example ++ "`.")
+            }
+        ]
+
 
 headingElement : Int -> List Html.Attribute -> List Html -> Html
 headingElement depth =
@@ -598,6 +620,9 @@ childrenOf node =
         FootnoteDefinition definition ->
             definition.children
 
+        ContainerDirective directive ->
+            directive.children
+
         Text _ ->
             []
 
@@ -617,6 +642,9 @@ childrenOf node =
             []
 
         FootnoteReference _ ->
+            []
+
+        LeafDirective _ ->
             []
 
 
