@@ -305,14 +305,19 @@ export async function pruneImageCache(
   try {
     names = await readdir(cache);
   } catch (error) {
-    if (isErrno(error) && error.code === "ENOENT") return;
+    // A cache folder that is missing or cannot be read has nothing to prune.
+    if (isErrno(error)) return;
     throw error;
   }
   await Promise.all(
     names
       .filter((name) => !keep.has(join(cache, name)))
       // A file that cannot be deleted only costs disk space, not a build.
-      .map((name) => rm(join(cache, name), { force: true }).catch(() => {})),
+      .map((name) =>
+        rm(join(cache, name), { force: true }).catch((error: unknown) => {
+          if (!isErrno(error)) throw error;
+        }),
+      ),
   );
 }
 

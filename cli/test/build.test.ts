@@ -709,6 +709,45 @@ describe("the blog fixture", () => {
     SLOW,
   );
 
+  test(
+    "warns, and still builds, when .sheaf/cache is a file",
+    async () => {
+      const root = copyFixture("minimal");
+      writeFileSync(
+        join(root, "content/posts/2026-11-23-hello-world.md"),
+        "---\ntitle: Hello, world\n---\n\n```elm\nx = 1\n```\n",
+      );
+      mkdirSync(join(root, ".sheaf"), { recursive: true });
+      writeFileSync(join(root, ".sheaf/cache"), "not a folder");
+
+      const result = await build(root, options(root));
+
+      expect(result.ok && result.value.warnings.map((w) => w.title)).toEqual([
+        "CACHE NOT SAVED",
+      ]);
+    },
+    SLOW,
+  );
+
+  test.skipIf(process.getuid?.() === 0)(
+    "builds a site without images when the cache folder cannot be read",
+    async () => {
+      const root = copyFixture("minimal");
+      const cache = join(root, ".sheaf/cache/images");
+      mkdirSync(cache, { recursive: true });
+      chmodSync(cache, 0o000);
+
+      try {
+        const result = await build(root, options(root));
+
+        expect(result.ok).toBe(true);
+      } finally {
+        chmodSync(cache, 0o755);
+      }
+    },
+    SLOW,
+  );
+
   for (const name of ["archive.md", "Archive.md"]) {
     test(
       `reports a page named ${name} as a duplicate of the archive`,

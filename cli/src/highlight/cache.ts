@@ -94,7 +94,9 @@ export async function saveHighlightCache(
       hint: `Make sure \`${CACHE_FOLDER}\` is a folder you can write to.`,
     });
   } finally {
-    await rm(temporary, { force: true });
+    // Cleanup is best-effort: when the folder cannot be looked into, the
+    // warning above must not be replaced by a crash.
+    await rm(temporary, { force: true }).catch(() => {});
   }
 }
 
