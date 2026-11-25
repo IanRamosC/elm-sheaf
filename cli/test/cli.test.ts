@@ -2,10 +2,12 @@ import { afterEach, describe, expect, test } from "bun:test";
 import {
   appendFileSync,
   existsSync,
+  mkdtempSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { unsupportedBun } from "../src/cli/main";
 import {
@@ -32,7 +34,14 @@ async function sheaf(args: string[], cwd: string) {
   return { stdout, stderr, exitCode };
 }
 
-afterEach(removeFixtureCopies);
+const copies: string[] = [];
+
+afterEach(() => {
+  removeFixtureCopies();
+  for (const folder of copies.splice(0)) {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
 
 /** A running `sheaf dev`, whose output is collected as it arrives. */
 function startDev(cwd: string) {
@@ -242,6 +251,11 @@ describe("sheaf", () => {
       ["dev", "--drafts"],
       ["dev", "--site-url", "https://x.example/"],
       ["build", "--port", "1"],
+      ["build", "--local", "/repo"],
+      ["init", "site", "--drafts"],
+      ["init", "site", "--port", "1"],
+      ["init"],
+      ["init", "one", "two"],
     ]) {
       const { stderr, exitCode } = await sheaf(args, import.meta.dir);
 
@@ -249,6 +263,52 @@ describe("sheaf", () => {
       expect(stderr).toContain("Usage:");
     }
   });
+
+  test("init in the current empty folder prints the next steps", async () => {
+    const folder = mkdtempSync(join(tmpdir(), "sheaf-init-cli-"));
+    copies.push(folder);
+
+    const { stdout, exitCode } = await sheaf(["init", "."], folder);
+
+    expect(exitCode).toBe(0);
+    expect(existsSync(join(folder, "sheaf.json"))).toBe(true);
+    expect(stdout).toContain("bun install");
+    expect(stdout).toContain("bunx sheaf dev");
+    expect(stdout).not.toContain("cd ");
+  });
+
+  test("init refuses a folder with files in it", async () => {
+    const folder = mkdtempSync(join(tmpdir(), "sheaf-init-cli-"));
+    copies.push(folder);
+    writeFileSync(join(folder, ".DS_Store"), "x");
+
+    const { stdout, exitCode } = await sheaf(["init", "."], folder);
+
+    expect(exitCode).toBe(1);
+    expect(stdout).toContain("FOLDER NOT EMPTY");
+  });
+
+  test(
+    "init --local makes a site that builds",
+    async () => {
+      const parent = mkdtempSync(join(tmpdir(), "sheaf-init-cli-"));
+      copies.push(parent);
+      const site = join(parent, "my blog");
+
+      const created = await sheaf(
+        ["init", site, "--local", join(import.meta.dir, "../..")],
+        parent,
+      );
+      const built = await sheaf(["build"], site);
+
+      expect(created.exitCode).toBe(0);
+      expect(created.stdout).toContain('cd "');
+      expect(built.stdout).toContain("Built");
+      expect(built.exitCode).toBe(0);
+      expect(existsSync(join(site, "dist/index.html"))).toBe(true);
+    },
+    SLOW,
+  );
 
   test("prints help and exits 2 for an unknown command", async () => {
     const { stderr, exitCode } = await sheaf(["frobnicate"], import.meta.dir);

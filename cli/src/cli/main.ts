@@ -1,7 +1,8 @@
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import packageJson from "../../package.json";
 import { build } from "../build";
+import { initSite } from "../init/init";
 import { runDev } from "./dev";
 import {
   count,
@@ -18,11 +19,13 @@ Commands:
   sheaf build [--drafts] [--site-url <url>]   Render the site into dist/
   sheaf check [--drafts] [--site-url <url>]   Run every build stage without writing dist/
   sheaf dev [--port <n>]                      Serve the site with drafts, rebuilding on every change
+  sheaf init <folder> [--local <path>]        Create a site in an empty or new folder
 
 Options:
   --drafts          Include drafts and documents dated in the future
   --site-url <url>  Use this siteUrl instead of the one in sheaf.json
   --port <n>        Serve on this port instead of the first free one from 4000
+  --local <path>    Use a checkout of the Sheaf repository instead of the published packages
   -h, --help        Show this help
   -v, --version     Show the version
 `;
@@ -32,7 +35,8 @@ type Command = "build" | "check";
 /** What to run, once the options are known to belong to the command. */
 type Invocation =
   | ({ command: Command } & CommandOptions)
-  | { command: "dev"; port: number | undefined };
+  | { command: "dev"; port: number | undefined }
+  | { command: "init"; folder: string; local: string | undefined };
 
 /**
  * Runs the command line and returns the exit code: 0 success, 1 errors in the
@@ -62,6 +66,9 @@ export async function main(args: string[]): Promise<number> {
   if (invocation.command === "dev") {
     return runDev(process.cwd(), invocation.port);
   }
+  if (invocation.command === "init") {
+    return runInit(invocation.folder, invocation.local);
+  }
   return runCommand(invocation.command, invocation);
 }
 
@@ -76,8 +83,17 @@ function invocationOf(
   values: Values,
 ): Invocation | undefined {
   const [command, ...extra] = positionals;
-  if (extra.length > 0) return undefined;
-  const { drafts, "site-url": siteUrl, port } = values;
+  const { drafts, "site-url": siteUrl, port, local } = values;
+
+  if (command === "init") {
+    const [folder, ...more] = extra;
+    if (folder === undefined || more.length > 0) return undefined;
+    if (drafts !== undefined || siteUrl !== undefined || port !== undefined) {
+      return undefined;
+    }
+    return { command, folder, local };
+  }
+  if (extra.length > 0 || local !== undefined) return undefined;
 
   if (command === "dev") {
     if (drafts !== undefined || siteUrl !== undefined) return undefined;
@@ -100,6 +116,7 @@ function parseArguments(args: string[]) {
         drafts: { type: "boolean" },
         "site-url": { type: "string" },
         port: { type: "string" },
+        local: { type: "string" },
         help: { type: "boolean", short: "h" },
         version: { type: "boolean", short: "v" },
       },
@@ -132,6 +149,35 @@ function parsePort(text: string): number | undefined {
 function usageError(): number {
   process.stderr.write(HELP);
   return 2;
+}
+
+async function runInit(
+  folder: string,
+  local: string | undefined,
+): Promise<number> {
+  const colour = supportsColour();
+  const result = await initSite(folder, {
+    local,
+    today: new Date().toISOString().slice(0, 10),
+  });
+  if (!result.ok) {
+    const rendered = await renderDiagnostics(result.error, process.cwd());
+    printDiagnostics(rendered, colour);
+    printErrorCount(rendered, colour);
+    return 1;
+  }
+
+  write(paint("green", `Created a site in ${folder}`, colour));
+  write("\nNext steps:");
+  if (resolve(folder) !== process.cwd()) write(`  cd ${shellQuoted(folder)}`);
+  write("  bun install");
+  write("  bunx sheaf dev");
+  return 0;
+}
+
+/** Quotes a folder name for the shell only when it needs it. */
+function shellQuoted(path: string): string {
+  return /^[\w@%+=:,./-]+$/.test(path) ? path : JSON.stringify(path);
 }
 
 type CommandOptions = { drafts: boolean; siteUrl: string | undefined };

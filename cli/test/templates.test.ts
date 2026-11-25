@@ -1,51 +1,20 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import {
-  cpSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { build } from "../src/build";
+import { initSite } from "../src/init/init";
 
 const STARTER = join(import.meta.dir, "../templates/default");
-const PACKAGE_SOURCE = join(import.meta.dir, "../../src");
+const REPO = join(import.meta.dir, "../..");
 const SLOW = 60_000;
 
-/**
- * Copies the starter as `sheaf init` will, until Task 8's `init` exists: the
- * welcome post gets a date and `elm.json` points at this repository's package.
- */
-function copyStarter(): string {
-  const root = mkdtempSync(join(tmpdir(), "sheaf-starter-"));
-  cpSync(STARTER, root, { recursive: true });
-
-  const welcome = join(root, "content/posts/welcome.md");
-  writeFileSync(
-    welcome,
-    readFileSync(welcome, "utf8").replaceAll("{{today}}", "2026-01-02"),
-  );
-  writeFileSync(
-    join(root, "elm.json"),
-    JSON.stringify({
-      type: "application",
-      "source-directories": ["src", ".sheaf/gen", PACKAGE_SOURCE],
-      "elm-version": "0.19.3",
-      dependencies: {
-        direct: {
-          "elm/core": "1.0.5",
-          "elm/json": "1.1.4",
-          "elm/time": "1.0.0",
-        },
-        indirect: {},
-      },
-      "test-dependencies": { direct: {}, indirect: {} },
-    }),
-  );
+/** Creates the site the way `sheaf init --local` does, in a folder of its own. */
+async function initStarter(): Promise<string> {
+  const root = join(mkdtempSync(join(tmpdir(), "sheaf-starter-")), "site");
+  const created = await initSite(root, { local: REPO, today: "2026-01-02" });
+  if (!created.ok) throw new Error(created.error[0]?.message);
   return root;
 }
 
@@ -61,7 +30,7 @@ describe("the default starter", () => {
   const read = (path: string) => readFileSync(join(root, "dist", path), "utf8");
 
   beforeAll(async () => {
-    root = copyStarter();
+    root = await initStarter();
     built = await build(root, {
       mode: "production",
       now: new Date("2026-01-03T00:00:00Z"),
@@ -71,7 +40,7 @@ describe("the default starter", () => {
     });
   }, SLOW);
 
-  afterAll(() => rmSync(root, { recursive: true, force: true }));
+  afterAll(() => rmSync(dirname(root), { recursive: true, force: true }));
 
   test("builds", () => {
     expect(built.ok ? [] : built.error.map(({ title }) => title)).toEqual([]);
