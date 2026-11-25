@@ -15,6 +15,7 @@ import Sheaf.Internal.Check as Check exposing (CheckedPage, LinkProblem(..), Loc
 import Sheaf.Internal.Component as Component exposing (Component)
 import Sheaf.Internal.Feed as Feed
 import Sheaf.Internal.Grouping as Grouping exposing (GroupPages, Grouped)
+import Sheaf.Internal.Head exposing (FeedFormat(..))
 import Sheaf.Internal.Hint as Hint
 import Sheaf.Internal.Html as Html exposing (Url(..))
 import Sheaf.Internal.Listing as Listing exposing (Body)
@@ -145,6 +146,7 @@ renderSite (Site site) request =
                     , basePath = context.basePath
                     , linkProblem = linkTarget context >> Results.error
                     , groupLinkProblem = Grouping.linkTarget context groupPages >> Results.error
+                    , feedPaths = feedPaths site.feeds
                     }
                 )
                 written
@@ -177,6 +179,25 @@ renderSite (Site site) request =
                 ]
             )
     }
+
+
+{-| The paths a head tag can link to for a format: the files the feeds write.
+-}
+feedPaths : List Feed -> FeedFormat -> List String
+feedPaths feeds format =
+    List.concatMap Feed.outputs feeds
+        |> List.filterMap
+            (\output ->
+                case ( output, format ) of
+                    ( FeedFile "RSS" path, Rss ) ->
+                        Just path
+
+                    ( FeedFile "Atom" path, Atom ) ->
+                        Just path
+
+                    _ ->
+                        Nothing
+            )
 
 
 {-| A feed uses its collection, and lists it by date as a listing route does.

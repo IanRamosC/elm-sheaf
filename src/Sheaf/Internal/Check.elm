@@ -17,9 +17,10 @@ since a layout they share usually made it.
 -}
 
 import Sheaf.Html exposing (Html)
-import Sheaf.Internal.Head as Head
+import Sheaf.Internal.Head as Head exposing (FeedFormat(..))
 import Sheaf.Internal.Hint as Hint
 import Sheaf.Internal.Html as Html exposing (GroupLink, HtmlProblem(..), Url(..))
+import Sheaf.Internal.Path as Path
 import Sheaf.Internal.Protocol as Protocol exposing (Diagnostic, Severity(..))
 import Sheaf.Internal.Site exposing (Page)
 import Sheaf.Ref as Ref exposing (Ref)
@@ -79,13 +80,15 @@ type alias CheckedPage =
 
 
 {-| What checking a page needs from the build: where the site is, and what is
-wrong with a link to a document or a group, if anything.
+wrong with a link to a document or a group, if anything, and the site paths of
+the feeds it writes in a format.
 -}
 type alias Build =
     { origin : String
     , basePath : String
     , linkProblem : Ref -> Maybe LinkProblem
     , groupLinkProblem : GroupLink -> Maybe GroupLinkProblem
+    , feedPaths : FeedFormat -> List String
     }
 
 
@@ -119,7 +122,7 @@ check build unchecked =
     { unchecked = unchecked
     , head = head
     , brokenLinks =
-        page.body
+        (page.body
             |> List.concatMap Html.urls
             |> List.filterMap
                 (\target ->
@@ -133,6 +136,8 @@ check build unchecked =
                         SitePath _ ->
                             Nothing
                 )
+        )
+            ++ List.filterMap (unknownFeed build.feedPaths) page.head
 
     -- Checked before resolving, which would hide a bad site path.
     , problems =
@@ -145,11 +150,29 @@ check build unchecked =
 -- LINKS
 
 
-{-| A link of a template with nowhere to point, and why.
+{-| A link of a template with nowhere to point, and why. A head tag can also
+link to a feed the site does not write, given the paths of the feeds it does.
 -}
 type BrokenLink
     = BrokenDocumentLink Ref LinkProblem
     | BrokenGroupLink GroupLink GroupLinkProblem
+    | UnknownFeed FeedFormat String (List String)
+
+
+{-| Feeds are written at their path without the leading slash, so that is how
+paths are compared.
+-}
+unknownFeed : (FeedFormat -> List String) -> Head.Tag -> Maybe BrokenLink
+unknownFeed feedPaths tag =
+    Head.siteFeed tag
+        |> Maybe.andThen
+            (\( format, path ) ->
+                if List.member (Path.dropLeadingSlash path) (List.map Path.dropLeadingSlash (feedPaths format)) then
+                    Nothing
+
+                else
+                    Just (UnknownFeed format path (feedPaths format))
+            )
 
 
 {-| Why a link to a group has nowhere to point. `NoGroupedRoute` has the
@@ -291,6 +314,63 @@ brokenLinkDiagnostic repeated =
 
         BrokenGroupLink link problem ->
             groupLinkDiagnostic (subject ++ " a `Sheaf.groupLink` points to") link problem
+
+        UnknownFeed format path declared ->
+            unknownFeedDiagnostic repeated format path declared
+
+
+{-| The message starts with what the head tag did, and then where it was.
+-}
+unknownFeedDiagnostic : RepeatedLink -> FeedFormat -> String -> List String -> Diagnostic
+unknownFeedDiagnostic repeated format path declared =
+    let
+        name : String
+        name =
+            feedFormatName format
+
+        links : String
+        links =
+            if repeated.pages == 1 then
+                "This page links to"
+
+            else
+                "These " ++ String.fromInt repeated.pages ++ " pages link to"
+
+        found : String
+        found =
+            if repeated.pages == 1 then
+                "Found while rendering `" ++ repeated.firstUrl ++ "` from the route `" ++ repeated.routeName ++ "`."
+
+            else
+                "Found while rendering the pages of the route `" ++ repeated.routeName ++ "`, the first of which is `" ++ repeated.firstUrl ++ "`."
+    in
+    { severity = Error
+    , title = "UNKNOWN FEED"
+    , message = links ++ " the " ++ name ++ " feed `" ++ path ++ "`, but the site has no " ++ name ++ " feed at that path.\n\n" ++ found
+    , sourcePath = Nothing
+    , span = Nothing
+    , hint = Just (declaredHint name declared)
+    }
+
+
+declaredHint : String -> List String -> String
+declaredHint name paths =
+    case paths of
+        [] ->
+            "The site declares no " ++ name ++ " feed. Add a `Feed` to the site's `feeds`, or remove the tag."
+
+        _ ->
+            "The " ++ name ++ " feeds of the site are " ++ String.join ", " (List.map (\path -> "`" ++ path ++ "`") paths) ++ "."
+
+
+feedFormatName : FeedFormat -> String
+feedFormatName format =
+    case format of
+        Rss ->
+            "RSS"
+
+        Atom ->
+            "Atom"
 
 
 groupLinkDiagnostic : String -> GroupLink -> GroupLinkProblem -> Diagnostic

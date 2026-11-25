@@ -12,7 +12,6 @@ const urls = {
   site: "https://example.com/a&b/",
   feed: "https://example.com/a&b/feed.xml",
 };
-const now = new Date("2026-05-05T00:00:00.000Z");
 
 function item(overrides: Partial<FeedItem> = {}): FeedItem {
   return {
@@ -32,7 +31,7 @@ function feed(items: FeedItem[]): Feed {
 }
 
 describe("rssFeed", () => {
-  const xml = rssFeed(feed([item()]), urls, metadata, now);
+  const xml = rssFeed(feed([item()]), urls, metadata);
 
   test("escapes text without CDATA", () => {
     expect(xml).toContain("Tom &amp; &quot;Jerry&quot; &lt;3");
@@ -56,33 +55,24 @@ describe("rssFeed", () => {
     );
   });
 
-  test("uses now for an empty feed and omits the editor without an email", () => {
-    const empty = rssFeed(
-      feed([]),
-      urls,
-      { ...metadata, author: { name: "Ann", email: null } },
-      now,
-    );
-    expect(empty).toContain(
-      "<lastBuildDate>Tue, 05 May 2026 00:00:00 GMT</lastBuildDate>",
-    );
+  test("leaves out the build date of an empty feed, and omits the editor without an email", () => {
+    const empty = rssFeed(feed([]), urls, {
+      ...metadata,
+      author: { name: "Ann", email: null },
+    });
+    expect(empty).not.toContain("lastBuildDate");
     expect(empty).not.toContain("managingEditor");
   });
 
   test("strips characters XML forbids", () => {
-    const dirty = rssFeed(
-      feed([item({ html: "a\u000cb" })]),
-      urls,
-      metadata,
-      now,
-    );
+    const dirty = rssFeed(feed([item({ html: "a\u000cb" })]), urls, metadata);
     expect(dirty).not.toContain("\u000c");
   });
 });
 
 describe("atomFeed", () => {
   test("separates published and updated", () => {
-    const xml = atomFeed(feed([item()]), urls, metadata, now);
+    const xml = atomFeed(feed([item()]), urls, metadata);
     expect(xml).toContain("<published>2026-01-01T00:00:00.000Z</published>");
     expect(xml).toContain("<updated>2026-01-03T00:00:00.000Z</updated>");
     expect(xml).toContain(
@@ -95,12 +85,12 @@ describe("atomFeed", () => {
     expect(xml).toContain("<email>ann@example.com</email>");
   });
 
-  test("uses now for an empty feed and skips an absent summary", () => {
-    expect(atomFeed(feed([]), urls, metadata, now)).toContain(
-      "<updated>2026-05-05T00:00:00.000Z</updated>",
+  test("gives an empty feed a fixed date, and skips an absent summary", () => {
+    expect(atomFeed(feed([]), urls, metadata)).toContain(
+      "<updated>1970-01-01T00:00:00.000Z</updated>",
     );
     expect(
-      atomFeed(feed([item({ summary: null })]), urls, metadata, now),
+      atomFeed(feed([item({ summary: null })]), urls, metadata),
     ).not.toContain("<summary>");
   });
 });

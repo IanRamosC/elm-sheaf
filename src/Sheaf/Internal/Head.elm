@@ -1,7 +1,7 @@
 module Sheaf.Internal.Head exposing
     ( Tag(..), OpenGraphType(..), TwitterCard(..), FeedFormat(..)
     , Context, toHtml
-    , PathProblem, problems
+    , PathProblem, problems, siteFeed
     )
 
 {-| The head tags behind [`Sheaf.Head`](Sheaf-Head), and how they are
@@ -9,7 +9,7 @@ rendered.
 
 @docs Tag, OpenGraphType, TwitterCard, FeedFormat
 @docs Context, toHtml
-@docs PathProblem, problems
+@docs PathProblem, problems, siteFeed
 
 -}
 
@@ -203,6 +203,23 @@ maybeToList maybe =
 
 
 -- PATHS
+
+
+{-| The format and site path of a tag that links to a feed of this site. A full
+URL points to a feed elsewhere, which the site cannot check.
+-}
+siteFeed : Tag -> Maybe ( FeedFormat, String )
+siteFeed tag =
+    case tag of
+        AlternateFeed format { path } ->
+            if Path.isSitePath path then
+                Just ( format, path )
+
+            else
+                Nothing
+
+        _ ->
+            Nothing
 
 
 {-| The page's own URL. Search engines and link previews need it absolute.

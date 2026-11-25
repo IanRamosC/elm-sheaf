@@ -8,8 +8,9 @@ import Sheaf.Collection as Collection
 import Sheaf.Component as Component exposing (Component)
 import Sheaf.Feed as Feed exposing (Feed)
 import Sheaf.Frontmatter as Frontmatter
+import Sheaf.Head as Head
 import Sheaf.Html as Html
-import Sheaf.Internal.Protocol exposing (FeedItem, Response, SitemapEntry)
+import Sheaf.Internal.Protocol exposing (Diagnostic, FeedItem, Response, Severity(..), SitemapEntry)
 import Sheaf.Internal.Render as Render
 import Sheaf.Ref as Ref
 import Sheaf.Route as Route exposing (Route)
@@ -23,6 +24,7 @@ suite =
         [ itemTests
         , absoluteUrlTests
         , feedProblemTests
+        , feedLinkTests
         , sitemapTests
         , clashTests
         ]
@@ -488,4 +490,68 @@ clashTests =
                     |> List.map (\( title, message, _ ) -> ( title, message ))
                     |> Expect.equal
                         [ ( "DUPLICATE PAGE", "The RSS feed `/feed.xml` and the Atom feed `/Feed.xml` make the files `feed.xml` and `Feed.xml`." ) ]
+        ]
+
+
+
+-- LINKS FROM THE HEAD
+
+
+homeWithHead : List Head.Tag -> Route
+homeWithHead head =
+    Route.single "/" { title = "Home", head = head, body = [] }
+
+
+feedLinkDiagnostics : List Head.Tag -> List Diagnostic
+feedLinkDiagnostics head =
+    request [ "posts" ] [ dated "a" "2026-11-01" ]
+        |> renderWithFeeds [ postRoute, homeWithHead head ] [ feed ]
+        |> .diagnostics
+        |> List.filter (\diagnostic -> diagnostic.title == "UNKNOWN FEED")
+
+
+feedLinkTests : Test
+feedLinkTests =
+    describe "links to feeds from the head"
+        [ test "a feed the site does not write at that path is unknown" <|
+            \_ ->
+                feedLinkDiagnostics [ Head.rssFeed { title = "Posts", path = "/fed.xml" } ]
+                    |> Expect.equal
+                        [ { severity = Error
+                          , title = "UNKNOWN FEED"
+                          , message = "This page links to the RSS feed `/fed.xml`, but the site has no RSS feed at that path.\n\nFound while rendering `/` from the route `/`."
+                          , sourcePath = Nothing
+                          , span = Nothing
+                          , hint = Just "The RSS feeds of the site are `/feed.xml`."
+                          }
+                        ]
+        , test "an Atom link to the RSS file is unknown" <|
+            \_ ->
+                feedLinkDiagnostics [ Head.atomFeed { title = "Posts", path = "/feed.xml" } ]
+                    |> List.map .message
+                    |> Expect.equal
+                        [ "This page links to the Atom feed `/feed.xml`, but the site has no Atom feed at that path.\n\nFound while rendering `/` from the route `/`." ]
+        , test "links to the paths of the feed are fine, and so are feeds on other hosts" <|
+            \_ ->
+                feedLinkDiagnostics
+                    [ Head.rssFeed { title = "Posts", path = "/feed.xml" }
+                    , Head.atomFeed { title = "Posts", path = "/atom.xml" }
+                    , Head.rssFeed { title = "Elsewhere", path = "https://example.org/rss.xml" }
+                    ]
+                    |> Expect.equal []
+        , test "a layout shared by many pages is reported once, with their count" <|
+            \_ ->
+                let
+                    route : Route
+                    route =
+                        Route.eachItem "/posts/:slug/"
+                            posts
+                            (\_ -> { title = "Post", head = [ Head.rssFeed { title = "Posts", path = "/fed.xml" } ], body = [] })
+                in
+                request [ "posts" ] [ dated "a" "2026-11-01", dated "b" "2026-11-02" ]
+                    |> renderWithFeeds [ route ] [ feed ]
+                    |> .diagnostics
+                    |> List.map .message
+                    |> Expect.equal
+                        [ "These 2 pages link to the RSS feed `/fed.xml`, but the site has no RSS feed at that path.\n\nFound while rendering the pages of the route `/posts/:slug/`, the first of which is `/posts/a/`." ]
         ]

@@ -156,6 +156,10 @@ stylesheet =
 
 
 {-| `<link rel="alternate">` to an RSS feed, so feed readers can find it.
+
+A path on this site must be the `rss` file of one of the site's feeds, or the
+build reports an `UNKNOWN FEED`. A full URL is not checked.
+
 -}
 rssFeed : { title : String, path : String } -> Tag
 rssFeed =
@@ -163,6 +167,10 @@ rssFeed =
 
 
 {-| `<link rel="alternate">` to an Atom feed, so feed readers can find it.
+
+A path on this site must be the `atom` file of one of the site's feeds, or the
+build reports an `UNKNOWN FEED`. A full URL is not checked.
+
 -}
 atomFeed : { title : String, path : String } -> Tag
 atomFeed =

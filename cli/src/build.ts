@@ -149,7 +149,7 @@ export async function build(
     return err(diagnostics);
   }
   const outputs = [
-    ...outputFiles(response, config.value, options.now),
+    ...outputFiles(response, config.value),
     ...imageOutputs(imaged.value.published),
   ];
   const clashes = staticClashes(outputs, staticFiles.value);
@@ -163,11 +163,7 @@ export async function build(
   });
 }
 
-function outputFiles(
-  response: Response,
-  config: Config,
-  now: Date,
-): OutputFile[] {
+function outputFiles(response: Response, config: Config): OutputFile[] {
   // `siteUrl.href` may lack the trailing slash that relative feed paths need.
   const site = config.siteUrl.origin + config.basePath;
   const files: OutputFile[] = response.pages.map(({ path, html }) => ({
@@ -184,12 +180,12 @@ function outputFiles(
       {
         kind: "text",
         path: feed.rss,
-        content: rssFeed(feed, render(feed.rss), response.site, now),
+        content: rssFeed(feed, render(feed.rss), response.site),
       },
       {
         kind: "text",
         path: feed.atom,
-        content: atomFeed(feed, render(feed.atom), response.site, now),
+        content: atomFeed(feed, render(feed.atom), response.site),
       },
     );
   }

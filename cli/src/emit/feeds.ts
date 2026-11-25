@@ -6,9 +6,12 @@ export type FeedUrls = { site: string; feed: string };
 
 const HEADER = '<?xml version="1.0" encoding="UTF-8"?>';
 
-/** The feed's last change: its newest item, or the build time when it is empty. */
-function lastChange(feed: Feed, now: Date): Date {
-  if (feed.items.length === 0) return now;
+/** Atom requires `updated`, so an empty feed gets a fixed one: the build time would change its bytes on every build. */
+const EMPTY_FEED_UPDATED = new Date(0);
+
+/** The feed's last change: its newest item, or null when it has none. */
+function lastChange(feed: Feed): Date | null {
+  if (feed.items.length === 0) return null;
   return new Date(Math.max(...feed.items.map(({ updated }) => updated)));
 }
 
@@ -17,9 +20,14 @@ export function rssFeed(
   feed: Feed,
   urls: FeedUrls,
   metadata: SiteMetadata,
-  now: Date,
 ): string {
   const { author } = metadata;
+  const changed = lastChange(feed);
+  // `lastBuildDate` is optional, so an empty feed leaves it out.
+  const lastBuild =
+    changed === null
+      ? []
+      : [`    <lastBuildDate>${changed.toUTCString()}</lastBuildDate>`];
   const items = feed.items.map(
     (item) =>
       `    <item>
@@ -44,7 +52,7 @@ export function rssFeed(
     `    <link>${xmlUrl(urls.site)}</link>`,
     `    <description>${escapeXml(metadata.description)}</description>`,
     `    <language>${escapeXml(metadata.language)}</language>`,
-    `    <lastBuildDate>${lastChange(feed, now).toUTCString()}</lastBuildDate>`,
+    ...lastBuild,
     `    <atom:link href="${xmlUrl(urls.feed)}" rel="self" type="application/rss+xml"/>`,
     ...editor,
     ...items,
@@ -59,9 +67,9 @@ export function atomFeed(
   feed: Feed,
   urls: FeedUrls,
   metadata: SiteMetadata,
-  now: Date,
 ): string {
   const { author } = metadata;
+  const updated = lastChange(feed) ?? EMPTY_FEED_UPDATED;
   const email =
     author.email === null ? "" : `<email>${escapeXml(author.email)}</email>`;
   const entries = feed.items.map((item) => {
@@ -89,7 +97,7 @@ export function atomFeed(
     `  <link rel="alternate" href="${xmlUrl(urls.site)}"/>`,
     `  <title>${escapeXml(metadata.title)}</title>`,
     `  <subtitle>${escapeXml(metadata.description)}</subtitle>`,
-    `  <updated>${lastChange(feed, now).toISOString()}</updated>`,
+    `  <updated>${updated.toISOString()}</updated>`,
     `  <author><name>${escapeXml(author.name)}</name>${email}</author>`,
     ...entries,
     "</feed>",
