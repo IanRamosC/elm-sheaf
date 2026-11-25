@@ -515,6 +515,7 @@ describe("the blog fixture", () => {
       });
 
       expect(first.ok && second.ok).toBe(true);
+      expect(firstTimes.length).toBeGreaterThan(0);
       expect(filesUnder(join(root, "dist"))).toEqual(firstFiles);
       expect(cacheTimes()).toEqual(firstTimes);
     },
