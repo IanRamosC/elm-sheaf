@@ -7,7 +7,8 @@
  *     bun run screenshots
  *
  * Elm 0.19.3 must be on the PATH, since the site is built without installing
- * its dependencies.
+ * its dependencies. Chrome is looked for at its usual macOS location; set
+ * `CHROME` to the path of its executable to use another.
  */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

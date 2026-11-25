@@ -6,15 +6,15 @@ Static sites with templates in Elm.
 
 [![Licence: BSD-3-Clause](https://img.shields.io/badge/licence-BSD--3--Clause-blue)][licence]
 
-Sheaf is a static site generator whose templates are written in Elm. Your
-content is Markdown with frontmatter, your pages are typed Elm functions, and
-the result is a folder of plain HTML and CSS with no JavaScript in it.
+Sheaf is a static site generator for Elm developers who want a blog, or a
+small site of their own, without an application framework. Your content is
+Markdown with frontmatter, your pages are typed Elm functions, and the result
+is a folder of plain HTML and CSS with no JavaScript in it.
 
-It is for Elm developers who want a blog, or a small site of their own, without
-an application framework. Sheaf checks what a static site usually gets wrong
-before it ships: a misspelled frontmatter field, a link to a post that doesn't
-exist, a code block in a language it can't highlight, or an image that isn't
-there all fail the build with a message that points at the line.
+Sheaf checks what a static site usually gets wrong before it ships: a
+misspelled frontmatter field, a link to a post that doesn't exist, a code block
+in a language it can't highlight, or an image that isn't there all fail the
+build with a message that points at the line.
 
 ```
 -- UNKNOWN FIELD ---------------------------------- content/posts/welcome.md:4:1
@@ -26,6 +26,8 @@ This document has a `sumary` field, but its collection does not declare one.
 
 Did you mean `summary`?
 ```
+
+The starter looks like this:
 
 ![The home page of the starter blog that sheaf init creates](https://raw.githubusercontent.com/IanRamosC/elm-sheaf/main/docs/images/home-light.png)
 
@@ -74,10 +76,7 @@ between documents, written `pages:about` in Markdown or
 
 ## Why Sheaf?
 
-Sheaf is for Elm developers who want a blog or a content site whose links and
-frontmatter are checked at build time and whose pages carry no JavaScript,
-with templates in the language they already know. Other tools may suit you
-better:
+Other tools may suit you better:
 
 - [elm-pages][elm-pages] is a hybrid framework: its routes can be pre-rendered
   or rendered on a server, and its pages become a full Elm application in the
@@ -90,8 +89,10 @@ better:
   choice of languages such as Nunjucks and Liquid, and Astro components. Some
   check part of what Sheaf checks: Hugo [fails the build][hugo-ref] on a broken
   `ref` link, Zola on a [broken internal link][zola-links], and Astro
-  [validates frontmatter][astro-schema] against a schema. Sheaf's templates are
-  Elm, so the compiler checks them along with everything they use.
+  [validates frontmatter][astro-schema] against a schema. In Sheaf, the
+  templates, the frontmatter decoders and the links written in Elm are all Elm
+  code, so one compiler checks them together, and the build checks your
+  content against them.
 
 ## Status
 

@@ -233,7 +233,9 @@ const RAW = "https://raw.githubusercontent.com/IanRamosC/elm-sheaf/main/";
 /**
  * The repository paths of the images a Markdown file shows, written either
  * relative to the file or as a `raw.githubusercontent.com` URL on `main`.
- * Images hosted elsewhere, such as badges, are left out.
+ * Images hosted elsewhere, such as badges, are left out. A reference-style
+ * image whose label has no definition is kept as written, so it shows up as
+ * missing.
  */
 function imagesShownBy(path: string): string[] {
   const prose = splitMarkdown(read(path)).prose.join("\n");
@@ -248,10 +250,13 @@ function imagesShownBy(path: string): string[] {
       (match) => match[1] ?? "",
     ),
     ...[...prose.matchAll(/!\[[^\]]*\]\[([^\]]+)\]/g)].map(
-      (match) => definitions.get((match[1] ?? "").toLowerCase()) ?? "",
+      (match) =>
+        definitions.get((match[1] ?? "").toLowerCase()) ??
+        `${match[0]} (no definition)`,
     ),
   ];
   return targets.flatMap((target) => {
+    if (target.startsWith("![")) return [target];
     if (target.startsWith(RAW)) return [target.slice(RAW.length)];
     if (/^[a-z][a-z0-9+.-]*:/i.test(target)) return [];
     return [relative(REPO, join(dirname(path), target))];
