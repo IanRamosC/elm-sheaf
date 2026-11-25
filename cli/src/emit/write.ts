@@ -1,4 +1,4 @@
-import { copyFile, cp, mkdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, posix } from "node:path";
 
 /**
@@ -27,21 +27,23 @@ export async function writeGenerated(
 }
 
 /**
- * Replaces `dist/` with the rendered pages, feeds and images, then copies `static/` into it
- * untouched. Page paths are relative to `dist/`; the base path is the web
- * server's business, so it is never a folder here.
+ * Replaces `dist/` with the rendered pages, feeds and images, then copies the
+ * files of `static/` (from `listStaticFiles`) over them. Paths are relative
+ * to `dist/`; the base path is the web server's business, so it is never a
+ * folder here.
  */
 export async function writeSite(
   siteRoot: string,
   files: OutputFile[],
+  staticFiles: OutputFile[],
 ): Promise<void> {
   const dist = join(siteRoot, "dist");
   // Checked up front so a bad path cannot leave a half-written dist/.
-  for (const { path } of files) assertInside(dist, path);
+  for (const { path } of [...files, ...staticFiles]) assertInside(dist, path);
   assertNoClashes(files.map(({ path }) => path));
   await rm(dist, { recursive: true, force: true });
   await mkdir(dist, { recursive: true });
-  for (const file of files) {
+  for (const file of [...files, ...staticFiles]) {
     const target = join(dist, file.path);
     await mkdir(dirname(target), { recursive: true });
     if (file.kind === "text") {
@@ -50,14 +52,6 @@ export async function writeSite(
       await copyFile(file.source, target);
     }
   }
-  await cp(join(siteRoot, "static"), dist, {
-    recursive: true,
-    force: true,
-    // Dereferencing keeps a symlinked asset a real file in `dist/`.
-    dereference: true,
-  }).catch((error: NodeJS.ErrnoException) => {
-    if (error.code !== "ENOENT") throw error;
-  });
 }
 
 /**

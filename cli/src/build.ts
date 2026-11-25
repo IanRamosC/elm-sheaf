@@ -26,6 +26,7 @@ import {
 import { runElm } from "./elm/run";
 import { atomFeed, rssFeed } from "./emit/feeds";
 import { sitemapXml } from "./emit/sitemap";
+import { listStaticFiles } from "./emit/static";
 import { type OutputFile, writeGenerated, writeSite } from "./emit/write";
 import { loadHighlightCache, saveHighlightCache } from "./highlight/cache";
 import {
@@ -108,6 +109,9 @@ export async function build(
   );
   if (!imaged.ok) return imaged;
 
+  const staticFiles = await listStaticFiles(siteRoot);
+  if (!staticFiles.ok) return staticFiles;
+
   const elm = await findElm(siteRoot);
   if (!elm.ok) return elm;
   const compiled = await compileElm(siteRoot, {
@@ -135,10 +139,14 @@ export async function build(
     return err(diagnostics);
   }
   if (options.write) {
-    await writeSite(siteRoot, [
-      ...outputFiles(response, config.value, options.now),
-      ...imageOutputs(imaged.value.published),
-    ]);
+    await writeSite(
+      siteRoot,
+      [
+        ...outputFiles(response, config.value, options.now),
+        ...imageOutputs(imaged.value.published),
+      ],
+      staticFiles.value,
+    );
   }
   return ok({
     pages: pages.length,
