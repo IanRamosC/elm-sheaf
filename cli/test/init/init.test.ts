@@ -110,11 +110,9 @@ describe("initSite", () => {
     const result = await initSite(folder, { local: REPO, today: "2026-01-02" });
 
     expect(result.ok).toBe(true);
-    expect(readFileSync(join(folder, "elm.json"), "utf8")).toContain(
-      `${REPO}/src`,
-    );
-    expect(readFileSync(join(folder, "package.json"), "utf8")).toContain(
-      `file:${REPO}/cli`,
-    );
+    const elm = JSON.parse(readFileSync(join(folder, "elm.json"), "utf8"));
+    expect(elm["source-directories"]).toContain(`${REPO}/src`);
+    const npm = JSON.parse(readFileSync(join(folder, "package.json"), "utf8"));
+    expect(npm.dependencies["elm-sheaf"]).toBe(`file:${REPO}/cli`);
   });
 });
