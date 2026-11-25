@@ -45,7 +45,7 @@ site =
             , Route.notFound (layout "Not found" [ h1 [] [ text "Not found" ] ])
             ]
         , feeds =
-            [ Feed.fromCollection { rss = "/notes/feed.xml", atom = "/notes/atom.xml" }
+            [ Feed.fromCollection { rss = "/notes/feed.xml", atom = "/notes/atom.xml", limit = Nothing }
                 notes
                 (\meta -> { title = meta.title, summary = Nothing })
             ]

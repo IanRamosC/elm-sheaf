@@ -41,14 +41,16 @@ type alias Metadata =
     Protocol.Metadata
 
 
-{-| A feed of the site: the paths of its RSS and Atom files, as written, and
-the collection it lists. It decodes a document's frontmatter for its title
-and summary, as an item route does for its template.
+{-| A feed of the site: the paths of its RSS and Atom files, as written, the
+collection it lists and how many of its newest documents, if not all. It
+decodes a document's frontmatter for its title and summary, as an item route
+does for its template.
 -}
 type Feed
     = Feed
         { rss : String
         , atom : String
+        , limit : Maybe Int
         , collection : String
         , describe : Protocol.Document -> Result (List Problem) Description
         }

@@ -19,13 +19,17 @@ type alias Feed =
     Site.Feed
 
 
-{-| A feed of every published document of a collection, written as RSS at
-`rss` and as Atom at `atom`. Each item gets its title and summary from the
-document's frontmatter, and its content is the document's whole body.
+{-| A feed of the newest `limit` published documents of a collection, or of
+all of them if `limit` is `Nothing`, written as RSS at `rss` and as Atom at
+`atom`. Each item gets its title and summary from the document's frontmatter,
+and its content is the document's whole body, so a limit keeps the files small
+for the readers that fetch them again and again.
 
-    Feed.fromCollection { rss = "/feed.xml", atom = "/atom.xml" }
+    Feed.fromCollection { rss = "/feed.xml", atom = "/atom.xml", limit = Just 20 }
         posts
         (\meta -> { title = meta.title, summary = meta.summary })
+
+A limit below 1 is reported when the site is built.
 
 An item links to the document's page, so the collection needs a
 [`Route.eachItem`](Sheaf-Route#eachItem) route. Items are ordered by date, so
@@ -34,11 +38,12 @@ item's content is made absolute, because a feed reader shows it away from the
 site.
 
 -}
-fromCollection : { rss : String, atom : String } -> Collection meta -> (meta -> { title : String, summary : Maybe String }) -> Feed
+fromCollection : { rss : String, atom : String, limit : Maybe Int } -> Collection meta -> (meta -> { title : String, summary : Maybe String }) -> Feed
 fromCollection files (Site.Collection collection) describe =
     Site.Feed
         { rss = files.rss
         , atom = files.atom
+        , limit = files.limit
         , collection = collection.name
         , describe =
             \document ->

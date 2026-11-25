@@ -2,7 +2,7 @@ module Sheaf.FeedTest exposing (suite)
 
 import Expect
 import Json.Encode exposing (Value)
-import RenderFixtures exposing (Source, bodyAt, draft, footnoteDefinition, footnoteReference, image, imageWith, link, markdownLink, page, paragraph, paths, photo, post, postRoute, posts, renderWithFeeds, request, requestUnder, span, textNode, titles)
+import RenderFixtures exposing (PostMeta, Source, bodyAt, draft, footnoteDefinition, footnoteReference, image, imageWith, link, markdownLink, page, paragraph, paths, photo, post, postRoute, posts, renderWithFeeds, request, requestUnder, span, textNode, titles)
 import Sheaf
 import Sheaf.Collection as Collection
 import Sheaf.Feed as Feed exposing (Feed)
@@ -32,7 +32,17 @@ suite =
 
 feedAt : { rss : String, atom : String } -> Feed
 feedAt files =
-    Feed.fromCollection files posts (\meta -> { title = meta.title, summary = Just ("About " ++ meta.title) })
+    Feed.fromCollection { rss = files.rss, atom = files.atom, limit = Nothing } posts aboutPost
+
+
+limitedTo : Maybe Int -> Feed
+limitedTo limit =
+    Feed.fromCollection { rss = "/feed.xml", atom = "/atom.xml", limit = limit } posts aboutPost
+
+
+aboutPost : PostMeta -> { title : String, summary : Maybe String }
+aboutPost meta =
+    { title = meta.title, summary = Just ("About " ++ meta.title) }
 
 
 feed : Feed
@@ -65,6 +75,11 @@ firstOfNovember =
 secondOfNovember : Time.Posix
 secondOfNovember =
     Time.millisToPosix 1793577600000
+
+
+thirdOfNovember : Time.Posix
+thirdOfNovember =
+    Time.millisToPosix 1793664000000
 
 
 items : Response -> List FeedItem
@@ -123,6 +138,37 @@ itemTests =
                     |> items
                     |> List.map (\item -> ( item.documentId, item.updated ))
                     |> Expect.equal [ ( "posts/a", firstOfNovember ), ( "posts/b", secondOfNovember ) ]
+        , test "a limit keeps the newest items, so the feed was last updated when they were" <|
+            \_ ->
+                let
+                    revised : Source
+                    revised =
+                        dated "a" "2026-11-01"
+                in
+                request [ "posts" ] [ { revised | updated = Just "2026-11-04" }, dated "b" "2026-11-02", dated "c" "2026-11-03" ]
+                    |> renderWithFeeds [ postRoute ] [ limitedTo (Just 2) ]
+                    |> items
+                    |> List.map (\item -> ( item.documentId, item.updated ))
+                    |> Expect.equal [ ( "posts/c", thirdOfNovember ), ( "posts/b", secondOfNovember ) ]
+        , test "a limit counts published documents only" <|
+            \_ ->
+                let
+                    newestDraft : Source
+                    newestDraft =
+                        draft "secret"
+                in
+                request [ "posts" ] [ dated "a" "2026-11-01", dated "b" "2026-11-02", { newestDraft | date = Just "2026-11-03" } ]
+                    |> renderWithFeeds [ postRoute ] [ limitedTo (Just 2) ]
+                    |> items
+                    |> List.map .documentId
+                    |> Expect.equal [ "posts/b", "posts/a" ]
+        , test "no limit keeps every item" <|
+            \_ ->
+                request [ "posts" ] [ dated "a" "2026-11-01", dated "b" "2026-11-02", dated "c" "2026-11-03" ]
+                    |> renderWithFeeds [ postRoute ] [ limitedTo Nothing ]
+                    |> items
+                    |> List.map .documentId
+                    |> Expect.equal [ "posts/c", "posts/b", "posts/a" ]
         , test "Sheaf.withFeeds adds feeds after the site's own" <|
             \_ ->
                 request [ "posts" ] [ dated "a" "2026-11-01" ]
@@ -245,12 +291,29 @@ feedProblemTests =
                     |> .diagnostics
                     |> List.map .message
                     |> Expect.equal [ "The Atom feed `atom.xml` does not start with `/`, so it could not be written." ]
+        , test "a feed keeps at least one item" <|
+            \_ ->
+                request [ "posts" ] [ dated "a" "2026-11-01" ]
+                    |> renderWithFeeds [ postRoute ] [ limitedTo (Just 0) ]
+                    |> Expect.all
+                        [ .diagnostics
+                            >> Expect.equal
+                                [ { severity = Sheaf.Internal.Protocol.Error
+                                  , title = "BAD ROUTE"
+                                  , message = "The feed `/feed.xml` has `limit = 0`, but `limit` must be at least 1, so it could not be written."
+                                  , sourcePath = Nothing
+                                  , span = Nothing
+                                  , hint = Nothing
+                                  }
+                                ]
+                        , .feeds >> Expect.equal []
+                        ]
         , test "a document the feed cannot describe fails the build, naming the document" <|
             \_ ->
                 let
                     summarized : Feed
                     summarized =
-                        Feed.fromCollection { rss = "/feed.xml", atom = "/atom.xml" }
+                        Feed.fromCollection { rss = "/feed.xml", atom = "/atom.xml", limit = Nothing }
                             (Collection.named "posts"
                                 (Frontmatter.succeed (\title summary -> { title = title, summary = Just summary })
                                     |> Frontmatter.required "title" Frontmatter.string

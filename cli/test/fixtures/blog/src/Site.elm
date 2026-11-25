@@ -49,6 +49,7 @@ site =
         , postFrontmatter = postMeta
         , pageFrontmatter = pageMeta
         , postsPerPage = 2
+        , feedSize = Just 20
         , tags = .tags
         , feedItem = \meta -> { title = meta.title, summary = meta.summary }
         , layouts =

@@ -31,17 +31,18 @@ type alias Context a =
     }
 
 
-{-| A feed with its items, newest first.
+{-| A feed with its newest items, newest first, as many as its limit keeps.
 
-A feed with a problem is not written. Its bad files, a collection with no item
-route and the frontmatter problems of its documents are reported here. A
+A feed with a problem is not written. Its bad files and limit, a collection
+with no item route and the frontmatter problems of its documents, even those
+past its limit, are reported here. A
 document that keeps it from being complete, such as one without a date, is
 reported on its own.
 
 -}
 render : Context a -> List Body -> Feed -> Result (List Diagnostic) Protocol.Feed
 render context bodies (Feed feed) =
-    case List.filterMap identity [ RouteCheck.badFeedFile "RSS" feed.rss, RouteCheck.badFeedFile "Atom" feed.atom ] of
+    case List.filterMap identity [ RouteCheck.badFeedFile "RSS" feed.rss, RouteCheck.badFeedFile "Atom" feed.atom, RouteCheck.badFeedLimit feed.rss feed.limit ] of
         [] ->
             case Dict.get feed.collection context.itemPatterns of
                 Just pattern ->
@@ -53,7 +54,11 @@ render context bodies (Feed feed) =
                         Ok dated ->
                             case ( complete, allOf dated ) of
                                 ( True, Just items ) ->
-                                    Ok { rss = Path.dropLeadingSlash feed.rss, atom = Path.dropLeadingSlash feed.atom, items = items }
+                                    Ok
+                                        { rss = Path.dropLeadingSlash feed.rss
+                                        , atom = Path.dropLeadingSlash feed.atom
+                                        , items = Maybe.withDefault items (Maybe.map (\limit -> List.take limit items) feed.limit)
+                                        }
 
                                 _ ->
                                     Err []

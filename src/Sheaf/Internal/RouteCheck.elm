@@ -1,10 +1,10 @@
-module Sheaf.Internal.RouteCheck exposing (badRoute, badFeedFile)
+module Sheaf.Internal.RouteCheck exposing (badRoute, badFeedFile, badFeedLimit)
 
 {-| The rules a route must follow before it makes any page: a pattern its kind
 of route accepts, and at least one document on each page. A feed's files
-follow the same rules for their paths.
+follow the same rules for their paths, and a feed keeps at least one item.
 
-@docs badRoute, badFeedFile
+@docs badRoute, badFeedFile, badFeedLimit
 
 -}
 
@@ -13,18 +13,20 @@ import Sheaf.Internal.Protocol exposing (Diagnostic, Severity(..))
 import Sheaf.Internal.Site as Site exposing (Route)
 
 
-{-| What breaks a rule: a route, or the file of a feed in one of its formats,
-such as `RSS`.
+{-| What breaks a rule: a route, the file of a feed in one of its formats,
+such as `RSS`, or a whole feed, named by its RSS file.
 -}
 type Subject
     = RouteSubject Route
     | FeedFile String String
+    | FeedSubject String
 
 
 type RouteProblem
     = BadPattern Pattern.Problem
     | Reserved
     | TooFewPerPage Int
+    | TooLowLimit Int
 
 
 routeProblem : Route -> Maybe RouteProblem
@@ -92,6 +94,26 @@ badFeedFile format path =
         |> Maybe.map (BadPattern >> diagnostic (FeedFile format path))
 
 
+{-| Why a feed, named by its RSS file `rss`, cannot keep `limit` items, if it
+cannot.
+
+    badFeedLimit "/feed.xml" (Just 20) == Nothing
+
+-}
+badFeedLimit : String -> Maybe Int -> Maybe Diagnostic
+badFeedLimit rss limit =
+    case limit of
+        Just count ->
+            if count < 1 then
+                Just (diagnostic (FeedSubject rss) (TooLowLimit count))
+
+            else
+                Nothing
+
+        Nothing ->
+            Nothing
+
+
 diagnostic : Subject -> RouteProblem -> Diagnostic
 diagnostic subject problem =
     let
@@ -102,6 +124,9 @@ diagnostic subject problem =
 
                 FeedFile format path ->
                     ( "The " ++ format ++ " feed `" ++ path ++ "`", "it" )
+
+                FeedSubject rss ->
+                    ( "The feed `" ++ rss ++ "`", "it" )
 
         breaks : String -> Maybe String -> Diagnostic
         breaks rule hint =
@@ -140,7 +165,7 @@ diagnostic subject problem =
                     breaks ("has the placeholder `" ++ placeholder ++ "`, which this kind of route does not fill")
                         (Just "`Route.eachItem` fills `:slug` and `Route.groupedBy` fills `:group`, each in a segment of its own, as in `/posts/:slug/` or `/tags/:group/`.")
 
-                FeedFile _ _ ->
+                _ ->
                     breaks ("has the placeholder `" ++ placeholder ++ "`, but a feed is one file") fileHint
 
         BadPattern (Pattern.MissingPlaceholder Pattern.Slug) ->
@@ -164,3 +189,6 @@ diagnostic subject problem =
 
         TooFewPerPage perPage ->
             breaks ("has `perPage = " ++ String.fromInt perPage ++ "`, but `perPage` must be at least 1") Nothing
+
+        TooLowLimit limit ->
+            breaks ("has `limit = " ++ String.fromInt limit ++ "`, but `limit` must be at least 1") Nothing

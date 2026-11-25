@@ -67,6 +67,13 @@ suite =
                 render [ tagged "a" 1 [ "Elm" ] ]
                     |> bodyAt "posts/a/index.html"
                     |> Expect.equal (Just "<a href=\"/blog/tags/elm/\">Elm</a>")
+        , test "a feed lists the newest feedSize posts" <|
+            \_ ->
+                requestWithSlugs slugTable [ "posts", "pages" ] [ tagged "a" 1 [], tagged "b" 2 [] ]
+                    |> Render.render (Blog.site { config | feedSize = Just 1 })
+                    |> .feeds
+                    |> List.map (.items >> List.map .documentId)
+                    |> Expect.equal [ [ "posts/b" ] ]
         , test "the site has the config's components" <|
             \_ ->
                 render [ { about | body = [ leafDirective "divider" (span 3 1 11) ] } ]
@@ -91,6 +98,7 @@ config =
     , postFrontmatter = postMeta
     , pageFrontmatter = postMeta
     , postsPerPage = 2
+    , feedSize = Nothing
     , tags = .tags
     , feedItem = \meta -> { title = meta.title, summary = Nothing }
     , layouts =

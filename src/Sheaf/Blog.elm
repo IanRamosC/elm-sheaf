@@ -51,6 +51,7 @@ Git does not keep empty folders, so commit an empty `.gitkeep` file in it.
             , postFrontmatter = postMeta
             , pageFrontmatter = pageMeta
             , postsPerPage = 10
+            , feedSize = Just 20
             , tags = .tags
             , feedItem = \meta -> { title = meta.title, summary = meta.summary }
             , layouts =
@@ -150,6 +151,8 @@ import Sheaf.Route as Route exposing (Group, Listing, Page)
   - `postFrontmatter` and `pageFrontmatter` decode the frontmatter of
     `content/posts/` and `content/pages/`.
   - `postsPerPage` is how many posts the index and each tag's pages list.
+  - `feedSize` is how many of the newest posts the feeds list, or `Nothing`
+    for every post.
   - `tags` gives a post's tags, as written in its frontmatter.
   - `feedItem` gives the title and summary of a post in the feeds.
   - `layouts` turn documents into pages.
@@ -162,6 +165,7 @@ type alias Config post page =
     , postFrontmatter : Frontmatter post
     , pageFrontmatter : Frontmatter page
     , postsPerPage : Int
+    , feedSize : Maybe Int
     , tags : post -> List String
     , feedItem : post -> { title : String, summary : Maybe String }
     , layouts : Layouts post page
@@ -229,7 +233,7 @@ site config =
             , Route.allItems "/archive/" posts (layouts.archive >> withFeeds)
             , Route.notFound (withFeeds layouts.notFound)
             ]
-        , feeds = [ Feed.fromCollection { rss = rssPath, atom = atomPath } posts config.feedItem ]
+        , feeds = [ Feed.fromCollection { rss = rssPath, atom = atomPath, limit = config.feedSize } posts config.feedItem ]
         , components = config.components
         }
 
