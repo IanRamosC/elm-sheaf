@@ -9,6 +9,26 @@ The repository holds two packages:
 - the root is the Elm package `ianramosc/elm-sheaf`, the library your templates import;
 - `cli/` is the npm package `elm-sheaf`, the Bun and TypeScript host that builds the site.
 
+## Start a new site
+
+```sh
+bunx elm-sheaf init my-blog
+cd my-blog
+bun install
+bunx sheaf dev
+```
+
+`init` creates the folder if it's missing and refuses one that has anything in it,
+hidden files included. This works once both packages are published; until then, point
+`--local` at a checkout of this repository:
+
+```sh
+bun run /path/to/sheaf/cli/src/index.ts init my-blog --local /path/to/sheaf
+```
+
+`bun install` copies a `file:` dependency, so after editing the repository's `cli/`, run
+`bun install` again in the site.
+
 ## Requirements and commands
 
 Sheaf needs [Elm 0.19.3](https://guide.elm-lang.org/install/elm.html) and
@@ -21,7 +41,14 @@ Run these in your site's folder:
 - `sheaf check` runs every build stage, reporting every problem it finds,
   without writing `dist/`.
 
-Both take `--drafts` to include drafts and documents dated in the future.
+Both take `--drafts` to include drafts and documents dated in the future, and
+`--site-url <url>` to use that `siteUrl` instead of the one in `sheaf.json`.
+
+`sheaf dev` serves the site with drafts and rebuilds it on every change, reloading
+the open pages. It takes `--port <n>` and otherwise uses the first free port from 4000.
+Each open tab holds one live-reload connection, and browsers allow six connections per
+origin over HTTP/1.1, so with more than six tabs open on the site, the extra ones stop
+loading until you close some.
 
 ## What works today
 
@@ -69,8 +96,6 @@ Both take `--drafts` to include drafts and documents dated in the future.
   and height so the page doesn't move as they load. A document's cover comes
   from its `image` frontmatter key, for its layout and link previews. Images
   are encoded once and kept in `.sheaf/cache/`.
-
-Not yet: `sheaf dev` and `sheaf init`.
 
 ## License
 
