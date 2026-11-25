@@ -65,8 +65,8 @@ function assertInside(directory: string, path: string): void {
 
 /**
  * Elm reports clashing outputs as DUPLICATE PAGE and `staticClashes` the
- * static files that clash, so one that gets here is a bug. Paths are compared lowercased because case-insensitive file systems
- * would silently merge them.
+ * static files that clash, so one that gets here is a bug. Paths are compared
+ * lowercased because case-insensitive file systems would silently merge them.
  */
 function assertNoClashes(paths: string[]): void {
   const folded = new Map<string, string>();
