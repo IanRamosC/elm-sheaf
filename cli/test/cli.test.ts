@@ -235,9 +235,25 @@ describe("sheaf", () => {
         const output = join(root, ".sheaf/dev", String(dev.child.pid));
         expect(existsSync(output)).toBe(true);
 
-        dev.child.kill("SIGTERM");
-        expect(await dev.child.exited).toBe(0);
-        expect(existsSync(output)).toBe(false);
+        if (process.platform === "win32") {
+          // Windows has no SIGTERM: kill() ends `dev` at once, before it can
+          // clean up, so the next `dev` on the site removes what it left.
+          dev.child.kill();
+          await dev.child.exited;
+          expect(existsSync(output)).toBe(true);
+          const next = startDev(root);
+          try {
+            await next.waitFor(/^Rebuilt/);
+            expect(existsSync(output)).toBe(false);
+          } finally {
+            next.child.kill();
+            await next.child.exited;
+          }
+        } else {
+          dev.child.kill("SIGTERM");
+          expect(await dev.child.exited).toBe(0);
+          expect(existsSync(output)).toBe(false);
+        }
       } finally {
         dev.child.kill();
       }
