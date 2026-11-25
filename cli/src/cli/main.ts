@@ -1,10 +1,15 @@
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import packageJson from "../../package.json";
 import { build } from "../build";
-import type { Diagnostic } from "../diagnostics/diagnostic";
-import { renderDiagnostic } from "../diagnostics/render";
+import { runDev } from "./dev";
+import {
+  count,
+  printDiagnostics,
+  printErrorCount,
+  renderDiagnostics,
+  write,
+} from "./report";
 import { paint, supportsColour } from "./terminal";
 
 const HELP = `Usage: sheaf <command> [options]
@@ -12,15 +17,22 @@ const HELP = `Usage: sheaf <command> [options]
 Commands:
   sheaf build [--drafts] [--site-url <url>]   Render the site into dist/
   sheaf check [--drafts] [--site-url <url>]   Run every build stage without writing dist/
+  sheaf dev [--port <n>]                      Serve the site with drafts, rebuilding on every change
 
 Options:
   --drafts          Include drafts and documents dated in the future
   --site-url <url>  Use this siteUrl instead of the one in sheaf.json
+  --port <n>        Serve on this port instead of the first free one from 4000
   -h, --help        Show this help
   -v, --version     Show the version
 `;
 
 type Command = "build" | "check";
+
+/** What to run, once the options are known to belong to the command. */
+type Invocation =
+  | ({ command: Command } & CommandOptions)
+  | { command: "dev"; port: number | undefined };
 
 /**
  * Runs the command line and returns the exit code: 0 success, 1 errors in the
@@ -39,19 +51,44 @@ export async function main(args: string[]): Promise<number> {
     process.stdout.write(`${packageJson.version}\n`);
     return 0;
   }
-  const [command, ...extra] = positionals;
-  if ((command !== "build" && command !== "check") || extra.length > 0) {
-    return usageError();
-  }
+  const invocation = invocationOf(positionals, values);
+  if (invocation === undefined) return usageError();
+
   const unsupported = unsupportedBun(Bun.version, packageJson.engines.bun);
   if (unsupported !== undefined) {
     process.stderr.write(`${unsupported}\n`);
     return 2;
   }
-  return runCommand(command, {
-    drafts: values.drafts === true,
-    siteUrl: values["site-url"],
-  });
+  if (invocation.command === "dev") {
+    return runDev(process.cwd(), invocation.port);
+  }
+  return runCommand(invocation.command, invocation);
+}
+
+type Values = NonNullable<ReturnType<typeof parseArguments>>["values"];
+
+/**
+ * Matches the options to the command. `dev` always includes drafts and has
+ * no siteUrl of its own to replace, so those options are mistakes there.
+ */
+function invocationOf(
+  positionals: string[],
+  values: Values,
+): Invocation | undefined {
+  const [command, ...extra] = positionals;
+  if (extra.length > 0) return undefined;
+  const { drafts, "site-url": siteUrl, port } = values;
+
+  if (command === "dev") {
+    if (drafts !== undefined || siteUrl !== undefined) return undefined;
+    if (port === undefined) return { command, port };
+    const parsed = parsePort(port);
+    return parsed === undefined ? undefined : { command, port: parsed };
+  }
+  if ((command === "build" || command === "check") && port === undefined) {
+    return { command, drafts: drafts === true, siteUrl };
+  }
+  return undefined;
 }
 
 function parseArguments(args: string[]) {
@@ -62,6 +99,7 @@ function parseArguments(args: string[]) {
       options: {
         drafts: { type: "boolean" },
         "site-url": { type: "string" },
+        port: { type: "string" },
         help: { type: "boolean", short: "h" },
         version: { type: "boolean", short: "v" },
       },
@@ -83,6 +121,12 @@ export function unsupportedBun(
 ): string | undefined {
   if (Bun.semver.satisfies(version, supported)) return undefined;
   return `Sheaf needs Bun ${supported}, but this is Bun ${version}. Run \`bun upgrade\` to update it.`;
+}
+
+/** Port 0 lets the system pick one; only the tests use it, so the help doesn't mention it. */
+function parsePort(text: string): number | undefined {
+  const port = Number(text);
+  return /^\d+$/.test(text) && port <= 65535 ? port : undefined;
 }
 
 function usageError(): number {
@@ -111,7 +155,10 @@ async function runCommand(
   const seconds = ((performance.now() - started) / 1000).toFixed(1);
 
   if (result.ok) {
-    await printDiagnostics(result.value.warnings, siteRoot, colour);
+    printDiagnostics(
+      await renderDiagnostics(result.value.warnings, siteRoot),
+      colour,
+    );
     const verb = command === "build" ? "Built" : "Checked";
     const { pages } = result.value;
     write(
@@ -120,44 +167,8 @@ async function runCommand(
     return 0;
   }
 
-  await printDiagnostics(result.error, siteRoot, colour);
-  const errors = result.error.filter(({ severity }) => severity === "error");
-  write(paint("red", `Found ${count(errors.length, "error")}`, colour));
+  const rendered = await renderDiagnostics(result.error, siteRoot);
+  printDiagnostics(rendered, colour);
+  printErrorCount(rendered, colour);
   return 1;
-}
-
-function count(amount: number, noun: string): string {
-  return `${amount} ${noun}${amount === 1 ? "" : "s"}`;
-}
-
-function write(line: string): void {
-  process.stdout.write(`${line}\n`);
-}
-
-async function printDiagnostics(
-  diagnostics: Diagnostic[],
-  siteRoot: string,
-  colour: boolean,
-): Promise<void> {
-  for (const diagnostic of diagnostics) {
-    const source = await readSource(siteRoot, diagnostic);
-    const [header = "", ...rest] = renderDiagnostic(diagnostic, source).split(
-      "\n",
-    );
-    const style = diagnostic.severity === "error" ? "red" : "yellow";
-    write(`${[paint(style, header, colour), ...rest].join("\n")}\n`);
-  }
-}
-
-/** A diagnostic may name something that is not a readable file, such as a folder; it then has no excerpt. */
-async function readSource(
-  siteRoot: string,
-  { sourcePath }: Diagnostic,
-): Promise<string | undefined> {
-  if (sourcePath === undefined) return undefined;
-  try {
-    return await readFile(join(siteRoot, sourcePath), "utf8");
-  } catch {
-    return undefined;
-  }
 }

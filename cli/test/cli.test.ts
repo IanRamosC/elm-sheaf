@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { readFileSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { unsupportedBun } from "../src/cli/main";
 import {
@@ -27,6 +33,57 @@ async function sheaf(args: string[], cwd: string) {
 }
 
 afterEach(removeFixtureCopies);
+
+/** A running `sheaf dev`, whose output is collected as it arrives. */
+function startDev(cwd: string) {
+  const child = Bun.spawn([process.execPath, ENTRY, "dev", "--port", "0"], {
+    cwd,
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ...process.env, NO_COLOR: "1" },
+  });
+  let output = "";
+  const decoder = new TextDecoder();
+  void (async () => {
+    for await (const chunk of child.stdout) {
+      output += decoder.decode(chunk, { stream: true });
+    }
+  })();
+
+  const occurrences = (pattern: RegExp) =>
+    output.match(new RegExp(pattern.source, "gm"))?.length ?? 0;
+
+  /** Waits until `pattern` has matched `times` lines of the output. */
+  async function waitFor(pattern: RegExp, times = 1): Promise<void> {
+    const deadline = performance.now() + SLOW / 2;
+    while (occurrences(pattern) < times) {
+      if (performance.now() > deadline || child.exitCode !== null) {
+        const stderr = await new Response(child.stderr).text();
+        throw new Error(
+          `Expected ${times} × ${pattern} in:\n${output}\nstderr:\n${stderr}`,
+        );
+      }
+      await Bun.sleep(20);
+    }
+  }
+
+  /** Waits until a second passes without new output, as when the builds have caught up. */
+  async function waitForQuiet(): Promise<void> {
+    let seen = "";
+    while (seen !== output) {
+      seen = output;
+      await Bun.sleep(1000);
+    }
+  }
+
+  return {
+    child,
+    output: () => output,
+    occurrences,
+    waitFor,
+    waitForQuiet,
+  };
+}
 
 describe("sheaf", () => {
   test(
@@ -96,6 +153,101 @@ describe("sheaf", () => {
     },
     SLOW,
   );
+
+  test(
+    "dev serves drafts, rebuilds on changes and shows errors",
+    async () => {
+      const root = copyFixture("blog");
+      const posts = join(root, "content/posts");
+      const site = join(root, "src/Site.elm");
+      const dev = startDev(root);
+      try {
+        await dev.waitFor(/^Serving at /);
+        const url = dev.output().match(/^Serving at (\S+)/m)?.[1] ?? "";
+        expect(url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/blog\/$/);
+        await dev.waitFor(/^Rebuilt \d+ pages in \d+\.\d+s/);
+
+        const home = await (await fetch(url)).text();
+        expect(home).toContain("Plans");
+        expect(home).toContain('<script type="module">');
+
+        appendFileSync(
+          join(posts, "2026-11-01-hello-sheaf.md"),
+          "\nA sentence added while serving.\n",
+        );
+        await dev.waitFor(/^Rebuilt/, 2);
+        const post = await (await fetch(`${url}posts/hello-sheaf/`)).text();
+        expect(post).toContain("A sentence added while serving.");
+
+        // Every build rewrites .sheaf/, which must not start another one.
+        await Bun.sleep(1000);
+        expect(dev.occurrences(/^Rebuilt/)).toBe(2);
+
+        const original = readFileSync(site, "utf8");
+        writeFileSync(site, `${original}\nbroken =\n`);
+        await dev.waitFor(/^Found \d+ errors?/);
+        const failed = await fetch(url);
+        expect(failed.status).toBe(500);
+        expect(await failed.text()).toContain("src/Site.elm");
+
+        writeFileSync(site, original);
+        await dev.waitFor(/^Rebuilt/, 3);
+        expect((await fetch(url)).status).toBe(200);
+
+        for (const name of [
+          "2026-11-01-hello-sheaf.md",
+          "2026-11-05-typed-templates.md",
+          "2026-11-10-formatting.md",
+          "2026-11-15-feeds.md",
+          "2026-11-20-tags-and-groups.md",
+        ]) {
+          appendFileSync(join(posts, name), "\nOne more line.\n");
+        }
+        await dev.waitFor(/^Rebuilt/, 4);
+        await Bun.sleep(1000);
+        expect(dev.occurrences(/^Rebuilt/)).toBe(4);
+
+        for (let edit = 0; edit < 10; edit++) {
+          appendFileSync(
+            join(posts, "2026-11-15-feeds.md"),
+            `\nEdit ${edit}.\n`,
+          );
+          if (edit === 5) {
+            rmSync(join(posts, "2026-11-05-typed-templates.md"));
+          }
+          await Bun.sleep(30);
+        }
+        await dev.waitForQuiet();
+        expect((await fetch(url)).status).toBe(200);
+
+        expect(existsSync(join(root, "dist"))).toBe(false);
+        const output = join(root, ".sheaf/dev", String(dev.child.pid));
+        expect(existsSync(output)).toBe(true);
+
+        dev.child.kill("SIGTERM");
+        expect(await dev.child.exited).toBe(0);
+        expect(existsSync(output)).toBe(false);
+      } finally {
+        dev.child.kill();
+      }
+    },
+    SLOW * 2,
+  );
+
+  test("dev rejects options of other commands and a bad port", async () => {
+    for (const args of [
+      ["dev", "--port", "abc"],
+      ["dev", "--port", "65536"],
+      ["dev", "--drafts"],
+      ["dev", "--site-url", "https://x.example/"],
+      ["build", "--port", "1"],
+    ]) {
+      const { stderr, exitCode } = await sheaf(args, import.meta.dir);
+
+      expect(exitCode).toBe(2);
+      expect(stderr).toContain("Usage:");
+    }
+  });
 
   test("prints help and exits 2 for an unknown command", async () => {
     const { stderr, exitCode } = await sheaf(["frobnicate"], import.meta.dir);
