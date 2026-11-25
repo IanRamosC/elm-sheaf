@@ -120,9 +120,15 @@ renderSite (Site site) request =
         made =
             List.concatMap (\( index, route ) -> pagesOf context bodies groupings index route) goodRoutes
 
+        groupPages : GroupPages
+        groupPages =
+            Grouping.groupPages goodRoutes groupings
+
+        -- A feed item's broken links are not checked again: its item page
+        -- has the same body, and reports them when it shows it.
         feeds : List (Result (List Diagnostic) Protocol.Feed)
         feeds =
-            List.map (Feed.render context bodies) site.feeds
+            List.map (Feed.render context (urlTarget context groupPages) bodies) site.feeds
 
         ( written, clashes ) =
             Output.withoutClashes
@@ -130,10 +136,6 @@ renderSite (Site site) request =
                     ++ List.concatMap Feed.outputs site.feeds
                     ++ [ Sitemap ]
                 )
-
-        groupPages : GroupPages
-        groupPages =
-            Grouping.groupPages goodRoutes groupings
 
         checked : List CheckedPage
         checked =

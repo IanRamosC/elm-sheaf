@@ -9,7 +9,7 @@ module Sheaf.Internal.Feed exposing (Context, render, outputs)
 import Dict exposing (Dict)
 import Sheaf.Internal.AbsoluteUrl as AbsoluteUrl
 import Sheaf.Internal.Frontmatter exposing (Problem)
-import Sheaf.Internal.Html as Html exposing (Url(..))
+import Sheaf.Internal.Html as Html exposing (Url)
 import Sheaf.Internal.Listing as Listing exposing (Body)
 import Sheaf.Internal.Output exposing (Output(..))
 import Sheaf.Internal.Path as Path
@@ -32,6 +32,8 @@ type alias Context a =
 
 
 {-| A feed with its newest items, newest first, as many as its limit keeps.
+`resolve` gives the URLs its items' bodies left to the renderer, as it does
+for pages: a component's links to documents and groups, and site paths.
 
 A feed with a problem is not written. Its bad files and limit, a collection
 with no item route and the frontmatter problems of its documents, even those
@@ -40,8 +42,8 @@ document that keeps it from being complete, such as one without a date, is
 reported on its own.
 
 -}
-render : Context a -> List Body -> Feed -> Result (List Diagnostic) Protocol.Feed
-render context bodies (Feed feed) =
+render : Context a -> (Url -> Maybe String) -> List Body -> Feed -> Result (List Diagnostic) Protocol.Feed
+render context resolve bodies (Feed feed) =
     case List.filterMap identity [ RouteCheck.badFeedFile "RSS" feed.rss, RouteCheck.badFeedFile "Atom" feed.atom, RouteCheck.badFeedLimit feed.rss feed.limit ] of
         [] ->
             case Dict.get feed.collection context.itemPatterns of
@@ -50,7 +52,7 @@ render context bodies (Feed feed) =
                         ( listed, complete ) =
                             Listing.listOf feed.collection bodies
                     in
-                    case Results.combine (List.map (itemOf context pattern feed.describe) listed) of
+                    case Results.combine (List.map (itemOf context resolve pattern feed.describe) listed) of
                         Ok dated ->
                             case ( complete, allOf dated ) of
                                 ( True, Just items ) ->
@@ -87,8 +89,8 @@ outputs (Feed feed) =
 own. A feed may describe a collection with other frontmatter than its item
 route does, so it reports its own frontmatter problems.
 -}
-itemOf : Context a -> String -> (Protocol.Document -> Result (List Problem) Description) -> ListedDocument -> Result (List Diagnostic) (Maybe Protocol.FeedItem)
-itemOf context pattern describe { document, body } =
+itemOf : Context a -> (Url -> Maybe String) -> String -> (Protocol.Document -> Result (List Problem) Description) -> ListedDocument -> Result (List Diagnostic) (Maybe Protocol.FeedItem)
+itemOf context resolve pattern describe { document, body } =
     describe document
         |> Result.mapError (List.map (Listing.frontmatterDiagnostic document))
         |> Result.map
@@ -108,26 +110,13 @@ itemOf context pattern describe { document, body } =
                         , url = context.origin ++ path
                         , title = description.title
                         , summary = description.summary
-                        , html = String.concat (List.map (Html.resolveUrls (sitePath context.basePath) >> Html.rewriteUrls absolute >> Html.toString) body)
+                        , html = String.concat (List.map (Html.resolveUrls resolve >> Html.rewriteUrls absolute >> Html.toString) body)
                         , date = date.posix
                         , updated = (Maybe.withDefault date document.updated).posix
                         }
                     )
                     document.date
             )
-
-
-{-| A body's images are site paths, which only need the base path. Its links
-to documents were written when it was rendered.
--}
-sitePath : String -> Url -> Maybe String
-sitePath basePath url =
-    case url of
-        SitePath path ->
-            Just (Path.join basePath path)
-
-        _ ->
-            Nothing
 
 
 allOf : List (Maybe a) -> Maybe (List a)

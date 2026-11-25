@@ -2,6 +2,7 @@ module RenderFixtures exposing
     ( PostMeta
     , Source
     , bodyAt
+    , containerDirective
     , draft
     , error
     , footnoteDefinition
@@ -378,6 +379,23 @@ photo =
         , ( "width", Encode.int 1200 )
         , ( "height", Encode.int 800 )
         , ( "variants", Encode.list identity [ variant "image/png" "png", variant "image/webp" "webp" ] )
+        ]
+
+
+{-| A container directive with these attributes and children, written at `at`.
+-}
+containerDirective : String -> List ( String, String ) -> Span -> List Value -> Value
+containerDirective name attributes at children =
+    Encode.object
+        [ ( "type", Encode.string "containerDirective" )
+        , ( "position", encodeSpan at )
+        , ( "name", Encode.string name )
+        , ( "attributes"
+          , Encode.list
+                (\( attribute, value ) -> Encode.object [ ( "name", Encode.string attribute ), ( "value", Encode.string value ) ])
+                attributes
+          )
+        , ( "children", Encode.list identity children )
         ]
 
 

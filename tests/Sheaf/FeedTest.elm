@@ -2,11 +2,13 @@ module Sheaf.FeedTest exposing (suite)
 
 import Expect
 import Json.Encode exposing (Value)
-import RenderFixtures exposing (PostMeta, Source, bodyAt, draft, footnoteDefinition, footnoteReference, image, imageWith, link, markdownLink, page, paragraph, paths, photo, post, postRoute, posts, renderWithFeeds, request, requestUnder, span, textNode, titles)
+import RenderFixtures exposing (PostMeta, Source, bodyAt, containerDirective, draft, footnoteDefinition, footnoteReference, image, imageWith, link, markdownLink, page, paragraph, paths, photo, post, postRoute, posts, renderWithFeeds, request, requestUnder, span, textNode, titles)
 import Sheaf
 import Sheaf.Collection as Collection
+import Sheaf.Component as Component exposing (Component)
 import Sheaf.Feed as Feed exposing (Feed)
 import Sheaf.Frontmatter as Frontmatter
+import Sheaf.Html as Html
 import Sheaf.Internal.Protocol exposing (FeedItem, Response, SitemapEntry)
 import Sheaf.Internal.Render as Render
 import Sheaf.Ref as Ref
@@ -209,6 +211,21 @@ absoluteUrlTests =
         , becomes "x/../y?a=../b#c" "https://example.com/blog/posts/a/y?a=../b#c"
         , becomes "mailto:a@b.c" "mailto:a@b.c"
         , becomes "https://elm-lang.org/../x" "https://elm-lang.org/../x"
+        , test "a component's link to a document points to its page" <|
+            \_ ->
+                request [ "posts" ] [ dated "a" "2026-11-01" |> withBody [ seeAlso "posts/b" ], dated "b" "2026-11-01" ]
+                    |> renderWithComponents
+                    |> itemHtml
+                    |> List.head
+                    |> Expect.equal (Just "<aside><a href=\"https://example.com/blog/posts/b/\">See also</a><p>Hi</p></aside>")
+        , test "a component's link to a draft is reported as on the item's page" <|
+            \_ ->
+                request [ "posts" ] [ dated "a" "2026-11-01" |> withBody [ seeAlso "posts/secret" ], draft "secret" ]
+                    |> renderWithComponents
+                    |> .diagnostics
+                    |> List.map (\diagnostic -> ( diagnostic.title, diagnostic.message ))
+                    |> Expect.equal
+                        [ ( "LINK TO DRAFT", "While rendering `/posts/a/` from the route `/posts/:slug/`, a `Sheaf.link` points to `posts/secret`, which is not published in this build because it is a draft or dated in the future." ) ]
         , test "an image's source is absolute" <|
             \_ ->
                 linkingTo [ paragraph [ image "x.png" ] ]
@@ -245,6 +262,25 @@ absoluteUrlTests =
                     |> bodyAt "posts/a/index.html"
                     |> Expect.equal (Just "<article><h1>a</h1><p><a href=\"../b/\">link</a></p></article>")
         ]
+
+
+{-| A container that links to the document named by its `to` attribute.
+-}
+seeAlsoComponent : Component
+seeAlsoComponent =
+    Component.container "see-also"
+        (Component.succeed identity |> Component.required "to" Component.string)
+        (\id children -> Html.aside [] (Sheaf.link (Ref.fromId id) [ Html.text "See also" ] :: children))
+
+
+seeAlso : String -> Value
+seeAlso id =
+    containerDirective "see-also" [ ( "to", id ) ] (span 3 1 12) [ paragraph [ textNode "Hi" ] ]
+
+
+renderWithComponents : Value -> Response
+renderWithComponents =
+    Render.render (Sheaf.site { metadata = RenderFixtures.metadata, routes = [ postRoute ], feeds = [ feed ], components = [ seeAlsoComponent ] })
 
 
 feedProblemTests : Test
