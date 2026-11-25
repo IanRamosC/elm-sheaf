@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { unsupportedBun } from "../src/cli/main";
 import {
   copyFixture,
   fixturePath,
@@ -97,5 +98,18 @@ describe("sheaf", () => {
 
     expect(exitCode).toBe(0);
     expect(stdout.trim()).toBe("0.1.0");
+  });
+});
+
+describe("unsupportedBun", () => {
+  test("accepts the floor and anything newer", () => {
+    expect(unsupportedBun("1.4.5", ">=1.4.5")).toBeUndefined();
+    expect(unsupportedBun("1.5.0", ">=1.4.5")).toBeUndefined();
+  });
+
+  test("names both versions when Bun is too old", () => {
+    expect(unsupportedBun("1.3.9", ">=1.4.5")).toBe(
+      "Sheaf needs Bun >=1.4.5, but this is Bun 1.3.9. Run `bun upgrade` to update it.",
+    );
   });
 });

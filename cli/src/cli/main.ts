@@ -21,7 +21,10 @@ Options:
 
 type Command = "build" | "check";
 
-/** Runs the command line and returns the exit code: 0 success, 1 errors in the site, 2 bad usage. */
+/**
+ * Runs the command line and returns the exit code: 0 success, 1 errors in the
+ * site, 2 bad usage or a Bun older than `engines.bun` in package.json.
+ */
 export async function main(args: string[]): Promise<number> {
   const parsed = parseArguments(args);
   if (parsed === undefined) return usageError();
@@ -38,6 +41,11 @@ export async function main(args: string[]): Promise<number> {
   const [command, ...extra] = positionals;
   if ((command !== "build" && command !== "check") || extra.length > 0) {
     return usageError();
+  }
+  const unsupported = unsupportedBun(Bun.version, packageJson.engines.bun);
+  if (unsupported !== undefined) {
+    process.stderr.write(`${unsupported}\n`);
+    return 2;
   }
   return runCommand(command, values.drafts === true);
 }
@@ -56,6 +64,20 @@ function parseArguments(args: string[]) {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Explains why this Bun cannot run Sheaf, or gives `undefined` when it can.
+ * Bun is a floor rather than an exact version: a newer Bun may encode images
+ * differently, but their file names hash the Bun version, so it only renames
+ * them.
+ */
+export function unsupportedBun(
+  version: string,
+  supported: string,
+): string | undefined {
+  if (Bun.semver.satisfies(version, supported)) return undefined;
+  return `Sheaf needs Bun ${supported}, but this is Bun ${version}. Run \`bun upgrade\` to update it.`;
 }
 
 function usageError(): number {

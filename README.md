@@ -12,8 +12,8 @@ The repository holds two packages:
 ## Requirements and commands
 
 Sheaf needs [Elm 0.19.3](https://guide.elm-lang.org/install/elm.html) and
-[Bun](https://bun.sh). It finds `elm` in your site's `node_modules/.bin` or on
-your `PATH`.
+[Bun](https://bun.sh) 1.4.5 or newer. It finds `elm` in your site's
+`node_modules/.bin` or on your `PATH`.
 
 Run these in your site's folder:
 
