@@ -1,8 +1,13 @@
-import { cp, mkdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, posix } from "node:path";
 
-/** A file to write under `dist/`, with a path relative to it. */
-export type OutputFile = { path: string; content: string };
+/**
+ * A file to write under `dist/`, with a path relative to it: either text, or
+ * a copy of a file elsewhere on disk, such as a cached image.
+ */
+export type OutputFile =
+  | { kind: "text"; path: string; content: string }
+  | { kind: "copy"; path: string; source: string };
 
 /**
  * Replaces `.sheaf/gen/` with the generated Elm sources. Deleting the old ones
@@ -22,7 +27,7 @@ export async function writeGenerated(
 }
 
 /**
- * Replaces `dist/` with the rendered pages and feeds, then copies `static/` into it
+ * Replaces `dist/` with the rendered pages, feeds and images, then copies `static/` into it
  * untouched. Page paths are relative to `dist/`; the base path is the web
  * server's business, so it is never a folder here.
  */
@@ -36,8 +41,14 @@ export async function writeSite(
   assertNoClashes(files.map(({ path }) => path));
   await rm(dist, { recursive: true, force: true });
   await mkdir(dist, { recursive: true });
-  for (const { path, content } of files) {
-    await writeInside(dist, path, content);
+  for (const file of files) {
+    const target = join(dist, file.path);
+    await mkdir(dirname(target), { recursive: true });
+    if (file.kind === "text") {
+      await writeFile(target, file.content);
+    } else {
+      await copyFile(file.source, target);
+    }
   }
   await cp(join(siteRoot, "static"), dist, {
     recursive: true,

@@ -35,7 +35,14 @@ export type Node = { position: Span } & (
       title?: string;
       children: Node[];
     }
-  | { type: "image"; url: string; alt: string; title?: string }
+  | {
+      type: "image";
+      url: string;
+      alt: string;
+      title?: string;
+      /** Set for an image in `content/` or `static/` once it is resolved. */
+      local?: LocalImage;
+    }
   | { type: "table"; align: TableAlignment[]; children: Node[] }
   | { type: "tableRow"; children: Node[] }
   | { type: "tableCell"; children: Node[] }
@@ -49,6 +56,26 @@ export type Node = { position: Span } & (
     }
   | { type: "leafDirective"; name: string; attributes: DirectiveAttribute[] }
 );
+
+/**
+ * A local image as published: `src` is the original format at the largest
+ * width, and `width` and `height` are that file's. `variants[0]` lists the
+ * original format's widths and the rest one configured format each; GIF and
+ * SVG files are copied unchanged, so they have no variants. Paths are site
+ * paths without the base path.
+ */
+export type LocalImage = {
+  src: string;
+  width: number;
+  height: number;
+  variants: ImageVariant[];
+};
+
+/** One format of an image at every width it is written in, narrowest first. */
+export type ImageVariant = {
+  mediaType: string;
+  files: { path: string; width: number }[];
+};
 
 /**
  * A code block as Shiki highlights it for the light and dark themes: the

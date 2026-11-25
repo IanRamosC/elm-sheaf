@@ -6,7 +6,7 @@ import { elmModuleName } from "../elm/names";
 import { err, ok, type Result } from "../result";
 import { URL_SCHEMES } from "../url-schemes";
 import { type DocumentDate, publicationDate } from "./dates";
-import type { SourceDocument } from "./document";
+import type { CoverImage, SourceDocument } from "./document";
 import { splitFrontmatter } from "./frontmatter";
 
 /** A Markdown file and its text; `path` is relative to the site root. */
@@ -179,7 +179,7 @@ function loadDocument(
     (filenameDate?.ok ? filenameDate.value : undefined);
   const updated = readKey("updated", asDate);
   const draft = readKey("draft", parseDraft) ?? false;
-  const imageSource = readKey("image", parseImage);
+  const image = readKey("image", parseImage);
 
   if (problems.length > 0) return err(problems);
 
@@ -196,7 +196,7 @@ function loadDocument(
     ...(updated && { updated }),
     draft,
     excluded,
-    ...(imageSource !== undefined && { imageSource }),
+    ...(image && { image }),
     frontmatter: withoutReservedKeys(data),
     frontmatterPositions: positions,
     body: split.value.body,
@@ -339,8 +339,41 @@ function parseDraft(value: unknown): Result<boolean, string> {
     : err("It must be true or false.");
 }
 
-function parseImage(value: unknown): Result<string, string> {
-  return typeof value === "string" ? ok(value) : err("It must be a file name.");
+const IMAGE_FORMS =
+  'Write it as `image: cover.png`, or as `image: { src: cover.png, alt: "…" }` to give it alt text.';
+
+function parseImage(value: unknown): Result<CoverImage, string> {
+  if (typeof value === "string") return parseImageSource(value, "");
+  if (!isRecord(value)) return err(IMAGE_FORMS);
+  const { src, alt = "", ...others } = value;
+  if (
+    typeof src !== "string" ||
+    typeof alt !== "string" ||
+    Object.keys(others).length > 0
+  ) {
+    return err(IMAGE_FORMS);
+  }
+  return parseImageSource(src, alt);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Open Graph needs an absolute URL for a remote image, which a
+ * protocol-relative or `data:` URL is not.
+ */
+function parseImageSource(
+  src: string,
+  alt: string,
+): Result<CoverImage, string> {
+  if (src.startsWith("//") || /^data:/i.test(src)) {
+    return err(
+      "A remote image must be an http or https URL, such as `https://example.com/cover.png`, and a local one a path, such as `cover.png`.",
+    );
+  }
+  return ok({ src, alt });
 }
 
 function withoutReservedKeys(

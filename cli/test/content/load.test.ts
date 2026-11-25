@@ -11,6 +11,7 @@ const config: Config = {
   basePath: "/",
   timezone: "UTC",
   highlight: { light: "github-light", dark: "github-dark" },
+  images: { widths: [480, 960, 1600], formats: ["webp"] },
 };
 const buildStart = new Date("2026-11-23T12:00:00Z");
 
@@ -63,7 +64,7 @@ describe("loadContent documents", () => {
       bodyStartLine: 4,
     });
     expect(doc?.updated).toBeUndefined();
-    expect(doc?.imageSource).toBeUndefined();
+    expect(doc?.image).toBeUndefined();
   });
 
   test("names a document folder's index.md after the folder", () => {
@@ -95,9 +96,17 @@ describe("loadContent documents", () => {
         instant: new Date("2026-11-02T08:00:00Z"),
         isoDate: "2026-11-02",
       },
-      imageSource: "cover.png",
+      image: { src: "cover.png", alt: "" },
       frontmatter: { title: "Hi" },
     });
+  });
+
+  test("reads an image with alt text", () => {
+    const [doc] = documents([
+      file("content/posts/a.md", "image: { src: cover.png, alt: Cover }"),
+    ]);
+
+    expect(doc?.image).toEqual({ src: "cover.png", alt: "Cover" });
   });
 
   test("reads dates in the configured timezone", () => {
@@ -296,6 +305,26 @@ describe("loadContent errors", () => {
       title: "BAD FRONTMATTER",
       span: { start: { line: 2, column: 1 }, end: { line: 2, column: 6 } },
     });
+  });
+
+  test("rejects a cover image that is not an http or https URL or a file", () => {
+    for (const image of [
+      "//cdn.example.com/x.png",
+      "data:image/png;base64,AAAA",
+      "{ src: //cdn.example.com/x.png }",
+      "12",
+      "{ alt: Cover }",
+      "{ src: cover.png, title: Cover }",
+    ]) {
+      const [problem] = problems([
+        file("content/posts/a.md", `image: ${image}`),
+      ]);
+
+      expect(problem).toMatchObject({
+        title: "BAD FRONTMATTER",
+        span: { start: { line: 2, column: 1 }, end: { line: 2, column: 6 } },
+      });
+    }
   });
 
   test("points a bad date at its key", () => {

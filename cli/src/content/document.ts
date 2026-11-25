@@ -2,6 +2,12 @@ import type { DocumentDate } from "./dates";
 import type { FieldPosition } from "./frontmatter";
 
 /**
+ * A document's own image, from `image: cover.png` or
+ * `image: { src: cover.png, alt: "…" }`. `src` is a path or an http(s) URL.
+ */
+export type CoverImage = { src: string; alt: string };
+
+/**
  * One Markdown document as it is read from disk, with the host's reserved
  * frontmatter keys resolved. Everything later stages need to know about a
  * document starts here.
@@ -18,8 +24,8 @@ export type SourceDocument = {
   draft: boolean;
   /** Left out of this build because it is a draft or dated in the future. */
   excluded: boolean;
-  /** The raw `image` value; it is not processed until images are supported. */
-  imageSource?: string;
+  /** The `image` key, which is resolved like an image in the body. */
+  image?: CoverImage;
   /** The user's own fields: every key except the reserved ones. */
   frontmatter: Record<string, unknown>;
   frontmatterPositions: FieldPosition[];

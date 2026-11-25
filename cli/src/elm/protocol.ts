@@ -3,7 +3,7 @@ import type { SourceDocument } from "../content/document";
 import type { BuildMode } from "../content/load";
 import type { GroupSlug } from "../content/slug";
 import type { Diagnostic, Span } from "../diagnostics/diagnostic";
-import type { Node } from "../markdown/tree";
+import type { LocalImage, Node } from "../markdown/tree";
 import { err, ok, type Result } from "../result";
 
 /** Bumped whenever the JSON exchanged with the Elm worker changes shape. */
@@ -29,6 +29,12 @@ export type WireBuild = {
 /** A date as the worker needs it: a moment to compare and the calendar date to show. */
 export type WireDate = { posixMillis: number; isoDate: string };
 
+/**
+ * A document's `image` key. `url` is the value as written; `local` is set for
+ * an image in `content/` or `static/`, and absent for an http(s) URL.
+ */
+export type DocumentImage = { url: string; alt: string; local?: LocalImage };
+
 export type RequestDocument = {
   id: string;
   collection: string;
@@ -40,6 +46,7 @@ export type RequestDocument = {
   excluded: boolean;
   frontmatter: SourceDocument["frontmatter"];
   frontmatterPositions: SourceDocument["frontmatterPositions"];
+  image?: DocumentImage;
   tree: Node;
 };
 
@@ -93,8 +100,12 @@ function wireDate(date: DocumentDate | undefined): WireDate | null {
     : null;
 }
 
-/** A loaded document together with the Markdown tree parsed from its body. */
-export type ParsedDocument = { source: SourceDocument; tree: Node };
+/** A loaded document together with the Markdown tree parsed from its body, and its resolved image. */
+export type ParsedDocument = {
+  source: SourceDocument;
+  tree: Node;
+  image?: DocumentImage;
+};
 
 export function encodeRequest(
   build: BuildInfo,
@@ -112,7 +123,7 @@ export function encodeRequest(
     },
     slugs,
     collections,
-    documents: documents.map(({ source, tree }) => ({
+    documents: documents.map(({ source, tree, image }) => ({
       id: source.id,
       collection: source.collection,
       sourcePath: source.sourcePath,
@@ -123,6 +134,7 @@ export function encodeRequest(
       excluded: source.excluded,
       frontmatter: source.frontmatter,
       frontmatterPositions: source.frontmatterPositions,
+      ...(image && { image }),
       tree,
     })),
   };

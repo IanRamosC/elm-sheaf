@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { embeddedFixtureModule } from "../../scripts/embed-protocol-fixtures";
 import type { SourceDocument } from "../../src/content/document";
@@ -17,6 +18,7 @@ import {
   highlightCode,
   languagesIn,
 } from "../../src/highlight/highlight";
+import { resolveImages } from "../../src/images/resolve";
 import { checkLinks } from "../../src/markdown/links";
 import { parseMarkdown } from "../../src/markdown/parse";
 
@@ -28,7 +30,7 @@ function fixture(name: string): unknown {
 
 /** Rebuilds what the loader and parser would hand to `encodeRequest`. */
 function sourcesOf(request: Request) {
-  return request.documents.map(({ tree, date, updated, ...rest }) => {
+  return request.documents.map(({ tree, date, updated, image, ...rest }) => {
     const source: SourceDocument = {
       ...rest,
       body: "",
@@ -46,7 +48,8 @@ function sourcesOf(request: Request) {
         isoDate: updated.isoDate,
       };
     }
-    return { source, tree };
+    if (image) source.image = { src: image.url, alt: image.alt };
+    return { source, tree, ...(image && { image }) };
   });
 }
 
@@ -82,7 +85,7 @@ describe("encodeRequest", () => {
 });
 
 describe("the all-nodes fixture tree", () => {
-  test("is what parsing, link checking and highlighting produce for all-nodes.md", async () => {
+  test("is what parsing, link checking, highlighting and image resolving produce for all-nodes.md", async () => {
     const [fixtureDocument] = (fixture("all-nodes-request") as Request)
       .documents;
     if (fixtureDocument === undefined)
@@ -96,9 +99,14 @@ describe("the all-nodes fixture tree", () => {
       excluded: false,
       frontmatter: {},
       frontmatterPositions: [],
+      image: { src: "a.png", alt: "A cat" },
       body: readFileSync(join(FIXTURES, "all-nodes.md"), "utf8"),
       bodyStartLine: 1,
     };
+    const siteRoot = mkdtempSync(join(tmpdir(), "sheaf-protocol-"));
+    const imagePath = "content/posts/a.png";
+    mkdirSync(join(siteRoot, "content/posts"), { recursive: true });
+    cpSync(join(FIXTURES, "a.png"), join(siteRoot, imagePath));
     const parsed = parseMarkdown(document);
     if (!parsed.ok) throw new Error("the sample does not parse");
     const checked = checkLinks(
@@ -113,10 +121,28 @@ describe("the all-nodes fixture tree", () => {
       languagesIn([checked.value]),
       new HighlightCache(),
     );
-    expect(highlightCode(checked.value, document, highlighter)).toEqual({
-      ok: true,
-      value: fixtureDocument.tree,
-    });
+    const highlighted = highlightCode(checked.value, document, highlighter);
+    if (!highlighted.ok) throw new Error("the sample does not highlight");
+    try {
+      const resolved = await resolveImages(
+        highlighted.value,
+        document,
+        siteRoot,
+        {
+          siteUrl: new URL("https://example.com/"),
+          basePath: "/",
+          timezone: "UTC",
+          highlight: { light: "github-light", dark: "github-dark" },
+          images: { widths: [480, 960, 1600], formats: ["webp"] },
+        },
+        new ContentFiles([document.sourcePath, imagePath]),
+      );
+      if (!resolved.ok) throw new Error(JSON.stringify(resolved.error));
+      expect(resolved.value.tree).toEqual(fixtureDocument.tree);
+      expect(resolved.value.image).toEqual(fixtureDocument.image);
+    } finally {
+      rmSync(siteRoot, { recursive: true, force: true });
+    }
   });
 });
 

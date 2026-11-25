@@ -2,7 +2,11 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type Config, parseConfig } from "./config/config";
 import type { SourceDocument } from "./content/document";
-import { type ContentFiles, listContentFiles } from "./content/files";
+import {
+  type ContentFiles,
+  listContentFiles,
+  listFiles,
+} from "./content/files";
 import {
   type BuildMode,
   loadContent,
@@ -29,6 +33,8 @@ import {
   highlightCode,
   languagesIn,
 } from "./highlight/highlight";
+import { imageOutputs } from "./images/emit";
+import { type ImageFile, resolveImages } from "./images/resolve";
 import { checkLinks } from "./markdown/links";
 import { parseMarkdown } from "./markdown/parse";
 import { collect, err, ok, type Result } from "./result";
@@ -95,6 +101,13 @@ export async function build(
   );
   if (!highlighted.ok) return highlighted;
 
+  const imaged = await resolveDocumentImages(
+    siteRoot,
+    config.value,
+    highlighted.value,
+  );
+  if (!imaged.ok) return imaged;
+
   const elm = await findElm(siteRoot);
   if (!elm.ok) return elm;
   const compiled = await compileElm(siteRoot, {
@@ -110,7 +123,7 @@ export async function build(
       mode: options.mode,
     },
     collections,
-    highlighted.value,
+    imaged.value.documents,
     slugTable(documents.value),
   );
   const ran = await runElm(compiled.value, request);
@@ -122,7 +135,10 @@ export async function build(
     return err(diagnostics);
   }
   if (options.write) {
-    await writeSite(siteRoot, outputFiles(response, config.value, options.now));
+    await writeSite(siteRoot, [
+      ...outputFiles(response, config.value, options.now),
+      ...imageOutputs(imaged.value.published),
+    ]);
   }
   return ok({
     pages: pages.length,
@@ -139,6 +155,7 @@ function outputFiles(
   // `siteUrl.href` may lack the trailing slash that relative feed paths need.
   const site = config.siteUrl.origin + config.basePath;
   const files: OutputFile[] = response.pages.map(({ path, html }) => ({
+    kind: "text",
     path,
     content: html,
   }));
@@ -149,16 +166,22 @@ function outputFiles(
     });
     files.push(
       {
+        kind: "text",
         path: feed.rss,
         content: rssFeed(feed, render(feed.rss), response.site, now),
       },
       {
+        kind: "text",
         path: feed.atom,
         content: atomFeed(feed, render(feed.atom), response.site, now),
       },
     );
   }
-  files.push({ path: "sitemap.xml", content: sitemapXml(response.sitemap) });
+  files.push({
+    kind: "text",
+    path: "sitemap.xml",
+    content: sitemapXml(response.sitemap),
+  });
   return files;
 }
 
@@ -220,4 +243,46 @@ async function highlightDocuments(
   );
   if (highlighted.ok) await saveHighlightCache(siteRoot, cache);
   return highlighted;
+}
+
+/**
+ * Resolves the images of every document, drafts included, so their errors are
+ * reported in every mode. Only the files of documents in this build's output
+ * are published, so a draft's images never reach a production `dist/`.
+ */
+async function resolveDocumentImages(
+  siteRoot: string,
+  config: Config,
+  documents: ParsedDocument[],
+): Promise<
+  Result<{ documents: ParsedDocument[]; published: ImageFile[] }, Diagnostic[]>
+> {
+  const files = await listFiles(siteRoot, "content", "static");
+  const results = await Promise.all(
+    documents.map(async ({ source, tree }) => {
+      const resolved = await resolveImages(
+        tree,
+        source,
+        siteRoot,
+        config,
+        files,
+      );
+      if (!resolved.ok) return resolved;
+      const { image, files: imageFiles } = resolved.value;
+      return ok({
+        document: {
+          source,
+          tree: resolved.value.tree,
+          ...(image && { image }),
+        },
+        published: source.excluded ? [] : imageFiles,
+      });
+    }),
+  );
+  const resolved = collect(results);
+  if (!resolved.ok) return resolved;
+  return ok({
+    documents: resolved.value.map(({ document }) => document),
+    published: resolved.value.flatMap(({ published }) => published),
+  });
 }

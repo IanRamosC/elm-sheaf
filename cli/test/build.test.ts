@@ -16,6 +16,7 @@ import {
   fixturePath,
   removeFixtureCopies,
 } from "./support/fixtures";
+import { pngBytes } from "./support/images";
 
 // The first compile of a site can take several seconds.
 const SLOW = 60_000;
@@ -121,6 +122,65 @@ describe("build", () => {
       });
 
       expect(titlesOf(result)).toEqual(["LINK TO DRAFT"]);
+    },
+    SLOW,
+  );
+
+  test(
+    "check encodes images into the cache but writes no dist",
+    async () => {
+      const root = copyFixture("minimal");
+      writeFileSync(
+        join(root, "content/posts/2026-11-23-hello-world.md"),
+        "---\ntitle: Hello, world\n---\n\n![A photo](photo.png)\n",
+      );
+      writeFileSync(join(root, "content/posts/photo.png"), pngBytes(600, 400));
+
+      const result = await build(root, {
+        mode: "production",
+        write: false,
+        now,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(readdirSync(join(root, ".sheaf/cache/images"))).toHaveLength(4);
+      expect(existsSync(join(root, "dist"))).toBe(false);
+    },
+    SLOW,
+  );
+
+  test(
+    "publishes the images of published documents only, but checks a draft's",
+    async () => {
+      const root = copyFixture("drafts");
+      const draft = join(root, "content/posts/2026-11-24-work-in-progress.md");
+      writeFileSync(
+        draft,
+        readFileSync(draft, "utf8").replace(/\n*$/, "\n\n![x](draft.png)\n"),
+      );
+      writeFileSync(
+        join(root, "content/posts/2026-11-25-shown.md"),
+        "---\ntitle: Shown\n---\n\n![x](shown.png)\n",
+      );
+      writeFileSync(join(root, "content/posts/shown.png"), pngBytes(300, 200));
+
+      expect(
+        titlesOf(await build(root, { mode: "production", write: true, now })),
+      ).toEqual(["MISSING IMAGE"]);
+
+      writeFileSync(join(root, "content/posts/draft.png"), pngBytes(200, 100));
+      const result = await build(root, {
+        mode: "production",
+        write: true,
+        now,
+      });
+
+      expect(result.ok).toBe(true);
+      const published = readdirSync(join(root, "dist/_sheaf/images")).sort();
+      expect(published.map((name) => name.replace(/^.*-/, ""))).toEqual([
+        "300.png",
+        "300.webp",
+      ]);
     },
     SLOW,
   );

@@ -38,9 +38,70 @@ describe("parseConfig", () => {
     expect(result.ok && result.value.timezone).toBe("Europe/Lisbon");
   });
 
-  test("accepts images, which are not used yet", () => {
-    const result = parse('{"siteUrl":"https://example.com/","images":{}}');
-    expect(result.ok).toBe(true);
+  test("resizes images to three widths and writes WebP by default", () => {
+    for (const json of [
+      '{"siteUrl":"https://example.com/"}',
+      '{"siteUrl":"https://example.com/","images":{}}',
+    ]) {
+      const result = parse(json);
+      expect(result.ok && result.value.images).toEqual({
+        widths: [480, 960, 1600],
+        formats: ["webp"],
+      });
+    }
+  });
+
+  test("keeps the image widths and formats it is given", () => {
+    const result = parse(
+      '{"siteUrl":"https://example.com/","images":{"widths":[640],"formats":[]}}',
+    );
+    expect(result.ok && result.value.images).toEqual({
+      widths: [640],
+      formats: [],
+    });
+  });
+
+  test("rejects image widths that are not positive whole numbers", () => {
+    for (const widths of ["[]", "[0]", "[-480]", "[480.5]", '["480"]', "480"]) {
+      const [problem] = errorsOf(
+        `{"siteUrl":"https://example.com/","images":{"widths":${widths}}}`,
+      );
+      expect(problem?.title).toBe("BAD CONFIG");
+      expect(problem?.message).toContain('"images.widths"');
+    }
+  });
+
+  test("explains that AVIF cannot be written", () => {
+    expect(
+      errorsOf(
+        '{"siteUrl":"https://example.com/","images":{"formats":["webp","avif"]}}',
+      ),
+    ).toEqual([
+      {
+        severity: "error",
+        title: "BAD CONFIG",
+        message: '"images.formats" asks for AVIF.',
+        sourcePath: "sheaf.json",
+        hint: 'Sheaf writes WebP variants only: Bun\'s image encoder can\'t write AVIF on Linux, where most sites are built. Use "formats": ["webp"].',
+      },
+    ]);
+  });
+
+  test("rejects unknown image formats and keys", () => {
+    const problems = errorsOf(
+      '{"siteUrl":"https://example.com/","images":{"widht":[1],"formats":["png"]}}',
+    );
+    expect(problems.map(({ message, hint }) => ({ message, hint }))).toEqual([
+      {
+        message: 'I do not know the key "images.widht".',
+        hint: 'Did you mean "widths"?',
+      },
+      {
+        message:
+          '"png" in "images.formats" is not an image format Sheaf writes.',
+        hint: 'Use "formats": ["webp"].',
+      },
+    ]);
   });
 
   test("highlights with the GitHub themes by default", () => {

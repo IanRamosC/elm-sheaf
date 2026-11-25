@@ -12,14 +12,23 @@ export type Config = {
   timezone: string;
   /** The Shiki themes code is highlighted with. */
   highlight: { light: string; dark: string };
+  /** The widths local images are resized to, and the formats written besides the original's. */
+  images: { widths: number[]; formats: ImageFormat[] };
 };
 
-// `images` is reserved for a later feature and ignored for now.
+/** A format Sheaf writes image variants in, besides each image's own. */
+export type ImageFormat = "webp";
+
 const knownKeys = ["siteUrl", "timezone", "highlight", "images"];
 
 const defaultTimezone = "UTC";
 
 const defaultThemes = { light: "github-light", dark: "github-dark" };
+
+const defaultImages: Config["images"] = {
+  widths: [480, 960, 1600],
+  formats: ["webp"],
+};
 
 /** A problem with one key, before it is located in `sheaf.json`. */
 type Problem = { message: string; hint?: string };
@@ -69,7 +78,20 @@ export function parseConfig(
     );
   }
 
-  if (!siteUrl.ok || !timezone.ok || !highlight.ok || problems.length > 0) {
+  const images = parseImages(fields.images);
+  if (!images.ok) {
+    problems.push(
+      ...images.error.map(({ message, hint }) => badConfig(message, hint)),
+    );
+  }
+
+  if (
+    !siteUrl.ok ||
+    !timezone.ok ||
+    !highlight.ok ||
+    !images.ok ||
+    problems.length > 0
+  ) {
     return err(problems);
   }
 
@@ -78,7 +100,65 @@ export function parseConfig(
     basePath: basePathOf(siteUrl.value),
     timezone: timezone.value,
     highlight: highlight.value,
+    images: images.value,
   });
+}
+
+/** `{ "widths": [480, 960, 1600], "formats": ["webp"] }`, where both are optional. */
+function parseImages(value: unknown): Result<Config["images"], Problem[]> {
+  if (value === undefined) return ok(defaultImages);
+  if (!isObject(value)) {
+    return err([{ message: '"images" must be an object.' }]);
+  }
+  const problems = unknownKeys(value, ["widths", "formats"], "images.");
+  const widths = parseWidths(value.widths);
+  const formats = parseFormats(value.formats);
+  if (!widths.ok) problems.push(widths.error);
+  if (!formats.ok) problems.push(...formats.error);
+  if (!widths.ok || !formats.ok || problems.length > 0) return err(problems);
+  return ok({ widths: widths.value, formats: formats.value });
+}
+
+function parseWidths(value: unknown): Result<number[], Problem> {
+  if (value === undefined) return ok(defaultImages.widths);
+  const isWidth = (width: unknown): width is number =>
+    typeof width === "number" && Number.isInteger(width) && width > 0;
+  if (Array.isArray(value) && value.length > 0 && value.every(isWidth)) {
+    return ok(value);
+  }
+  return err({
+    message: '"images.widths" must be a non-empty list of widths in pixels.',
+    hint: 'Use whole numbers above 0, such as "widths": [480, 960, 1600].',
+  });
+}
+
+const FORMATS_HINT = 'Use "formats": ["webp"].';
+
+function parseFormats(value: unknown): Result<ImageFormat[], Problem[]> {
+  if (value === undefined) return ok(defaultImages.formats);
+  if (!Array.isArray(value)) {
+    return err([
+      { message: '"images.formats" must be a list.', hint: FORMATS_HINT },
+    ]);
+  }
+  const formats: ImageFormat[] = [];
+  const problems: Problem[] = [];
+  for (const format of value) {
+    if (format === "webp") {
+      if (!formats.includes(format)) formats.push(format);
+    } else if (format === "avif") {
+      problems.push({
+        message: '"images.formats" asks for AVIF.',
+        hint: `Sheaf writes WebP variants only: Bun's image encoder can't write AVIF on Linux, where most sites are built. ${FORMATS_HINT}`,
+      });
+    } else {
+      problems.push({
+        message: `${JSON.stringify(format)} in "images.formats" is not an image format Sheaf writes.`,
+        hint: FORMATS_HINT,
+      });
+    }
+  }
+  return problems.length > 0 ? err(problems) : ok(formats);
 }
 
 /** `{ "theme": { "light": …, "dark": … } }`, where every part is optional. */

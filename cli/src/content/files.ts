@@ -8,8 +8,8 @@ export type FileLookup =
   | { caseOf: string };
 
 /**
- * Every file under `content/`, so links and images are looked up the same way
- * on every machine. macOS stores names in NFD and ignores case, while Linux
+ * Every file in some folders of a site, so links and images are looked up
+ * the same way on every machine. macOS stores names in NFD and ignores case, while Linux
  * compares bytes exactly, so asking the disk would accept a link on a laptop
  * that breaks the build in CI. Here both sides are NFC-normalised and compared
  * exactly, and a match that ignores case is reported instead of accepted.
@@ -35,32 +35,54 @@ export class ContentFiles {
     const caseOf = this.byLowerCasePath.get(normalized.toLowerCase());
     return caseOf === undefined ? undefined : { caseOf };
   }
+
+  /** The names of the files directly in `folder` (relative to the site root), as stored on disk. */
+  namesIn(folder: string): string[] {
+    const prefix = `${folder.normalize("NFC")}/`;
+    return [...this.byPath]
+      .filter(
+        ([normalized]) =>
+          normalized.startsWith(prefix) &&
+          !normalized.slice(prefix.length).includes("/"),
+      )
+      .map(([, stored]) => stored.slice(prefix.length));
+  }
+}
+
+/** Lists every file under `<root>/content`; see {@link listFiles}. */
+export function listContentFiles(root: string): Promise<ContentFiles> {
+  return listFiles(root, "content");
 }
 
 /**
- * Lists every file under `<root>/content`, skipping hidden files and folders
- * (`.obsidian`, `.git`), which belong to other tools.
+ * Lists every file under the given folders of `root`, skipping hidden files
+ * and folders (`.obsidian`, `.git`), which belong to other tools. A missing
+ * folder has no files; `readContentFiles` agrees for `content/`.
  */
-export async function listContentFiles(root: string): Promise<ContentFiles> {
-  let entries: Awaited<ReturnType<typeof readEntries>>;
-  try {
-    entries = await readEntries(join(root, "content"));
-  } catch (error) {
-    // A site without `content/` has no files; `readContentFiles` agrees.
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return new ContentFiles([]);
+export async function listFiles(
+  root: string,
+  ...folders: string[]
+): Promise<ContentFiles> {
+  const paths: string[] = [];
+  for (const folder of folders) {
+    for (const entry of await readEntries(join(root, folder))) {
+      if (!entry.isFile()) continue;
+      const path = relative(root, join(entry.parentPath, entry.name))
+        .split(sep)
+        .join("/");
+      if (!path.split("/").some((name) => name.startsWith("."))) {
+        paths.push(path);
+      }
     }
-    throw error;
   }
-  const paths = entries
-    .filter((entry) => entry.isFile())
-    .map((entry) =>
-      relative(root, join(entry.parentPath, entry.name)).split(sep).join("/"),
-    )
-    .filter((path) => !path.split("/").some((name) => name.startsWith(".")));
   return new ContentFiles(paths);
 }
 
-function readEntries(folder: string) {
-  return readdir(folder, { recursive: true, withFileTypes: true });
+async function readEntries(folder: string) {
+  try {
+    return await readdir(folder, { recursive: true, withFileTypes: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
 }
