@@ -29,6 +29,7 @@ import {
   pngBytes,
   webpBytes,
 } from "../support/images";
+import { permissionsApply } from "../support/permissions";
 
 const config: Config = {
   siteUrl: new URL("https://example.com/"),
@@ -463,8 +464,8 @@ describe("cache upkeep", () => {
     ]);
   });
 
-  test.skipIf(process.getuid?.() === 0)(
-    "reports an image that cannot be read",
+  test.skipIf(!permissionsApply)(
+    "reports an image that cannot be read (needs file permissions)",
     async () => {
       const root = await site({
         [POST]: "Text.\n\n![x](photo.png)\n",

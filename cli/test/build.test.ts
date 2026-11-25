@@ -19,6 +19,7 @@ import {
   removeFixtureCopies,
 } from "./support/fixtures";
 import { pngBytes } from "./support/images";
+import { permissionsApply } from "./support/permissions";
 
 // The first compile of a site can take several seconds.
 const SLOW = 60_000;
@@ -663,8 +664,8 @@ describe("the blog fixture", () => {
     SLOW,
   );
 
-  test.skipIf(process.getuid?.() === 0)(
-    "reports an unreadable image at the image",
+  test.skipIf(!permissionsApply)(
+    "reports an unreadable image at the image (needs file permissions)",
     async () => {
       const root = copyFixture("blog");
       const photo = join(root, "content/posts/2026-11-19-pictures/photo.png");
@@ -686,8 +687,8 @@ describe("the blog fixture", () => {
     SLOW,
   );
 
-  test.skipIf(process.getuid?.() === 0)(
-    "warns, and still builds, when the highlight cache cannot be saved",
+  test.skipIf(!permissionsApply)(
+    "warns, and still builds, when the highlight cache cannot be saved (needs file permissions)",
     async () => {
       const root = copyFixture("minimal");
       writeFileSync(
@@ -731,8 +732,8 @@ describe("the blog fixture", () => {
     SLOW,
   );
 
-  test.skipIf(process.getuid?.() === 0)(
-    "builds a site without images when the cache folder cannot be read",
+  test.skipIf(!permissionsApply)(
+    "builds a site without images when the cache folder cannot be read (needs file permissions)",
     async () => {
       const root = copyFixture("minimal");
       const cache = join(root, ".sheaf/cache/images");

@@ -23,6 +23,7 @@ import {
 } from "../../src/highlight/highlight";
 import { parseMarkdown } from "../../src/markdown/parse";
 import type { Highlight, Node } from "../../src/markdown/tree";
+import { permissionsApply } from "../support/permissions";
 
 const themes = { light: "github-light", dark: "github-dark" };
 
@@ -268,8 +269,8 @@ describe("the highlight cache", () => {
     expect(cache.hits).toBe(1);
   });
 
-  test.skipIf(process.getuid?.() === 0)(
-    "warns when the cache folder cannot be written",
+  test.skipIf(!permissionsApply)(
+    "warns when the cache folder cannot be written (needs file permissions)",
     async () => {
       const root = temporarySite();
       const folder = join(root, ".sheaf/cache");
