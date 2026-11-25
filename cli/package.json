@@ -5,8 +5,7 @@
   "license": "BSD-3-Clause",
   "type": "module",
   "files": [
-    "src",
-    "templates"
+    "src"
   ],
   "bin": {
     "sheaf": "src/index.ts"
@@ -17,6 +16,7 @@
   "packageManager": "bun@1.4.5",
   "scripts": {
     "test": "bun test",
+    "embed-starter": "bun scripts/embed-starter.ts",
     "embed-fixtures": "bun scripts/embed-protocol-fixtures.ts",
     "screenshots": "bun scripts/screenshots.ts",
     "check": "bunx --bun biome check . && bunx --bun tsc --noEmit"

@@ -1,20 +1,11 @@
-import {
-  cp,
-  mkdir,
-  readdir,
-  readFile,
-  rename,
-  writeFile,
-} from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import packageManifest from "../../package.json";
 import { isErrno } from "../content/files";
 import type { Diagnostic } from "../diagnostics/diagnostic";
 import { err, ok, type Result } from "../result";
 import { elmJson, packageJson } from "./project-files";
-
-/** Plan 5 embeds this folder in the binaries. */
-const STARTER = new URL("../../templates/default/", import.meta.url);
+import { STARTER } from "./starter.generated";
 
 type InitOptions = {
   /** A checkout of the Sheaf repository to use instead of the published packages. */
@@ -51,15 +42,12 @@ export async function initSite(
   }
 
   await mkdir(target, { recursive: true });
-  await cp(STARTER, target, { recursive: true });
-  // npm drops files named `.gitignore` from packages, so the starter stores it without the dot.
-  await rename(join(target, "gitignore"), join(target, ".gitignore"));
-
-  const welcome = join(target, "content/posts/welcome.md");
-  await writeFile(
-    welcome,
-    (await readFile(welcome, "utf8")).replaceAll("{{today}}", today),
-  );
+  for (const [path, text] of STARTER) {
+    // npm drops files named `.gitignore` from packages, so the starter stores it without the dot.
+    const file = join(target, path === "gitignore" ? ".gitignore" : path);
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, text.replaceAll("{{today}}", today));
+  }
   await writeFile(join(target, "elm.json"), elmJson(localRepository));
   await writeFile(
     join(target, "package.json"),

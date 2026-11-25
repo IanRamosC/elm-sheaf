@@ -19,6 +19,12 @@
   },
   "overrides": [
     {
+      "includes": ["src/init/starter.generated.ts"],
+      "linter": {
+        "rules": { "suspicious": { "noTemplateCurlyInString": "off" } }
+      }
+    },
+    {
       "includes": ["templates/default/static/style.css"],
       "linter": { "rules": { "complexity": { "noImportantStyles": "off" } } }
     }
