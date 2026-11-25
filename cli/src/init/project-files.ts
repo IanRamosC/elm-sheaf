@@ -1,7 +1,7 @@
 import { sep } from "node:path";
 
 /** The Elm version Sheaf is built for; npm's `elm` tag for it is `0.19.3-0`. */
-const ELM_NPM_VERSION = "0.19.3-0";
+export const ELM_NPM_VERSION = "0.19.3-0";
 
 /** The Elm package's version in the registry, which `--local` replaces with its source. */
 const ELM_PACKAGE_VERSION = "1.0.0";
