@@ -5,6 +5,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   statSync,
@@ -163,6 +164,7 @@ describe("build", () => {
 
       const result = await build(root, options(root, { output: undefined }));
 
+      expect(titlesOf(result)).toEqual([]);
       expect(result.ok).toBe(true);
       expect(readdirSync(join(root, ".sheaf/cache/images"))).toHaveLength(4);
       expect(existsSync(join(root, "dist"))).toBe(false);
@@ -192,6 +194,7 @@ describe("build", () => {
       writeFileSync(join(root, "content/posts/draft.png"), pngBytes(200, 100));
       const result = await build(root, options(root));
 
+      expect(titlesOf(result)).toEqual([]);
       expect(result.ok).toBe(true);
       const published = readdirSync(join(root, "dist/_sheaf/images")).sort();
       expect(published.map((name) => name.replace(/^.*-/, ""))).toEqual([
@@ -306,6 +309,7 @@ describe("build", () => {
 
       const result = await build(root, options(root));
 
+      expect(titlesOf(result)).toEqual([]);
       expect(result.ok).toBe(true);
       const page = join(root, "dist/posts/hello-world/index.html");
       expect(readFileSync(page, "utf8")).toContain(
@@ -386,10 +390,46 @@ describe("build", () => {
 
         const result = await build(root, options(root));
 
+        expect(titlesOf(result)).toEqual([]);
         expect(result.ok).toBe(true);
       },
       SLOW,
     );
+
+    test(
+      "resolves a relative source directory against the site root",
+      async () => {
+        const root = copyFixture("minimal");
+        const path = join(root, "elm.json");
+        const elm = JSON.parse(readFileSync(path, "utf8"));
+        elm["source-directories"] = [
+          "src",
+          ".sheaf/gen",
+          // The temporary folder may sit behind a symlink, as on macOS.
+          relative(realpathSync(root), join(REPO, "src")),
+        ];
+        writeFileSync(path, JSON.stringify(elm));
+
+        const result = await build(root, options(root));
+
+        expect(titlesOf(result)).toEqual([]);
+        expect(result.ok).toBe(true);
+      },
+      SLOW,
+    );
+
+    test("reports a bad elm.json before it looks at the content", async () => {
+      const root = copyFixture("minimal");
+      writeFileSync(join(root, "elm.json"), "{ ");
+      writeFileSync(
+        join(root, "content/posts/2026-11-24-bad.md"),
+        "---\ntitle: [unclosed\n---\n",
+      );
+
+      const result = await build(root, options(root, { output: undefined }));
+
+      expect(titlesOf(result)).toEqual(["BAD ELM JSON"]);
+    });
 
     test(
       "builds a site made by init --local",

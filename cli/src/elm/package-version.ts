@@ -1,13 +1,17 @@
 import type { Diagnostic } from "../diagnostics/diagnostic";
 import { err, ok, type Result } from "../result";
 
-/** The Elm package every site needs, and the versions this CLI works with. */
+const SUPPORTED_MAJOR = 1;
+
+/**
+ * The Elm package every site needs, and the versions this CLI works with: any
+ * version of the supported major. The range text is built from that major, so
+ * the two cannot differ.
+ */
 export const SUPPORTED_ELM_PACKAGE = {
   name: "ianramosc/elm-sheaf",
-  range: "1.0.0 <= v < 2.0.0",
+  range: `${SUPPORTED_MAJOR}.0.0 <= v < ${SUPPORTED_MAJOR + 1}.0.0`,
 };
-
-const SUPPORTED_MAJOR = 1;
 
 /**
  * Checks that a site gets the Sheaf Elm package exactly once, at a version

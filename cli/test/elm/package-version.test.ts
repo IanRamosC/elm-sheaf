@@ -70,6 +70,11 @@ describe("checkElmPackage", () => {
     expect(titles(result)).toEqual(["BAD ELM JSON"]);
   });
 
+  test("reports a version that is not a string", () => {
+    const text = elmJson("1.0.0").replace('"1.0.0"', "1");
+    expect(titles(checkElmPackage(text, noLocal))).toEqual(["BAD ELM JSON"]);
+  });
+
   test("reports an elm.json that is not an object", () => {
     expect(titles(checkElmPackage("[]", noLocal))).toEqual(["BAD ELM JSON"]);
   });
