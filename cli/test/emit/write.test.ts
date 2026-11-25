@@ -64,7 +64,7 @@ describe("writeSite", () => {
     if (!staticFiles.ok) throw new Error("static/ should be listed");
 
     await writeSite(
-      root,
+      join(root, "dist"),
       [
         { kind: "text", path: "index.html", content: "home" },
         { kind: "text", path: "posts/one/index.html", content: "one" },
@@ -89,7 +89,7 @@ describe("writeSite", () => {
     writeFileSync(source, "image bytes");
 
     await writeSite(
-      root,
+      join(root, "dist"),
       [
         { kind: "text", path: "index.html", content: "<p>Hi</p>" },
         { kind: "copy", path: "_sheaf/images/h-480.webp", source },
@@ -112,14 +112,14 @@ describe("writeSite", () => {
 
     await expect(
       writeSite(
-        root,
+        join(root, "dist"),
         [{ kind: "text", path: "../escape.html", content: "" }],
         [],
       ),
     ).rejects.toThrow("../escape.html");
     await expect(
       writeSite(
-        root,
+        join(root, "dist"),
         [
           { kind: "text", path: "fine.html", content: "" },
           { kind: "text", path: "/etc/passwd", content: "" },
@@ -129,7 +129,7 @@ describe("writeSite", () => {
     ).rejects.toThrow("/etc/passwd");
     await expect(
       writeSite(
-        root,
+        join(root, "dist"),
         [
           {
             kind: "copy",
@@ -147,7 +147,7 @@ describe("writeSite", () => {
     const root = siteRoot();
 
     await writeSite(
-      root,
+      join(root, "dist"),
       [
         { kind: "text", path: "index.html", content: "home" },
         { kind: "text", path: "feed.xml", content: "<rss/>" },
@@ -172,7 +172,7 @@ describe("writeSite", () => {
 
     await expect(
       writeSite(
-        root,
+        join(root, "dist"),
         [
           { kind: "text", path: "feed.xml", content: "" },
           { kind: "text", path: "feed.xml/index.html", content: "" },
@@ -182,7 +182,7 @@ describe("writeSite", () => {
     ).rejects.toThrow("feed.xml");
     await expect(
       writeSite(
-        root,
+        join(root, "dist"),
         [
           { kind: "text", path: "About/index.html", content: "" },
           { kind: "text", path: "about/index.html", content: "" },
@@ -194,7 +194,7 @@ describe("writeSite", () => {
     );
     await expect(
       writeSite(
-        root,
+        join(root, "dist"),
         [
           { kind: "text", path: "a/index.html", content: "" },
           { kind: "copy", path: "A/index.html", source: join(root, "x") },

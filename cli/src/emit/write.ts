@@ -2,7 +2,7 @@ import { copyFile, mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, posix } from "node:path";
 
 /**
- * A file to write under `dist/`, with a path relative to it: either text, or
+ * A file to write to the output folder, with a path relative to it: either text, or
  * a copy of a file elsewhere on disk, such as a cached image.
  */
 export type OutputFile =
@@ -27,24 +27,23 @@ export async function writeGenerated(
 }
 
 /**
- * Replaces `dist/` with the rendered pages, feeds and images, then copies the
+ * Replaces `folder` with the rendered pages, feeds and images, then copies the
  * files of `static/` (from `listStaticFiles`) over them. Paths are relative
- * to `dist/`; the base path is the web server's business, so it is never a
+ * to `folder`; the base path is the web server's business, so it is never a
  * folder here.
  */
 export async function writeSite(
-  siteRoot: string,
+  folder: string,
   files: OutputFile[],
   staticFiles: OutputFile[],
 ): Promise<void> {
-  const dist = join(siteRoot, "dist");
-  // Checked up front so a bad path cannot leave a half-written dist/.
-  for (const { path } of [...files, ...staticFiles]) assertInside(dist, path);
+  // Checked up front so a bad path cannot leave a half-written folder.
+  for (const { path } of [...files, ...staticFiles]) assertInside(folder, path);
   assertNoClashes(files.map(({ path }) => path));
-  await rm(dist, { recursive: true, force: true });
-  await mkdir(dist, { recursive: true });
+  await rm(folder, { recursive: true, force: true });
+  await mkdir(folder, { recursive: true });
   for (const file of [...files, ...staticFiles]) {
-    const target = join(dist, file.path);
+    const target = join(folder, file.path);
     await mkdir(dirname(target), { recursive: true });
     if (file.kind === "text") {
       await writeFile(target, file.content);

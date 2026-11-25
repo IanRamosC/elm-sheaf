@@ -21,6 +21,38 @@ describe("parseConfig", () => {
     );
   });
 
+  test("lets a siteUrl override replace the one in the file", () => {
+    const result = parseConfig(
+      '{"siteUrl":"https://a.example/"}',
+      "sheaf.json",
+      {
+        siteUrl: "https://user.github.io/repo/",
+      },
+    );
+
+    expect(result.ok && result.value.basePath).toBe("/repo/");
+    expect(result.ok && result.value.siteUrl.href).toBe(
+      "https://user.github.io/repo/",
+    );
+  });
+
+  test("rejects a siteUrl override with a query, naming the flag and no file", () => {
+    const result = parseConfig(
+      '{"siteUrl":"https://a.example/"}',
+      "sheaf.json",
+      {
+        siteUrl: "https://user.github.io/repo/?x=1",
+      },
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toHaveLength(1);
+    expect(result.error[0]?.title).toBe("BAD CONFIG");
+    expect(result.error[0]?.message).toContain("--site-url");
+    expect(result.error[0]).not.toHaveProperty("sourcePath");
+  });
+
   test("uses / as the base path for a site at the domain root", () => {
     const result = parse('{"siteUrl":"https://example.com"}');
     expect(result.ok && result.value.basePath).toBe("/");

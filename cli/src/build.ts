@@ -42,17 +42,21 @@ import { collect, err, ok, type Result } from "./result";
 
 export type BuildOptions = {
   mode: BuildMode;
-  /** `false` is `sheaf check`: every stage runs, but `dist/` is left alone. */
-  write: boolean;
   /** Decides which dated documents are not yet published. */
   now: Date;
+  /** The absolute folder the site is written to; `undefined` is `sheaf check`, which writes no site. */
+  output: string | undefined;
+  /** Whether Elm compiles with `--optimize`, which rejects `Debug` calls. */
+  optimize: boolean;
+  /** Replaces the `siteUrl` of `sheaf.json`. */
+  siteUrl?: string;
+  /** Receives what the Elm worker logs, as it logs it. */
+  log: (line: string) => void;
 };
 
 export type BuildSuccess = {
   pages: number;
   warnings: Diagnostic[];
-  /** What the Elm worker logged; the CLI prints it. */
-  output: string[];
 };
 
 /**
@@ -65,7 +69,7 @@ export async function build(
   siteRoot: string,
   options: BuildOptions,
 ): Promise<Result<BuildSuccess, Diagnostic[]>> {
-  const config = await readConfig(siteRoot);
+  const config = await readConfig(siteRoot, options.siteUrl);
   if (!config.ok) return config;
 
   const files = await readContentFiles(siteRoot);
@@ -116,7 +120,7 @@ export async function build(
   if (!elm.ok) return elm;
   const compiled = await compileElm(siteRoot, {
     elm: elm.value,
-    optimize: true,
+    optimize: options.optimize,
   });
   if (!compiled.ok) return compiled;
 
@@ -130,17 +134,17 @@ export async function build(
     imaged.value.documents,
     slugTable(documents.value),
   );
-  const ran = await runElm(compiled.value, request);
+  const ran = await runElm(compiled.value, request, options.log);
   if (!ran.ok) return ran;
 
-  const { response } = ran.value;
+  const response = ran.value;
   const { pages, diagnostics } = response;
   if (diagnostics.some(({ severity }) => severity === "error")) {
     return err(diagnostics);
   }
-  if (options.write) {
+  if (options.output !== undefined) {
     await writeSite(
-      siteRoot,
+      options.output,
       [
         ...outputFiles(response, config.value, options.now),
         ...imageOutputs(imaged.value.published),
@@ -148,11 +152,7 @@ export async function build(
       staticFiles.value,
     );
   }
-  return ok({
-    pages: pages.length,
-    warnings: diagnostics,
-    output: ran.value.output,
-  });
+  return ok({ pages: pages.length, warnings: diagnostics });
 }
 
 function outputFiles(
@@ -195,6 +195,7 @@ function outputFiles(
 
 async function readConfig(
   siteRoot: string,
+  siteUrl: string | undefined,
 ): Promise<Result<Config, Diagnostic[]>> {
   let text: string;
   try {
@@ -210,7 +211,9 @@ async function readConfig(
       },
     ]);
   }
-  return parseConfig(text, "sheaf.json");
+  return parseConfig(text, "sheaf.json", {
+    ...(siteUrl === undefined ? {} : { siteUrl }),
+  });
 }
 
 function parseDocuments(

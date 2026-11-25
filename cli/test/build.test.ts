@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join, relative } from "node:path";
-import { build } from "../src/build";
+import { type BuildOptions, build } from "../src/build";
 import { imageHash } from "../src/images/codec";
 import {
   copyFixture,
@@ -29,6 +29,17 @@ function titlesOf(result: Awaited<ReturnType<typeof build>>): string[] {
   return result.ok ? [] : result.error.map(({ title }) => title);
 }
 
+function options(root: string, overrides: Partial<BuildOptions> = {}) {
+  return {
+    mode: "production",
+    now,
+    output: join(root, "dist"),
+    optimize: true,
+    log: () => {},
+    ...overrides,
+  } satisfies BuildOptions;
+}
+
 function clean(root: string) {
   rmSync(join(root, "dist"), { recursive: true, force: true });
 }
@@ -40,11 +51,7 @@ describe("build", () => {
       const root = fixturePath("minimal");
       clean(root);
 
-      const result = await build(root, {
-        mode: "production",
-        write: true,
-        now,
-      });
+      const result = await build(root, options(root));
 
       expect(result.ok && result.value.pages).toBe(1);
       expect(existsSync(join(root, "dist/posts/hello-world/index.html"))).toBe(
@@ -63,11 +70,7 @@ describe("build", () => {
       const root = fixturePath("broken-links");
       clean(root);
 
-      const result = await build(root, {
-        mode: "production",
-        write: true,
-        now,
-      });
+      const result = await build(root, options(root));
 
       expect(titlesOf(result)).toEqual(["BROKEN LINK", "BROKEN LINK"]);
       expect(existsSync(join(root, "dist"))).toBe(false);
@@ -84,11 +87,7 @@ describe("build", () => {
       const draftPage = join(root, "dist/posts/work-in-progress/index.html");
 
       clean(root);
-      const production = await build(root, {
-        mode: "production",
-        write: true,
-        now,
-      });
+      const production = await build(root, options(root));
       expect(production.ok).toBe(true);
       expect(existsSync(join(root, "dist/posts/hello-world/index.html"))).toBe(
         true,
@@ -96,11 +95,7 @@ describe("build", () => {
       expect(existsSync(draftPage)).toBe(false);
 
       clean(root);
-      const withDrafts = await build(root, {
-        mode: "drafts",
-        write: true,
-        now,
-      });
+      const withDrafts = await build(root, options(root, { mode: "drafts" }));
       expect(withDrafts.ok).toBe(true);
       expect(existsSync(draftPage)).toBe(true);
     },
@@ -116,13 +111,39 @@ describe("build", () => {
         "---\ntitle: Linker\n---\n\nSee [the draft](posts:work-in-progress).\n",
       );
 
-      const result = await build(root, {
-        mode: "production",
-        write: true,
-        now,
-      });
+      const result = await build(root, options(root));
 
       expect(titlesOf(result)).toEqual(["LINK TO DRAFT"]);
+    },
+    SLOW,
+  );
+
+  test(
+    "logs what the worker prints, and Elm still reports a link to a draft",
+    async () => {
+      const root = copyFixture("drafts");
+      const site = join(root, "src/Site.elm");
+      writeFileSync(
+        site,
+        readFileSync(site, "utf8")
+          .replace("import Sheaf\n", "import Content.Posts\nimport Sheaf\n")
+          .replace(
+            "body = post.body }",
+            'body = Debug.log "rendering" post.body ++ [ Sheaf.link Content.Posts.workInProgress [] ] }',
+          ),
+      );
+      const lines: string[] = [];
+
+      const result = await build(
+        root,
+        options(root, {
+          optimize: false,
+          log: (line) => lines.push(line),
+        }),
+      );
+
+      expect(titlesOf(result)).toEqual(["LINK TO DRAFT"]);
+      expect(lines.some((line) => line.startsWith("rendering:"))).toBe(true);
     },
     SLOW,
   );
@@ -137,11 +158,7 @@ describe("build", () => {
       );
       writeFileSync(join(root, "content/posts/photo.png"), pngBytes(600, 400));
 
-      const result = await build(root, {
-        mode: "production",
-        write: false,
-        now,
-      });
+      const result = await build(root, options(root, { output: undefined }));
 
       expect(result.ok).toBe(true);
       expect(readdirSync(join(root, ".sheaf/cache/images"))).toHaveLength(4);
@@ -165,16 +182,12 @@ describe("build", () => {
       );
       writeFileSync(join(root, "content/posts/shown.png"), pngBytes(300, 200));
 
-      expect(
-        titlesOf(await build(root, { mode: "production", write: true, now })),
-      ).toEqual(["MISSING IMAGE"]);
+      expect(titlesOf(await build(root, options(root)))).toEqual([
+        "MISSING IMAGE",
+      ]);
 
       writeFileSync(join(root, "content/posts/draft.png"), pngBytes(200, 100));
-      const result = await build(root, {
-        mode: "production",
-        write: true,
-        now,
-      });
+      const result = await build(root, options(root));
 
       expect(result.ok).toBe(true);
       const published = readdirSync(join(root, "dist/_sheaf/images")).sort();
@@ -192,11 +205,7 @@ describe("build", () => {
       const root = fixturePath("minimal");
       clean(root);
 
-      const result = await build(root, {
-        mode: "production",
-        write: false,
-        now,
-      });
+      const result = await build(root, options(root, { output: undefined }));
 
       expect(result.ok && result.value.pages).toBe(1);
       expect(existsSync(join(root, "dist"))).toBe(false);
@@ -213,11 +222,7 @@ describe("build", () => {
         '---\ntitle: Code\n---\n\n```elm\nmain = text "<&>"\n```\n',
       );
 
-      const result = await build(root, {
-        mode: "production",
-        write: true,
-        now,
-      });
+      const result = await build(root, options(root));
 
       expect(titlesOf(result)).toEqual([]);
       const page = readFileSync(
@@ -240,11 +245,7 @@ describe("build", () => {
         "---\ntitle: Code\ndraft: true\n---\n\n```elmm\nx = 1\n```\n",
       );
 
-      const result = await build(root, {
-        mode: "production",
-        write: true,
-        now,
-      });
+      const result = await build(root, options(root));
 
       expect(titlesOf(result)).toEqual(["UNKNOWN LANGUAGE"]);
     },
@@ -264,11 +265,7 @@ describe("build", () => {
         ),
       );
 
-      const result = await build(root, {
-        mode: "production",
-        write: false,
-        now,
-      });
+      const result = await build(root, options(root, { output: undefined }));
 
       expect(titlesOf(result)).toEqual(["DEBUG REMNANTS"]);
     },
@@ -281,11 +278,7 @@ describe("build", () => {
       const root = fixturePath("base-path");
       clean(root);
 
-      const result = await build(root, {
-        mode: "production",
-        write: true,
-        now,
-      });
+      const result = await build(root, options(root));
 
       expect(result.ok).toBe(true);
       const page = join(root, "dist/posts/hello-world/index.html");
@@ -314,19 +307,11 @@ describe("build", () => {
         join(root, "content/posts/2026-11-23-hello-world.md"),
         "---\ntitle: Hello, world\n---\n\nNo links.\n",
       );
-      const first = await build(root, {
-        mode: "production",
-        write: false,
-        now,
-      });
+      const first = await build(root, options(root, { output: undefined }));
       expect(first.ok).toBe(true);
       renameSync(join(root, "content/posts"), join(root, "content/articles"));
 
-      const result = await build(root, {
-        mode: "production",
-        write: false,
-        now,
-      });
+      const result = await build(root, options(root, { output: undefined }));
 
       expect(titlesOf(result)).toContain("MODULE NOT FOUND");
     },
@@ -337,7 +322,7 @@ describe("build", () => {
     const root = copyFixture("minimal");
     mkdirSync(join(root, "content/_"));
 
-    const result = await build(root, { mode: "production", write: false, now });
+    const result = await build(root, options(root, { output: undefined }));
 
     expect(titlesOf(result)).toEqual(["BAD COLLECTION NAME"]);
   });
@@ -349,11 +334,7 @@ describe("build", () => {
       mkdirSync(join(root, "content/.obsidian"));
       writeFileSync(join(root, "content/.obsidian/notes.md"), "not a document");
 
-      const result = await build(root, {
-        mode: "production",
-        write: false,
-        now,
-      });
+      const result = await build(root, options(root, { output: undefined }));
 
       expect(result.ok && result.value.pages).toBe(1);
     },
@@ -364,7 +345,7 @@ describe("build", () => {
     const root = copyFixture("minimal");
     rmSync(join(root, "sheaf.json"));
 
-    const result = await build(root, { mode: "production", write: false, now });
+    const result = await build(root, options(root, { output: undefined }));
 
     expect(titlesOf(result)).toEqual(["NO SHEAF.JSON"]);
   });
@@ -446,11 +427,7 @@ describe("the blog fixture", () => {
       const root = fixturePath("blog");
       clean(root);
 
-      const result = await build(root, {
-        mode: "production",
-        write: true,
-        now,
-      });
+      const result = await build(root, options(root));
 
       expect(titlesOf(result)).toEqual([]);
       const files = filesUnder(join(root, "dist"));
@@ -479,7 +456,7 @@ describe("the blog fixture", () => {
     async () => {
       const root = copyFixture("blog");
 
-      const result = await build(root, { mode: "drafts", write: true, now });
+      const result = await build(root, options(root, { mode: "drafts" }));
 
       expect(titlesOf(result)).toEqual([]);
       expect(filesMentioning(root, hidden)).toEqual(
@@ -505,14 +482,10 @@ describe("the blog fixture", () => {
           (file) => `${file} ${statSync(join(cache, file)).mtimeMs}`,
         );
 
-      const first = await build(root, { mode: "production", write: true, now });
+      const first = await build(root, options(root));
       const firstFiles = filesUnder(join(root, "dist"));
       const firstTimes = cacheTimes();
-      const second = await build(root, {
-        mode: "production",
-        write: true,
-        now,
-      });
+      const second = await build(root, options(root));
 
       expect(first.ok && second.ok).toBe(true);
       expect(firstTimes.length).toBeGreaterThan(0);
@@ -532,11 +505,7 @@ describe("the blog fixture", () => {
         readFileSync(post, "utf8").replace(":::callout", ":::callot"),
       );
 
-      const result = await build(root, {
-        mode: "production",
-        write: false,
-        now,
-      });
+      const result = await build(root, options(root, { output: undefined }));
 
       expect(titlesOf(result)).toEqual(["UNKNOWN COMPONENT"]);
       const [diagnostic] = result.ok ? [] : result.error;
@@ -561,11 +530,7 @@ describe("the blog fixture", () => {
         ),
       );
 
-      const result = await build(root, {
-        mode: "production",
-        write: false,
-        now,
-      });
+      const result = await build(root, options(root, { output: undefined }));
 
       expect(titlesOf(result)).toEqual(["UNKNOWN ATTRIBUTE"]);
       const [diagnostic] = result.ok ? [] : result.error;
@@ -588,11 +553,7 @@ describe("the blog fixture", () => {
         "---\ntitle: Sketch\ndraft: true\nimage: sketch.png\n---\n\n![A sketch](sketch.png)\n",
       );
 
-      const result = await build(root, {
-        mode: "production",
-        write: true,
-        now,
-      });
+      const result = await build(root, options(root));
 
       expect(titlesOf(result)).toEqual([]);
       const hash = imageHash(image);
@@ -617,11 +578,7 @@ describe("the blog fixture", () => {
           "---\ntitle: Archive\n---\n\nOld posts.\n",
         );
 
-        const result = await build(root, {
-          mode: "production",
-          write: false,
-          now,
-        });
+        const result = await build(root, options(root, { output: undefined }));
 
         expect(titlesOf(result)).toEqual(["DUPLICATE PAGE"]);
         const message = result.ok ? "" : (result.error[0]?.message ?? "");
@@ -641,11 +598,7 @@ describe("the blog fixture", () => {
       mkdirSync(postsDir);
       writeFileSync(join(postsDir, ".gitkeep"), "");
 
-      const result = await build(root, {
-        mode: "production",
-        write: true,
-        now,
-      });
+      const result = await build(root, options(root));
 
       expect(titlesOf(result)).toEqual([]);
       const dist = join(root, "dist");
@@ -671,11 +624,7 @@ describe("the routes fixture", () => {
       const root = fixturePath("routes");
       clean(root);
 
-      const result = await build(root, {
-        mode: "production",
-        write: true,
-        now,
-      });
+      const result = await build(root, options(root));
 
       expect(titlesOf(result)).toEqual([]);
       expect(filesUnder(join(root, "dist"))).toMatchSnapshot("files");

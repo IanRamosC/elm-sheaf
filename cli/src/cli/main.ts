@@ -10,13 +10,14 @@ import { paint, supportsColour } from "./terminal";
 const HELP = `Usage: sheaf <command> [options]
 
 Commands:
-  sheaf build [--drafts]   Render the site into dist/
-  sheaf check [--drafts]   Run every build stage without writing dist/
+  sheaf build [--drafts] [--site-url <url>]   Render the site into dist/
+  sheaf check [--drafts] [--site-url <url>]   Run every build stage without writing dist/
 
 Options:
-  --drafts      Include drafts and documents dated in the future
-  -h, --help    Show this help
-  -v, --version Show the version
+  --drafts          Include drafts and documents dated in the future
+  --site-url <url>  Use this siteUrl instead of the one in sheaf.json
+  -h, --help        Show this help
+  -v, --version     Show the version
 `;
 
 type Command = "build" | "check";
@@ -47,7 +48,10 @@ export async function main(args: string[]): Promise<number> {
     process.stderr.write(`${unsupported}\n`);
     return 2;
   }
-  return runCommand(command, values.drafts === true);
+  return runCommand(command, {
+    drafts: values.drafts === true,
+    siteUrl: values["site-url"],
+  });
 }
 
 function parseArguments(args: string[]) {
@@ -57,6 +61,7 @@ function parseArguments(args: string[]) {
       allowPositionals: true,
       options: {
         drafts: { type: "boolean" },
+        "site-url": { type: "string" },
         help: { type: "boolean", short: "h" },
         version: { type: "boolean", short: "v" },
       },
@@ -85,20 +90,27 @@ function usageError(): number {
   return 2;
 }
 
-async function runCommand(command: Command, drafts: boolean): Promise<number> {
+type CommandOptions = { drafts: boolean; siteUrl: string | undefined };
+
+async function runCommand(
+  command: Command,
+  { drafts, siteUrl }: CommandOptions,
+): Promise<number> {
   const siteRoot = process.cwd();
   const colour = supportsColour();
   const started = performance.now();
 
   const result = await build(siteRoot, {
     mode: drafts ? "drafts" : "production",
-    write: command === "build",
     now: new Date(),
+    output: command === "build" ? join(siteRoot, "dist") : undefined,
+    optimize: true,
+    ...(siteUrl === undefined ? {} : { siteUrl }),
+    log: write,
   });
   const seconds = ((performance.now() - started) / 1000).toFixed(1);
 
   if (result.ok) {
-    for (const line of result.value.output) write(line);
     await printDiagnostics(result.value.warnings, siteRoot, colour);
     const verb = command === "build" ? "Built" : "Checked";
     const { pages } = result.value;

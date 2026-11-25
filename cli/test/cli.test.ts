@@ -44,6 +44,24 @@ describe("sheaf", () => {
   );
 
   test(
+    "build --site-url writes that address into the sitemap",
+    async () => {
+      const root = copyFixture("minimal");
+
+      const { exitCode } = await sheaf(
+        ["build", "--site-url", "https://x.example/sub/"],
+        root,
+      );
+
+      expect(exitCode).toBe(0);
+      expect(readFileSync(join(root, "dist/sitemap.xml"), "utf8")).toContain(
+        "https://x.example/sub/",
+      );
+    },
+    SLOW,
+  );
+
+  test(
     "check fails with the diagnostics and a count",
     async () => {
       const { stdout, exitCode } = await sheaf(

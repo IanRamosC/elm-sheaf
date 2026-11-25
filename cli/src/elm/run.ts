@@ -16,13 +16,13 @@ type ElmWorker = {
 };
 
 /** One line per console call; `log` is the default level, so it carries no prefix. */
-function captureConsole(output: string[]) {
+function captureConsole(log: (line: string) => void) {
   return Object.fromEntries(
     CONSOLE_LEVELS.map((level) => [
       level,
       (...args: unknown[]) => {
         const line = format(...args);
-        output.push(level === "log" ? line : `${level}: ${line}`);
+        log(level === "log" ? line : `${level}: ${line}`);
       },
     ]),
   );
@@ -45,26 +45,28 @@ function runtimeError(thrown: unknown): Diagnostic {
   };
 }
 
-type Outcome = Result<{ response: Response; output: string[] }, Diagnostic[]>;
+type Outcome = Result<Response, Diagnostic[]>;
 
 /**
  * Runs the compiled worker once: sends it the request and waits for its
  * response. The code runs in a fresh context, which keeps it from reaching
  * the host's globals by accident (it is not a security sandbox). That context
  * has none of its own, so it is given the few the Elm runtime uses. Console
- * output is returned rather than printed, because only `cli/` writes to the
- * terminal.
+ * output goes to `log` as it happens, so it is not lost when the run fails,
+ * and because only `cli/` writes to the terminal.
  *
  * The worker's timers are wrapped so that a callback that throws becomes a
  * runtime error instead of crashing the host, and so that any still pending
- * when the run ends are cancelled instead of keeping the process alive.
+ * when the run ends are cancelled instead of keeping the process alive. Once
+ * it has ended, a worker that is still running schedules nothing more.
  */
 export async function runElm(
   compiledJs: string,
   request: Request,
+  log: (line: string) => void,
 ): Promise<Outcome> {
   const code = await readFile(compiledJs, "utf8");
-  const output: string[] = [];
+  let finished = false;
 
   return new Promise((resolve, reject) => {
     const workerTimers = new Set<ReturnType<typeof setTimeout>>();
@@ -80,6 +82,7 @@ export async function runElm(
       RESPONSE_TIMEOUT_MS,
     );
     const finish = (conclude: () => void) => {
+      finished = true;
       clearTimeout(responseTimeout);
       for (const timer of workerTimers) clearTimeout(timer);
       conclude();
@@ -87,8 +90,9 @@ export async function runElm(
     const settle = (outcome: Outcome) => finish(() => resolve(outcome));
 
     const context = createContext({
-      console: captureConsole(output),
+      console: captureConsole(log),
       setTimeout: (callback: () => void, delay?: number) => {
+        if (finished) return;
         const timer = setTimeout(() => {
           workerTimers.delete(timer);
           try {
@@ -112,7 +116,7 @@ export async function runElm(
       worker.ports.sheafResponse.subscribe((value) => {
         const response = decodeResponse(value);
         if (response.ok) {
-          settle(ok({ response: response.value, output }));
+          settle(ok(response.value));
         } else {
           // Our own Elm code produced it, so a bad shape is a bug in Sheaf.
           finish(() =>

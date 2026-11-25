@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import {
   chmodSync,
   existsSync,
@@ -35,6 +35,9 @@ const FIXTURES = join(import.meta.dir, "../fixtures");
 // The first compile of a site can take several seconds, and elm make runs
 // again for each fixture.
 const COMPILE_TIMEOUT_MS = 60_000;
+
+// Distinct from every other delay, so the test can find the call it is about.
+const AFTER_RESPONSE_DELAY_MS = 4321;
 
 const scratchDirectories: string[] = [];
 
@@ -124,15 +127,45 @@ describe("runElm", () => {
       };
     })(this);`);
 
-    const result = await runElm(path, emptyRequest);
+    const lines: string[] = [];
 
-    expect(result).toEqual({
-      ok: true,
-      value: {
-        response: emptyResponse,
-        output: ["warn: Compiled in DEV mode.", "starting"],
-      },
-    });
+    const result = await runElm(path, emptyRequest, (line) => lines.push(line));
+
+    expect(result).toEqual({ ok: true, value: emptyResponse });
+    expect(lines).toEqual(["warn: Compiled in DEV mode.", "starting"]);
+  });
+
+  test("schedules nothing for a worker that keeps running after it responded", async () => {
+    const path = compiledFile(`(function (scope) {
+      scope.Elm = {
+        SheafMain: {
+          init: function () {
+            var subscriber;
+            return {
+              ports: {
+                sheafResponse: { subscribe: function (callback) { subscriber = callback; } },
+                sheafRequest: {
+                  send: function () {
+                    subscriber(${emptyResponseJs});
+                    setTimeout(function () {}, ${AFTER_RESPONSE_DELAY_MS});
+                  },
+                },
+              },
+            };
+          },
+        },
+      };
+    })(this);`);
+    const hostSetTimeout = spyOn(globalThis, "setTimeout");
+
+    try {
+      await runElm(path, emptyRequest, () => {});
+
+      const delays = hostSetTimeout.mock.calls.map(([, delay]) => delay);
+      expect(delays).not.toContain(AFTER_RESPONSE_DELAY_MS);
+    } finally {
+      hostSetTimeout.mockRestore();
+    }
   });
 
   test("gives the worker the timers Elm's scheduler uses", async () => {
@@ -140,7 +173,7 @@ describe("runElm", () => {
       respondingWorker("setTimeout(function () {}, 0); clearTimeout(0);"),
     );
 
-    const result = await runElm(path, emptyRequest);
+    const result = await runElm(path, emptyRequest, () => {});
 
     expect(result.ok).toBe(true);
   });
@@ -161,7 +194,7 @@ describe("runElm", () => {
       };
     })(this);`);
 
-    const result = await runElm(path, emptyRequest);
+    const result = await runElm(path, emptyRequest, () => {});
 
     expect(result).toEqual({
       ok: false,
@@ -198,7 +231,7 @@ describe("runElm", () => {
       };
     })(this);`);
 
-    const result = await runElm(path, emptyRequest);
+    const result = await runElm(path, emptyRequest, () => {});
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -256,7 +289,7 @@ describe("runElm", () => {
       };
     })(this);`);
 
-    await expect(runElm(path, emptyRequest)).rejects.toThrow(
+    await expect(runElm(path, emptyRequest, () => {})).rejects.toThrow(
       "pages must be a list",
     );
   });
@@ -399,18 +432,19 @@ describe("a Sheaf site", () => {
       const compiled = await compileElm(siteRoot, { elm, optimize: false });
       expect(compiled.ok).toBe(true);
       if (!compiled.ok) return;
-      const ran = await runElm(compiled.value, request);
+      const lines: string[] = [];
+      const ran = await runElm(compiled.value, request, (line) =>
+        lines.push(line),
+      );
 
       expect(ran.ok).toBe(true);
       if (!ran.ok) return;
-      expect(ran.value.response.diagnostics).toEqual([]);
-      const page = ran.value.response.pages.find(
+      expect(ran.value.diagnostics).toEqual([]);
+      const page = ran.value.pages.find(
         ({ path }) => path === "posts/hello-world/index.html",
       );
       expect(page?.html).toContain('href="/posts/hello-world/#top"');
-      expect(ran.value.output.some((line) => line.startsWith("warn:"))).toBe(
-        true,
-      );
+      expect(lines.some((line) => line.startsWith("warn:"))).toBe(true);
     },
     COMPILE_TIMEOUT_MS,
   );

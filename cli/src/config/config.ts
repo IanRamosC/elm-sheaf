@@ -33,16 +33,24 @@ const defaultImages: Config["images"] = {
 /** A problem with one key, before it is located in `sheaf.json`. */
 type Problem = { message: string; hint?: string };
 
-/** Parses the text of `sheaf.json`, reporting every problem found in it at once. */
+/**
+ * Parses the text of `sheaf.json`, reporting every problem found in it at
+ * once. A `siteUrl` override, from `--site-url`, replaces the one in the file.
+ */
 export function parseConfig(
   json: string,
   sourcePath: string,
+  overrides: { siteUrl?: string } = {},
 ): Result<Config, Diagnostic[]> {
-  const badConfig = (message: string, hint?: string): Diagnostic => ({
+  const badConfig = (
+    message: string,
+    hint?: string,
+    inFile = true,
+  ): Diagnostic => ({
     severity: "error",
     title: "BAD CONFIG",
     message,
-    sourcePath,
+    ...(inFile ? { sourcePath } : {}),
     ...(hint === undefined ? {} : { hint }),
   });
 
@@ -64,9 +72,20 @@ export function parseConfig(
     ({ message, hint }) => badConfig(message, hint),
   );
 
-  const siteUrl = parseSiteUrl(fields.siteUrl);
-  if (!siteUrl.ok)
-    problems.push(badConfig(siteUrl.error.message, siteUrl.error.hint));
+  const siteUrl =
+    overrides.siteUrl === undefined
+      ? parseSiteUrl(fields.siteUrl)
+      : parseFullUrl(overrides.siteUrl, `--site-url "${overrides.siteUrl}"`);
+  if (!siteUrl.ok) {
+    // The flag is not in the file, so pointing at the file would mislead.
+    problems.push(
+      badConfig(
+        siteUrl.error.message,
+        siteUrl.error.hint,
+        overrides.siteUrl === undefined,
+      ),
+    );
+  }
 
   const timezone = parseTimezone(fields.timezone);
   if (!timezone.ok) problems.push(badConfig(timezone.error));
@@ -227,22 +246,31 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+const FULL_URL_HINT = "Use a full URL such as https://example.com/";
+
 function parseSiteUrl(
   value: unknown,
 ): Result<URL, { message: string; hint?: string }> {
   if (value === undefined) {
     return err({
       message: 'The required key "siteUrl" is missing.',
-      hint: "Use a full URL such as https://example.com/",
+      hint: FULL_URL_HINT,
     });
   }
-  const fullUrlHint = "Use a full URL such as https://example.com/";
   if (typeof value !== "string") {
-    return err({ message: '"siteUrl" must be a string.', hint: fullUrlHint });
+    return err({ message: '"siteUrl" must be a string.', hint: FULL_URL_HINT });
   }
+  return parseFullUrl(value, `"${value}"`);
+}
+
+/** `subject` is how messages refer to the value: the quoted text, or the flag it came from. */
+function parseFullUrl(
+  value: string,
+  subject: string,
+): Result<URL, { message: string; hint?: string }> {
   const notAFullUrl = err({
-    message: `"${value}" is not a full URL.`,
-    hint: fullUrlHint,
+    message: `${subject} is not a full URL.`,
+    hint: FULL_URL_HINT,
   });
   try {
     const url = new URL(value);
@@ -253,7 +281,7 @@ function parseSiteUrl(
     }
     if (url.search !== "" || url.hash !== "") {
       return err({
-        message: `"${value}" has a query or a fragment.`,
+        message: `${subject} has a query or a fragment.`,
         hint: 'Write the site\'s address without "?" or "#", such as https://example.com/blog/.',
       });
     }
