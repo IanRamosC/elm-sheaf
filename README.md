@@ -39,6 +39,10 @@ Both take `--drafts` to include drafts and documents dated in the future.
 - Head tags for search engines and link previews: description, canonical URL,
   Open Graph, Twitter cards, stylesheets and feed links.
 - Sites served under a base path, such as `https://example.com/blog/`.
+- Components: Markdown directives such as `:::callout{kind="note"}` render
+  with views written in Elm, and their attributes are decoded into your own
+  types. An unknown component or attribute is an error, with a suggestion when
+  the name is close to one the site has.
 - Code blocks highlighted at build time by [Shiki](https://shiki.style/), in a
   light and a dark theme (`github-light` and `github-dark` unless `sheaf.json`
   says otherwise). A block marked with a language Shiki doesn't know is an
@@ -60,7 +64,13 @@ Both take `--drafts` to include drafts and documents dated in the future.
   }
   ```
 
-Not yet: Markdown directives and components, `sheaf dev` and `sheaf init`.
+- Local images, from `content/` or `static/`, resized to several widths and
+  written as WebP next to their own format, in a `<picture>` with their width
+  and height so the page doesn't move as they load. A document's cover comes
+  from its `image` frontmatter key, for its layout and link previews. Images
+  are encoded once and kept in `.sheaf/cache/`.
+
+Not yet: `sheaf dev` and `sheaf init`.
 
 ## License
 
