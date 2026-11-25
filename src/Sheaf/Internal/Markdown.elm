@@ -62,11 +62,15 @@ type alias Scope =
 {-| A footnote that is both referenced and defined. Only these are rendered:
 a definition nobody references is dropped, and a reference to nothing stays
 as the text that was written.
+
+`references` holds where each reference is, in the order they are rendered,
+because each one gets its own id and its own back link.
+
 -}
 type alias Footnote =
     { id : String
     , number : Int
-    , firstReference : Span
+    , references : List Span
     , content : List Node
     }
 
@@ -303,31 +307,40 @@ listElement list =
         Html.ul []
 
 
-{-| In a tight list the items hold their text directly, not in paragraphs.
+{-| In a tight list the items hold their text directly, not in paragraphs. In
+a loose one a task item's checkbox goes inside its first paragraph, as on
+GitHub, so that it sits on the line of the text.
 -}
 renderListItem : Scope -> Bool -> Node -> Rendered
 renderListItem scope spread node =
     case node of
         ListItem item ->
-            let
-                content : Rendered
-                content =
-                    if spread then
-                        renderNodes scope item.children
-
-                    else
-                        combine (List.map (renderTightBlock scope) item.children)
-            in
-            case item.checked of
-                Just isChecked ->
+            case ( item.checked, spread, item.children ) of
+                ( Just isChecked, True, (Paragraph first) :: rest ) ->
                     element (Html.li [ Attributes.class "task-list-item" ])
-                        (Result.map (\inner -> checkbox isChecked :: Html.text " " :: inner) content)
+                        (merge
+                            (element (Html.p []) (withCheckbox isChecked (renderNodes scope first.children)))
+                            (renderNodes scope rest)
+                        )
 
-                Nothing ->
-                    element (Html.li []) content
+                ( Just isChecked, _, _ ) ->
+                    element (Html.li [ Attributes.class "task-list-item" ])
+                        (withCheckbox isChecked (renderItemContent scope spread item.children))
+
+                ( Nothing, _, _ ) ->
+                    element (Html.li []) (renderItemContent scope spread item.children)
 
         other ->
             renderNode scope other
+
+
+renderItemContent : Scope -> Bool -> List Node -> Rendered
+renderItemContent scope spread children =
+    if spread then
+        renderNodes scope children
+
+    else
+        combine (List.map (renderTightBlock scope) children)
 
 
 renderTightBlock : Scope -> Node -> Rendered
@@ -340,9 +353,14 @@ renderTightBlock scope node =
             renderNode scope other
 
 
-checkbox : Bool -> Html
-checkbox isChecked =
-    Html.input [ Attributes.type_ "checkbox", Attributes.checked isChecked, Attributes.disabled True ] []
+withCheckbox : Bool -> Rendered -> Rendered
+withCheckbox isChecked =
+    Result.map
+        (\inner ->
+            Html.input [ Attributes.type_ "checkbox", Attributes.checked isChecked, Attributes.disabled True ] []
+                :: Html.text " "
+                :: inner
+        )
 
 
 
@@ -431,21 +449,23 @@ textAlign side =
 -- FOOTNOTES
 
 
-{-| Footnotes are numbered by their first reference, as on GitHub. Identifiers
-are only lower-cased, which keeps them valid in an `id` and a fragment.
+{-| Footnotes are numbered by their first reference, as on GitHub. The body
+is read first, then each rendered definition in turn, which is the order they
+appear on the page. A definition nobody references is never read, so the
+references in it do not count.
+
+Identifiers arrive URL-safe from the host and are only lower-cased, which
+keeps them valid in an `id` and a fragment.
+
 -}
 footnotesOf : Node -> Dict String Footnote
 footnotesOf tree =
     let
-        nodes : List Node
-        nodes =
-            descendants tree
-
         -- The first definition of an identifier wins, so the list is reversed
         -- because `Dict.fromList` keeps the last.
         definitions : Dict String (List Node)
         definitions =
-            nodes
+            descendants tree
                 |> List.filterMap
                     (\node ->
                         case node of
@@ -458,37 +478,66 @@ footnotesOf tree =
                 |> List.reverse
                 |> Dict.fromList
 
-        addReference : { a | position : Span, identifier : String } -> Dict String Footnote -> Dict String Footnote
-        addReference reference footnotes =
+        addReference :
+            { position : Span, identifier : String }
+            -> ( Dict String Footnote, List (List Node) )
+            -> ( Dict String Footnote, List (List Node) )
+        addReference reference ( footnotes, newlyNumbered ) =
             let
                 id : String
                 id =
                     footnoteId reference.identifier
             in
             case ( Dict.get id footnotes, Dict.get id definitions ) of
+                ( Just footnote, _ ) ->
+                    ( Dict.insert id { footnote | references = footnote.references ++ [ reference.position ] } footnotes
+                    , newlyNumbered
+                    )
+
                 ( Nothing, Just content ) ->
-                    Dict.insert id
+                    ( Dict.insert id
                         { id = id
                         , number = Dict.size footnotes + 1
-                        , firstReference = reference.position
+                        , references = [ reference.position ]
                         , content = content
                         }
                         footnotes
+                    , newlyNumbered ++ [ content ]
+                    )
 
-                _ ->
+                ( Nothing, Nothing ) ->
+                    ( footnotes, newlyNumbered )
+
+        collect : List (List Node) -> Dict String Footnote -> Dict String Footnote
+        collect toRead footnotes =
+            case toRead of
+                [] ->
                     footnotes
-    in
-    nodes
-        |> List.filterMap
-            (\node ->
-                case node of
-                    FootnoteReference reference ->
-                        Just reference
 
-                    _ ->
-                        Nothing
-            )
-        |> List.foldl addReference Dict.empty
+                nodes :: rest ->
+                    let
+                        ( withReferences, newlyNumbered ) =
+                            List.foldl addReference ( footnotes, [] ) (List.concatMap referencesIn nodes)
+                    in
+                    collect (rest ++ newlyNumbered) withReferences
+    in
+    collect [ [ tree ] ] Dict.empty
+
+
+{-| The references a node renders, leaving out definitions, which are rendered
+apart from where they are written.
+-}
+referencesIn : Node -> List { position : Span, identifier : String }
+referencesIn node =
+    case node of
+        FootnoteReference reference ->
+            [ reference ]
+
+        FootnoteDefinition _ ->
+            []
+
+        _ ->
+            List.concatMap referencesIn (childrenOf node)
 
 
 footnoteId : String -> String
@@ -575,17 +624,16 @@ footnoteReference : Scope -> { position : Span, identifier : String } -> Html
 footnoteReference scope reference =
     case Dict.get (footnoteId reference.identifier) scope.footnotes of
         Just footnote ->
-            -- Later references to the same footnote must not repeat the id,
-            -- so the back link always returns to the first.
             Html.sup []
                 [ Html.a
                     (List.concat
                         [ [ Attributes.href ("#user-content-fn-" ++ footnote.id) ]
-                        , if reference.position == footnote.firstReference then
-                            [ Attributes.id ("user-content-fnref-" ++ footnote.id) ]
+                        , case indexOf reference.position footnote.references of
+                            Just index ->
+                                [ Attributes.id (referenceId footnote index) ]
 
-                          else
-                            []
+                            Nothing ->
+                                []
                         , [ Internal.booleanAttribute "data-footnote-ref" True ]
                         ]
                     )
@@ -594,6 +642,27 @@ footnoteReference scope reference =
 
         Nothing ->
             Html.text ("[^" ++ reference.identifier ++ "]")
+
+
+{-| The id of a footnote's reference, counting from 1. Only the first one goes
+without a suffix, as on GitHub.
+-}
+referenceId : Footnote -> Int -> String
+referenceId footnote index =
+    if index == 1 then
+        "user-content-fnref-" ++ footnote.id
+
+    else
+        "user-content-fnref-" ++ footnote.id ++ "-" ++ String.fromInt index
+
+
+indexOf : a -> List a -> Maybe Int
+indexOf wanted items =
+    items
+        |> List.indexedMap (\index item -> ( index + 1, item ))
+        |> List.filter (\( _, item ) -> item == wanted)
+        |> List.head
+        |> Maybe.map Tuple.first
 
 
 renderFootnotes : Scope -> Rendered
@@ -615,21 +684,16 @@ renderFootnotes scope =
                 )
 
 
-{-| The back link goes at the end of the last paragraph, as on GitHub.
+{-| The back links, one for each reference, go at the end of the last
+paragraph, as on GitHub.
 -}
 renderFootnote : Scope -> Footnote -> Rendered
 renderFootnote scope footnote =
     let
-        backLink : List Html
-        backLink =
-            [ Html.text " "
-            , Html.a
-                [ Attributes.href ("#user-content-fnref-" ++ footnote.id)
-                , Internal.booleanAttribute "data-footnote-backref" True
-                , Attributes.attribute "aria-label" ("Back to reference " ++ String.fromInt footnote.number)
-                ]
-                [ Html.text "↩" ]
-            ]
+        backLinks : List Html
+        backLinks =
+            List.indexedMap (\index _ -> backLinkTo footnote (index + 1)) footnote.references
+                |> List.concat
 
         content : Rendered
         content =
@@ -637,9 +701,34 @@ renderFootnote scope footnote =
                 (Paragraph last) :: before ->
                     merge
                         (renderNodes scope (List.reverse before))
-                        (element (Html.p []) (Result.map (\inner -> inner ++ backLink) (renderNodes scope last.children)))
+                        (element (Html.p []) (Result.map (\inner -> inner ++ backLinks) (renderNodes scope last.children)))
 
                 _ ->
-                    merge (renderNodes scope footnote.content) (Ok [ Html.p [] backLink ])
+                    merge (renderNodes scope footnote.content) (Ok [ Html.p [] backLinks ])
     in
     element (Html.li [ Attributes.id ("user-content-fn-" ++ footnote.id) ]) content
+
+
+{-| Only later back links are told apart, with the index of their reference,
+as on GitHub.
+-}
+backLinkTo : Footnote -> Int -> List Html
+backLinkTo footnote index =
+    let
+        ( label, mark ) =
+            if index == 1 then
+                ( String.fromInt footnote.number, [ Html.text "↩" ] )
+
+            else
+                ( String.fromInt footnote.number ++ "-" ++ String.fromInt index
+                , [ Html.text "↩", Html.sup [] [ Html.text (String.fromInt index) ] ]
+                )
+    in
+    [ Html.text " "
+    , Html.a
+        [ Attributes.href ("#" ++ referenceId footnote index)
+        , Internal.booleanAttribute "data-footnote-backref" True
+        , Attributes.attribute "aria-label" ("Back to reference " ++ label)
+        ]
+        mark
+    ]

@@ -189,6 +189,10 @@ listTests =
             \_ ->
                 listNode { ordered = False, start = Nothing, spread = False } [ item (Just True) "done", item (Just False) "todo" ]
                     |> rendersTo "<ul><li class=\"task-list-item\"><input type=\"checkbox\" checked disabled> done</li><li class=\"task-list-item\"><input type=\"checkbox\" disabled> todo</li></ul>"
+        , test "a loose task item has its checkbox inside the first paragraph" <|
+            \_ ->
+                listNode { ordered = False, start = Nothing, spread = True } [ item (Just False) "Write it" ]
+                    |> rendersTo "<ul><li class=\"task-list-item\"><p><input type=\"checkbox\" disabled> Write it</p></li></ul>"
         ]
 
 
@@ -232,7 +236,12 @@ referenceOnLine line identifier =
 
 definition : String -> String -> Node
 definition identifier content =
-    FootnoteDefinition { position = at 9, identifier = identifier, children = [ paragraph [ text content ] ] }
+    definitionOf identifier [ text content ]
+
+
+definitionOf : String -> List Node -> Node
+definitionOf identifier content =
+    FootnoteDefinition { position = at 9, identifier = identifier, children = [ paragraph content ] }
 
 
 backLink : String -> Int -> String
@@ -259,11 +268,49 @@ footnoteTests =
                 renderWith noLinks (root [ paragraph [ reference "b", reference "a" ], definition "a" "A", definition "b" "B" ])
                     |> Result.map (String.contains "<li id=\"user-content-fn-b\"><p>B")
                     |> Expect.equal (Ok True)
-        , test "a second reference to the same footnote has the same number and no duplicate id" <|
+        , test "a second reference to the same footnote has the same number, its own id and its own back link" <|
             \_ ->
-                renderWith noLinks (root [ paragraph [ reference "x", referenceOnLine 2 "x" ], definition "x" "Note." ])
-                    |> Result.map (String.split "id=\"user-content-fnref-x\"" >> List.length)
-                    |> Expect.equal (Ok 2)
+                renderWith noLinks (root [ paragraph [ reference "a", referenceOnLine 2 "a" ], definition "a" "Note." ])
+                    |> Expect.equal
+                        (Ok
+                            ("<p><sup><a href=\"#user-content-fn-a\" id=\"user-content-fnref-a\" data-footnote-ref>1</a></sup>"
+                                ++ "<sup><a href=\"#user-content-fn-a\" id=\"user-content-fnref-a-2\" data-footnote-ref>1</a></sup></p>"
+                                ++ "<section data-footnotes class=\"footnotes\"><ol><li id=\"user-content-fn-a\"><p>Note."
+                                ++ backLink "a" 1
+                                ++ " <a href=\"#user-content-fnref-a-2\" data-footnote-backref aria-label=\"Back to reference 1-2\">↩<sup>2</sup></a>"
+                                ++ "</p></li></ol></section>"
+                            )
+                        )
+        , test "references inside a definition nobody references are not counted" <|
+            \_ ->
+                renderWith noLinks (root [ paragraph [ text "a" ], definitionOf "b" [ text "B", referenceOnLine 9 "c" ], definition "c" "C" ])
+                    |> Expect.equal (Ok "<p>a</p>")
+        , test "a footnote referenced only from a rendered definition is numbered after the body's, wherever the definitions are" <|
+            \_ ->
+                renderWith noLinks
+                    (root
+                        [ definitionOf "a" [ text "A", referenceOnLine 9 "c" ]
+                        , definition "b" "B"
+                        , definition "c" "C"
+                        , paragraph [ reference "a", referenceOnLine 2 "b" ]
+                        ]
+                    )
+                    |> Expect.equal
+                        (Ok
+                            ("<p><sup><a href=\"#user-content-fn-a\" id=\"user-content-fnref-a\" data-footnote-ref>1</a></sup>"
+                                ++ "<sup><a href=\"#user-content-fn-b\" id=\"user-content-fnref-b\" data-footnote-ref>2</a></sup></p>"
+                                ++ "<section data-footnotes class=\"footnotes\"><ol>"
+                                ++ "<li id=\"user-content-fn-a\"><p>A<sup><a href=\"#user-content-fn-c\" id=\"user-content-fnref-c\" data-footnote-ref>3</a></sup>"
+                                ++ backLink "a" 1
+                                ++ "</p></li>"
+                                ++ "<li id=\"user-content-fn-b\"><p>B"
+                                ++ backLink "b" 2
+                                ++ "</p></li>"
+                                ++ "<li id=\"user-content-fn-c\"><p>C"
+                                ++ backLink "c" 3
+                                ++ "</p></li></ol></section>"
+                            )
+                        )
         , test "identifiers are lower-cased" <|
             \_ ->
                 renderWith noLinks (root [ paragraph [ reference "Note" ], definition "Note" "N" ])
