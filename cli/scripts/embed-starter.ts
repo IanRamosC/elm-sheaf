@@ -44,14 +44,15 @@ export function decodeStarterFile(path: string, bytes: Uint8Array): string {
   }
 }
 
-export function readStarter(): Map<string, string> {
+/** Reads the given starter files (by default every listed one) from `folder`. */
+export function readStarter(
+  paths: string[] = starterPaths(),
+  folder: string = join(REPOSITORY, STARTER_FOLDER),
+): Map<string, string> {
   return new Map(
-    starterPaths().map((path) => [
+    paths.map((path) => [
       path,
-      decodeStarterFile(
-        path,
-        readFileSync(join(REPOSITORY, STARTER_FOLDER, ...path.split("/"))),
-      ),
+      decodeStarterFile(path, readFileSync(join(folder, ...path.split("/")))),
     ]),
   );
 }

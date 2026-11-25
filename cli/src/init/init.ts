@@ -7,6 +7,8 @@ import { err, ok, type Result } from "../result";
 import { elmJson, packageJson } from "./project-files";
 import { STARTER } from "./starter.generated";
 
+const WELCOME_POST = "content/posts/welcome.md";
+
 type InitOptions = {
   /** A checkout of the Sheaf repository to use instead of the published packages. */
   local: string | undefined;
@@ -46,7 +48,10 @@ export async function initSite(
     // npm drops files named `.gitignore` from packages, so the starter stores it without the dot.
     const file = join(target, path === "gitignore" ? ".gitignore" : path);
     await mkdir(dirname(file), { recursive: true });
-    await writeFile(file, text.replaceAll("{{today}}", today));
+    await writeFile(
+      file,
+      path === WELCOME_POST ? text.replaceAll("{{today}}", today) : text,
+    );
   }
   await writeFile(join(target, "elm.json"), elmJson(localRepository));
   await writeFile(

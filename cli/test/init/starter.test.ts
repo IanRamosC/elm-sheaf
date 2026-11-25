@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test";
-import { decodeStarterFile, readStarter } from "../../scripts/embed-starter";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { readStarter } from "../../scripts/embed-starter";
 import { STARTER } from "../../src/init/starter.generated";
 
 test("the embedded starter matches cli/templates/default", () => {
@@ -23,11 +26,12 @@ test("keeps gitignore under its npm-safe name", () => {
   expect(STARTER.has(".gitignore")).toBe(false);
 });
 
-test("a starter file that is not text is refused by name", () => {
-  expect(() =>
-    decodeStarterFile(
-      "static/logo.png",
-      new Uint8Array([0x89, 0x50, 0xff, 0xfe]),
-    ),
-  ).toThrow("static/logo.png");
+test("a binary file in the starter folder fails with its name", () => {
+  const folder = mkdtempSync(join(tmpdir(), "starter-"));
+  try {
+    writeFileSync(join(folder, "logo.png"), new Uint8Array([0x89, 0xff, 0xfe]));
+    expect(() => readStarter(["logo.png"], folder)).toThrow("logo.png");
+  } finally {
+    rmSync(folder, { recursive: true });
+  }
 });
