@@ -24,6 +24,7 @@ import {
   type Response,
 } from "./elm/protocol";
 import { runElm } from "./elm/run";
+import { staticClashes } from "./emit/clashes";
 import { atomFeed, rssFeed } from "./emit/feeds";
 import { sitemapXml } from "./emit/sitemap";
 import { listStaticFiles } from "./emit/static";
@@ -142,15 +143,14 @@ export async function build(
   if (diagnostics.some(({ severity }) => severity === "error")) {
     return err(diagnostics);
   }
+  const outputs = [
+    ...outputFiles(response, config.value, options.now),
+    ...imageOutputs(imaged.value.published),
+  ];
+  const clashes = staticClashes(outputs, staticFiles.value);
+  if (clashes.length > 0) return err(clashes);
   if (options.output !== undefined) {
-    await writeSite(
-      options.output,
-      [
-        ...outputFiles(response, config.value, options.now),
-        ...imageOutputs(imaged.value.published),
-      ],
-      staticFiles.value,
-    );
+    await writeSite(options.output, outputs, staticFiles.value);
   }
   return ok({ pages: pages.length, warnings: diagnostics });
 }

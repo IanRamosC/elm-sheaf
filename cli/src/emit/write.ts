@@ -39,7 +39,7 @@ export async function writeSite(
 ): Promise<void> {
   // Checked up front so a bad path cannot leave a half-written folder.
   for (const { path } of [...files, ...staticFiles]) assertInside(folder, path);
-  assertNoClashes(files.map(({ path }) => path));
+  assertNoClashes([...files, ...staticFiles].map(({ path }) => path));
   await rm(folder, { recursive: true, force: true });
   await mkdir(folder, { recursive: true });
   for (const file of [...files, ...staticFiles]) {
@@ -64,8 +64,8 @@ function assertInside(directory: string, path: string): void {
 }
 
 /**
- * Elm reports clashing outputs as DUPLICATE PAGE, so one that gets here is a
- * bug. Paths are compared lowercased because case-insensitive file systems
+ * Elm reports clashing outputs as DUPLICATE PAGE and `staticClashes` the
+ * static files that clash, so one that gets here is a bug. Paths are compared lowercased because case-insensitive file systems
  * would silently merge them.
  */
 function assertNoClashes(paths: string[]): void {

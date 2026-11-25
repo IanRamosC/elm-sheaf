@@ -214,6 +214,29 @@ describe("build", () => {
   );
 
   test(
+    "reports a static file that would replace the feed, and writes no dist",
+    async () => {
+      const root = copyFixture("blog");
+      writeFileSync(join(root, "static/feed.xml"), "mine");
+
+      const built = await build(root, options(root));
+      const checked = await build(root, options(root, { output: undefined }));
+
+      for (const result of [built, checked]) {
+        expect(result.ok ? [] : result.error).toMatchObject([
+          {
+            title: "STATIC FILE CLASH",
+            message:
+              "static/feed.xml would replace the feed.xml that Sheaf generates.",
+          },
+        ]);
+      }
+      expect(existsSync(join(root, "dist"))).toBe(false);
+    },
+    SLOW,
+  );
+
+  test(
     "highlights code and caches the tokens",
     async () => {
       const root = copyFixture("minimal");
