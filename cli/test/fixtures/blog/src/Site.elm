@@ -3,12 +3,14 @@ module Site exposing (site)
 import Content.Pages
 import Sheaf
 import Sheaf.Blog as Blog
+import Sheaf.Component as Component exposing (Component)
 import Sheaf.Date as Date
 import Sheaf.Document exposing (Document)
 import Sheaf.Frontmatter as Frontmatter exposing (Frontmatter)
 import Sheaf.Head as Head
-import Sheaf.Html exposing (Html, a, article, footer, h1, h2, header, li, main_, nav, p, text, time, ul)
-import Sheaf.Html.Attributes exposing (datetime, href, siteHref)
+import Sheaf.Html exposing (Html, a, article, aside, footer, h1, h2, header, li, main_, nav, p, text, time, ul)
+import Sheaf.Html.Attributes exposing (attribute, class, datetime, href, siteHref)
+import Sheaf.Image as Image
 import Sheaf.Route exposing (Group, Listing, Page, Pagination)
 
 
@@ -61,8 +63,37 @@ site =
             , archive = archive
             , notFound = notFound
             }
-        , components = []
+        , components = [ callout ]
         }
+
+
+
+-- COMPONENTS
+
+
+type CalloutKind
+    = Note
+    | Warning
+
+
+callout : Component
+callout =
+    Component.container "callout"
+        (Component.succeed identity
+            |> Component.required "kind"
+                (Component.oneOf [ ( "note", Note ), ( "warning", Warning ) ])
+        )
+        calloutView
+
+
+calloutView : CalloutKind -> List Html -> Html
+calloutView kind content =
+    case kind of
+        Note ->
+            aside [ class "callout note" ] content
+
+        Warning ->
+            aside [ class "callout warning" ] content
 
 
 
@@ -72,10 +103,11 @@ site =
 post : Document PostMeta -> Page
 post document =
     layout document.meta.title
-        (List.filterMap identity [ Maybe.map Head.description document.meta.summary ])
+        (preview document :: List.filterMap identity [ Maybe.map Head.description document.meta.summary ])
         [ article []
             (h1 [] [ text document.meta.title ]
                 :: published document
+                :: cover document
                 :: document.body
                 ++ [ ul [] (List.map (\name -> li [] [ Blog.tagLink name [ text name ] ]) document.meta.tags) ]
             )
@@ -137,6 +169,33 @@ layout title head body =
         , footer [] [ a [ siteHref "/feed.xml" ] [ text "RSS" ] ]
         ]
     }
+
+
+preview : Document PostMeta -> Head.Tag
+preview document =
+    Head.openGraph
+        { title = document.meta.title
+        , description = document.meta.summary
+        , image = Maybe.map Image.src document.image
+        , kind =
+            case document.date of
+                Just date ->
+                    Head.Article { published = date, modified = document.updated }
+
+                Nothing ->
+                    Head.Website
+        }
+
+
+cover : Document meta -> Html
+cover document =
+    case document.image of
+        Just image ->
+            -- The cover is at the top of the page, where lazy loading only delays it.
+            Image.view [ attribute "loading" "eager" ] image
+
+        Nothing ->
+            text ""
 
 
 postList : List (Document PostMeta) -> Html

@@ -5,6 +5,7 @@
       "**",
       "!test/fixtures/**/content",
       "!**/.sheaf",
+      "!**/dist",
       "!**/elm-stuff"
     ]
   },

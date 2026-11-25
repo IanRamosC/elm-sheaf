@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import { join, relative } from "node:path";
 import { build } from "../src/build";
+import { imageHash } from "../src/images/codec";
 import {
   copyFixture,
   fixturePath,
@@ -377,10 +378,22 @@ function filesUnder(dir: string): string[] {
     .sort();
 }
 
+/** The URLs of `href`, `src` and each candidate of `srcset` in `text`. */
+function urlsIn(text: string): string[] {
+  return [...text.matchAll(/(href|src|srcset)="([^"]*)"/g)].flatMap(
+    ([, name, value = ""]) =>
+      name === "srcset"
+        ? value
+            .split(",")
+            .map((candidate) => candidate.trim().split(" ")[0] ?? "")
+        : [value],
+  );
+}
+
 /**
- * The `href` and `src` values in `dist/` that point into the site but match
- * no written file. A full URL of the site counts as its path, because feeds
- * make every link absolute.
+ * The URLs in `dist/` that point into the site but match no written file. A
+ * full URL of the site counts as its path, because feeds make every link
+ * absolute.
  */
 function unresolvedLinks(root: string, siteUrl: string): string[] {
   const dist = join(root, "dist");
@@ -389,11 +402,11 @@ function unresolvedLinks(root: string, siteUrl: string): string[] {
 
   for (const file of filesUnder(dist)) {
     const text = readFileSync(join(dist, file), "utf8");
-    for (const [, url] of text.matchAll(/(?:href|src)="([^"]*)"/g)) {
-      const path = url?.startsWith(siteUrl)
+    for (const url of urlsIn(text)) {
+      const path = url.startsWith(siteUrl)
         ? basePath + url.slice(siteUrl.length)
         : url;
-      if (!path?.startsWith(basePath)) continue;
+      if (!path.startsWith(basePath)) continue;
 
       const target = join(
         dist,
@@ -440,13 +453,16 @@ describe("the blog fixture", () => {
       });
 
       expect(titlesOf(result)).toEqual([]);
-      expect(filesUnder(join(root, "dist"))).toMatchSnapshot("files");
+      const files = filesUnder(join(root, "dist"));
+      expect(files).toMatchSnapshot("files");
+      expect(files.filter((file) => file.endsWith(".webp"))).not.toEqual([]);
       for (const file of [
         "feed.xml",
         "atom.xml",
         "sitemap.xml",
         "index.html",
         "tags/elm/index.html",
+        "posts/pictures/index.html",
       ]) {
         expect(readFileSync(join(root, "dist", file), "utf8")).toMatchSnapshot(
           file,
@@ -475,6 +491,88 @@ describe("the blog fixture", () => {
         ]),
       );
       expect(unresolvedLinks(root, "https://example.com/blog/")).toEqual([]);
+    },
+    SLOW,
+  );
+
+  test(
+    "encodes nothing again on a second build",
+    async () => {
+      const root = copyFixture("blog");
+      const cache = join(root, ".sheaf/cache/images");
+      const cacheTimes = () =>
+        filesUnder(cache).map(
+          (file) => `${file} ${statSync(join(cache, file)).mtimeMs}`,
+        );
+
+      const first = await build(root, { mode: "production", write: true, now });
+      const firstFiles = filesUnder(join(root, "dist"));
+      const firstTimes = cacheTimes();
+      const second = await build(root, {
+        mode: "production",
+        write: true,
+        now,
+      });
+
+      expect(first.ok && second.ok).toBe(true);
+      expect(filesUnder(join(root, "dist"))).toEqual(firstFiles);
+      expect(cacheTimes()).toEqual(firstTimes);
+    },
+    SLOW,
+  );
+
+  test(
+    "reports a misspelled component where it is used",
+    async () => {
+      const root = copyFixture("blog");
+      const post = join(root, "content/posts/2026-11-19-pictures/index.md");
+      writeFileSync(
+        post,
+        readFileSync(post, "utf8").replace(":::callout", ":::callot"),
+      );
+
+      const result = await build(root, {
+        mode: "production",
+        write: false,
+        now,
+      });
+
+      expect(titlesOf(result)).toEqual(["UNKNOWN COMPONENT"]);
+      const [diagnostic] = result.ok ? [] : result.error;
+      expect(diagnostic?.sourcePath).toBe(
+        "content/posts/2026-11-19-pictures/index.md",
+      );
+      expect(diagnostic?.span?.start.line).toBe(12);
+    },
+    SLOW,
+  );
+
+  test(
+    "publishes no file of a draft's image",
+    async () => {
+      const root = copyFixture("blog");
+      const image = pngBytes(300, 200);
+      writeFileSync(join(root, "content/posts/sketch.png"), image);
+      writeFileSync(
+        join(root, "content/posts/2026-11-26-sketch.md"),
+        "---\ntitle: Sketch\ndraft: true\nimage: sketch.png\n---\n\n![A sketch](sketch.png)\n",
+      );
+
+      const result = await build(root, {
+        mode: "production",
+        write: true,
+        now,
+      });
+
+      expect(titlesOf(result)).toEqual([]);
+      const hash = imageHash(image);
+      // The draft's image is still checked, so its files are in the cache.
+      expect(
+        filesUnder(join(root, ".sheaf/cache/images")).filter((file) =>
+          file.startsWith(hash),
+        ),
+      ).not.toEqual([]);
+      expect(filesMentioning(root, [hash])).toEqual([]);
     },
     SLOW,
   );
