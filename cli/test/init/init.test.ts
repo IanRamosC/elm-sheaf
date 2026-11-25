@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { initSite } from "../../src/init/init";
 
 const REPO = join(import.meta.dir, "../../..");
@@ -111,8 +111,9 @@ describe("initSite", () => {
 
     expect(result.ok).toBe(true);
     const elm = JSON.parse(readFileSync(join(folder, "elm.json"), "utf8"));
-    expect(elm["source-directories"]).toContain(`${REPO}/src`);
+    const repo = REPO.split(sep).join("/");
+    expect(elm["source-directories"]).toContain(`${repo}/src`);
     const npm = JSON.parse(readFileSync(join(folder, "package.json"), "utf8"));
-    expect(npm.dependencies["elm-sheaf"]).toBe(`file:${REPO}/cli`);
+    expect(npm.dependencies["elm-sheaf"]).toBe(`file:${repo}/cli`);
   });
 });

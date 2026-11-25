@@ -1,3 +1,5 @@
+import { sep } from "node:path";
+
 /** The Elm version Sheaf is built for; npm's `elm` tag for it is `0.19.3-0`. */
 const ELM_NPM_VERSION = "0.19.3-0";
 
@@ -22,7 +24,7 @@ export function elmJson(local: string | undefined): string {
     "source-directories": [
       "src",
       ".sheaf/gen",
-      ...(local === undefined ? [] : [`${local}/src`]),
+      ...(local === undefined ? [] : [`${forwardSlashes(local)}/src`]),
     ],
     "elm-version": "0.19.3",
     dependencies: { direct, indirect: {} },
@@ -42,11 +44,19 @@ export function packageJson(
   return formatted({
     private: true,
     dependencies: {
-      "elm-sheaf": local === undefined ? `^${cliVersion}` : `file:${local}/cli`,
+      "elm-sheaf":
+        local === undefined
+          ? `^${cliVersion}`
+          : `file:${forwardSlashes(local)}/cli`,
       elm: ELM_NPM_VERSION,
     },
     trustedDependencies: ["elm"],
   });
+}
+
+/** Windows accepts `/` too, so paths written into the site's files use it alone. */
+function forwardSlashes(path: string): string {
+  return path.split(sep).join("/");
 }
 
 function formatted(json: object): string {
