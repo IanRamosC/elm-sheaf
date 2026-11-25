@@ -1,5 +1,3 @@
-/* biome-ignore-all lint/complexity/noImportantStyles: Shiki sets the light colours inline, which only !important overrides. */
-
 /*
  * Contrast ratios (WCAG 2.1; AA asks 4.5:1 for text):
  *
@@ -191,6 +189,7 @@ pre {
 
 /* Shiki's documented CSS for dark themes; the light ones are inline. */
 @media (prefers-color-scheme: dark) {
+  /* Shiki sets the light colours inline, which only !important overrides. */
   .shiki,
   .shiki span {
     color: var(--shiki-dark) !important;

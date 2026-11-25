@@ -80,24 +80,23 @@ page site document =
 index : Sheaf.Metadata -> Listing (Post meta) -> Page
 index site { items, pagination } =
     let
-        heading : String
-        heading =
+        ( title, heading ) =
             if pagination.page == 1 then
-                "Latest posts"
+                ( site.title, "Latest posts" )
 
             else
-                "Posts, page " ++ String.fromInt pagination.page ++ " of " ++ String.fromInt pagination.pages
+                let
+                    paged : String
+                    paged =
+                        "Posts, page " ++ String.fromInt pagination.page ++ " of " ++ String.fromInt pagination.pages
+                in
+                ( titled site paged, paged )
     in
     Layout.view site
-        { title =
-            if pagination.page == 1 then
-                site.title
-
-            else
-                titled site heading
+        { title = title
         , description = site.description
         , head = []
-        , body = [ h1 [] [ text heading ], postList items, pages pagination ]
+        , body = [ h1 [] [ text heading ], postList items, pageLinks pagination ]
         }
 
 
@@ -109,7 +108,7 @@ tag site name { items, pagination } =
         { title = titled site ("Posts tagged " ++ name)
         , description = "Posts tagged " ++ name ++ " on " ++ site.title ++ "."
         , head = []
-        , body = [ h1 [] [ text ("Posts tagged " ++ name) ], postList items, pages pagination ]
+        , body = [ h1 [] [ text ("Posts tagged " ++ name) ], postList items, pageLinks pagination ]
         }
 
 
@@ -138,8 +137,7 @@ archive site items =
         , head = []
         , body =
             [ h1 [] [ text "Archive" ]
-            , ol [ class "archive" ]
-                (List.map (\item -> li [] [ published item, Sheaf.link item.ref [ text item.meta.title ] ]) items)
+            , ol [ class "archive" ] (List.map archiveEntry items)
             ]
         }
 
@@ -218,6 +216,11 @@ postSummary item =
         ]
 
 
+archiveEntry : Document (Post meta) -> Html
+archiveEntry item =
+    li [] [ published item, Sheaf.link item.ref [ text item.meta.title ] ]
+
+
 tagLinks : List String -> List Html
 tagLinks names =
     List.map (\name -> span [ class "tag" ] [ Blog.tagLink name [ text name ] ]) names
@@ -288,8 +291,8 @@ monthName month =
             "December"
 
 
-pages : Pagination -> Html
-pages pagination =
+pageLinks : Pagination -> Html
+pageLinks pagination =
     if pagination.pages <= 1 then
         text ""
 

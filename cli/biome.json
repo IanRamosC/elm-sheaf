@@ -17,5 +17,11 @@
       "suspicious": { "noExplicitAny": "error" }
     }
   },
+  "overrides": [
+    {
+      "includes": ["templates/default/static/style.css"],
+      "linter": { "rules": { "complexity": { "noImportantStyles": "off" } } }
+    }
+  ],
   "formatter": { "enabled": true, "indentStyle": "space" }
 }
