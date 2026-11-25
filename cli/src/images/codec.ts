@@ -7,8 +7,15 @@ Bun.Image.backend = "bun";
 
 const QUALITY = 80;
 
-/** Part of every image's hash, so that changing them renames every variant. */
-const ENCODER_SETTINGS = `webp quality ${QUALITY}, jpeg quality ${QUALITY}, png default`;
+/**
+ * Part of every image's hash, so that changing them renames every variant.
+ * The Bun version is in it because a Bun upgrade may change the encoders'
+ * bytes: without it a warm cache would keep the old bytes while a fresh
+ * machine wrote new ones under the same name. The highlight cache keys on
+ * Shiki's version for the same reason. Once Sheaf ships as a compiled binary
+ * (Plan 5), its own version belongs here too.
+ */
+const ENCODER_SETTINGS = `bun ${Bun.version}, webp quality ${QUALITY}, jpeg quality ${QUALITY}, png default`;
 
 /** A format Sheaf can encode a variant in. */
 export type EncodedFormat = "jpeg" | "png" | "webp";
@@ -23,7 +30,7 @@ export type RasterInfo = {
   height: number;
 };
 
-/** The first 16 hex digits of SHA-256 over the source bytes and the encoder settings. */
+/** The first 16 hex digits of SHA-256 over the source bytes, the encoder settings and the encoder version. */
 export function imageHash(bytes: Uint8Array): string {
   return createHash("sha256")
     .update(bytes)

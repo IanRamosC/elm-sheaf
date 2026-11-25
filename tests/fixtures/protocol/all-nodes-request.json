@@ -131,7 +131,7 @@
         "url": "a.png",
         "alt": "A cat",
         "local": {
-          "src": "/_sheaf/images/db8ae27b0a2081d8-600.png",
+          "src": "/_sheaf/images/36454e773ed1eac0-600.png",
           "width": 600,
           "height": 400,
           "variants": [
@@ -139,11 +139,11 @@
               "mediaType": "image/png",
               "files": [
                 {
-                  "path": "/_sheaf/images/db8ae27b0a2081d8-480.png",
+                  "path": "/_sheaf/images/36454e773ed1eac0-480.png",
                   "width": 480
                 },
                 {
-                  "path": "/_sheaf/images/db8ae27b0a2081d8-600.png",
+                  "path": "/_sheaf/images/36454e773ed1eac0-600.png",
                   "width": 600
                 }
               ]
@@ -152,11 +152,11 @@
               "mediaType": "image/webp",
               "files": [
                 {
-                  "path": "/_sheaf/images/db8ae27b0a2081d8-480.webp",
+                  "path": "/_sheaf/images/36454e773ed1eac0-480.webp",
                   "width": 480
                 },
                 {
-                  "path": "/_sheaf/images/db8ae27b0a2081d8-600.webp",
+                  "path": "/_sheaf/images/36454e773ed1eac0-600.webp",
                   "width": 600
                 }
               ]
@@ -498,7 +498,7 @@
                 "alt": "A cat",
                 "title": "Cat",
                 "local": {
-                  "src": "/_sheaf/images/db8ae27b0a2081d8-600.png",
+                  "src": "/_sheaf/images/36454e773ed1eac0-600.png",
                   "width": 600,
                   "height": 400,
                   "variants": [
@@ -506,11 +506,11 @@
                       "mediaType": "image/png",
                       "files": [
                         {
-                          "path": "/_sheaf/images/db8ae27b0a2081d8-480.png",
+                          "path": "/_sheaf/images/36454e773ed1eac0-480.png",
                           "width": 480
                         },
                         {
-                          "path": "/_sheaf/images/db8ae27b0a2081d8-600.png",
+                          "path": "/_sheaf/images/36454e773ed1eac0-600.png",
                           "width": 600
                         }
                       ]
@@ -519,11 +519,11 @@
                       "mediaType": "image/webp",
                       "files": [
                         {
-                          "path": "/_sheaf/images/db8ae27b0a2081d8-480.webp",
+                          "path": "/_sheaf/images/36454e773ed1eac0-480.webp",
                           "width": 480
                         },
                         {
-                          "path": "/_sheaf/images/db8ae27b0a2081d8-600.webp",
+                          "path": "/_sheaf/images/36454e773ed1eac0-600.webp",
                           "width": 600
                         }
                       ]

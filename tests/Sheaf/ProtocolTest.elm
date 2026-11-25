@@ -109,7 +109,7 @@ requestTests =
                 let
                     files : String -> List { path : String, width : Int }
                     files extension =
-                        List.map (\width -> { path = "/_sheaf/images/db8ae27b0a2081d8-" ++ String.fromInt width ++ "." ++ extension, width = width }) [ 480, 600 ]
+                        List.map (\width -> { path = "/_sheaf/images/36454e773ed1eac0-" ++ String.fromInt width ++ "." ++ extension, width = width }) [ 480, 600 ]
                 in
                 decodeRequest ProtocolFixtures.allNodesRequest
                     |> Result.map (.documents >> List.map .image)
@@ -120,7 +120,7 @@ requestTests =
                                 , alt = "A cat"
                                 , local =
                                     Just
-                                        { src = "/_sheaf/images/db8ae27b0a2081d8-600.png"
+                                        { src = "/_sheaf/images/36454e773ed1eac0-600.png"
                                         , width = 600
                                         , height = 400
                                         , variants =
