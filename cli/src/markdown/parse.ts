@@ -103,7 +103,9 @@ export function parseMarkdown(
     const repeated = new Set<string>();
     for (const name of attributeNames(document.body, offsetOf(node, start))) {
       if (!attributes.some((attribute) => attribute.name === name)) {
-        attributes.push({ name, value: values[name] ?? "" });
+        // Not `values[name]`, which for `__proto__` is the object's prototype.
+        const value = Object.hasOwn(values, name) ? values[name] : undefined;
+        attributes.push({ name, value: value ?? "" });
       } else if (name !== "class" && !repeated.has(name)) {
         // Classes combine, so only other names can be written twice.
         repeated.add(name);

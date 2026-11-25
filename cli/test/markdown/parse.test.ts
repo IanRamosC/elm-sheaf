@@ -236,6 +236,15 @@ describe("parseMarkdown directives", () => {
     ]);
   });
 
+  // mdast-util-directive stores attributes in a plain object, where setting
+  // `__proto__` to a string does nothing, so the value never reaches us.
+  test("gives an attribute named __proto__ an empty value", () => {
+    const tree = parse("::x{__proto__=a}\n");
+    expect(firstOfType(tree, "leafDirective").attributes).toEqual([
+      { name: "__proto__", value: "" },
+    ]);
+  });
+
   test("joins every class into one attribute", () => {
     const tree = parse("::x{.a .b}\n");
     expect(firstOfType(tree, "leafDirective").attributes).toEqual([

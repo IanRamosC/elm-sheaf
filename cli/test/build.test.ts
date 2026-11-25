@@ -548,6 +548,35 @@ describe("the blog fixture", () => {
   );
 
   test(
+    "reports an attribute named __proto__ where it is used",
+    async () => {
+      const root = copyFixture("blog");
+      const post = join(root, "content/posts/2026-11-19-pictures/index.md");
+      writeFileSync(
+        post,
+        readFileSync(post, "utf8").replace(
+          ':::callout{kind="note"}',
+          ':::callout{kind="note" __proto__=a}',
+        ),
+      );
+
+      const result = await build(root, {
+        mode: "production",
+        write: false,
+        now,
+      });
+
+      expect(titlesOf(result)).toEqual(["UNKNOWN ATTRIBUTE"]);
+      const [diagnostic] = result.ok ? [] : result.error;
+      expect(diagnostic?.sourcePath).toBe(
+        "content/posts/2026-11-19-pictures/index.md",
+      );
+      expect(diagnostic?.span?.start.line).toBe(12);
+    },
+    SLOW,
+  );
+
+  test(
     "publishes no file of a draft's image",
     async () => {
       const root = copyFixture("blog");
