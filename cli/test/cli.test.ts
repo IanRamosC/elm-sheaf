@@ -285,9 +285,12 @@ describe("sheaf", () => {
     const folder = mkdtempSync(join(tmpdir(), "sheaf-init-cli-"));
     copies.push(folder);
 
-    const { stdout, exitCode } = await sheaf(["init", "."], folder);
+    const { stdout, stderr, exitCode } = await sheaf(["init", "."], folder);
 
-    expect(exitCode).toBe(0);
+    expect({ exitCode, stderr, stdout }).toMatchObject({
+      exitCode: 0,
+      stderr: "",
+    });
     expect(existsSync(join(folder, "sheaf.json"))).toBe(true);
     expect(stdout).toContain("bun install");
     expect(stdout).toContain("bunx sheaf dev");
