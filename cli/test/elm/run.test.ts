@@ -295,8 +295,14 @@ describe("runElm", () => {
   });
 });
 
+/** An `elm` that prints `version`: a batch file on Windows, a shell script elsewhere. */
 function installFakeElm(directory: string, version: string): string {
   mkdirSync(directory, { recursive: true });
+  if (process.platform === "win32") {
+    const path = join(directory, "elm.cmd");
+    writeFileSync(path, `@echo ${version}\r\n`);
+    return path;
+  }
   const path = join(directory, "elm");
   writeFileSync(path, `#!/bin/sh\necho ${version}\n`);
   chmodSync(path, 0o755);
@@ -326,6 +332,20 @@ describe("findElm", () => {
 
     expect(found).toEqual({ ok: true, value: globalElm });
   });
+
+  test.skipIf(process.platform !== "win32")(
+    "finds npm's elm.cmd, not the shell script beside it (Windows only)",
+    async () => {
+      const siteRoot = join(scratchDirectory(), "my site");
+      const bin = join(siteRoot, "node_modules/.bin");
+      const elmCmd = installFakeElm(bin, "0.19.3");
+      writeFileSync(join(bin, "elm"), "#!/bin/sh\necho 0.19.1\n");
+
+      const found = await findElm(siteRoot, { path: "" });
+
+      expect(found).toEqual({ ok: true, value: elmCmd });
+    },
+  );
 
   test("reports a missing Elm with how to install it", async () => {
     const found = await findElm(scratchDirectory(), {

@@ -13,17 +13,28 @@ const COMPILED_OUTPUT = ".sheaf/site.js";
 
 type Execution = { exitCode: number; stdout: string; stderr: string };
 
-/** Runs a program without a shell; a non-zero exit is a result, not an exception. */
+/**
+ * Runs a program without a shell, except the `cmd.exe` a batch file needs;
+ * a non-zero exit is a result, not an exception.
+ */
 function run(
   program: string,
   args: string[],
   workingDirectory: string,
 ): Promise<Execution> {
+  const [file, fileArgs, verbatim] = isBatchFile(program)
+    ? batchCommand(program, args)
+    : [program, args, false];
   return new Promise((resolve, reject) => {
     execFile(
-      program,
-      args,
-      { cwd: workingDirectory, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+      file,
+      fileArgs,
+      {
+        cwd: workingDirectory,
+        encoding: "utf8",
+        maxBuffer: 64 * 1024 * 1024,
+        windowsVerbatimArguments: verbatim,
+      },
       (error, stdout, stderr) => {
         if (error === null) {
           resolve({ exitCode: 0, stdout, stderr });
@@ -35,6 +46,30 @@ function run(
       },
     );
   });
+}
+
+function isBatchFile(program: string): boolean {
+  return /\.(cmd|bat)$/i.test(program);
+}
+
+/**
+ * Windows starts a batch file, such as npm's `elm.cmd`, only through
+ * `cmd.exe`, and `execFile` quotes arguments by rules `cmd.exe` doesn't
+ * follow. So the command line is built here and passed as it is: every part
+ * in double quotes, which keeps spaces and `&`, `|`, `<`, `>` and `^`
+ * literal, all inside one more pair that `/s` strips. `/d` skips AutoRun
+ * commands. A `%` would still expand, but Sheaf's arguments have none.
+ */
+function batchCommand(
+  program: string,
+  args: string[],
+): [string, string[], boolean] {
+  const line = [program, ...args].map((part) => `"${part}"`).join(" ");
+  return [
+    process.env.ComSpec ?? "cmd.exe",
+    ["/d", "/s", "/c", `"${line}"`],
+    true,
+  ];
 }
 
 async function isExecutable(path: string): Promise<boolean> {
@@ -56,6 +91,13 @@ async function firstExecutable(
 }
 
 /**
+ * The names `elm` goes by. On Windows a program needs an extension, and npm
+ * puts a shell script for Unix, with none, next to `elm.cmd`.
+ */
+const ELM_NAMES =
+  process.platform === "win32" ? ["elm.exe", "elm.cmd"] : ["elm"];
+
+/**
  * Finds Elm 0.19.3, looking for the site's own copy in `node_modules/.bin`
  * before `PATH` (`options.path` stands in for it, so tests need not change
  * the environment).
@@ -65,13 +107,15 @@ export async function findElm(
   options: { path?: string } = {},
 ): Promise<Result<string, Diagnostic[]>> {
   const searchPath = options.path ?? process.env.PATH ?? "";
-  const found = await firstExecutable([
-    join(siteRoot, "node_modules/.bin/elm"),
-    ...searchPath
-      .split(delimiter)
-      .filter((directory) => directory !== "")
-      .map((directory) => join(directory, "elm")),
-  ]);
+  const directories = [
+    join(siteRoot, "node_modules/.bin"),
+    ...searchPath.split(delimiter).filter((directory) => directory !== ""),
+  ];
+  const found = await firstExecutable(
+    directories.flatMap((directory) =>
+      ELM_NAMES.map((name) => join(directory, name)),
+    ),
+  );
   if (found === undefined) {
     return err([
       {
