@@ -340,7 +340,7 @@ describe("findElm", () => {
           title: "ELM NOT FOUND",
           message:
             "Sheaf compiles templates with Elm, but there is no `elm` in node_modules/.bin or on your PATH.",
-          hint: "Install Elm 0.19.3: npm install --save-dev elm@0.19.3",
+          hint: "Install Elm 0.19.3: npm install --save-dev elm@0.19.3-0",
         },
       ],
     });
@@ -359,7 +359,7 @@ describe("findElm", () => {
           severity: "error",
           title: "WRONG ELM VERSION",
           message: `Sheaf needs Elm 0.19.3, but ${oldElm} is version 0.19.1.`,
-          hint: "Install Elm 0.19.3: npm install --save-dev elm@0.19.3",
+          hint: "Install Elm 0.19.3: npm install --save-dev elm@0.19.3-0",
         },
       ],
     });

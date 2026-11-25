@@ -5,7 +5,9 @@ import type { Diagnostic, Span } from "../diagnostics/diagnostic";
 import { err, ok, type Result } from "../result";
 
 const REQUIRED_ELM_VERSION = "0.19.3";
-const INSTALL_HINT = `Install Elm ${REQUIRED_ELM_VERSION}: npm install --save-dev elm@${REQUIRED_ELM_VERSION}`;
+/** npm's `elm` package has no `0.19.3`; its release of Elm 0.19.3 is `0.19.3-0`. */
+const ELM_NPM_VERSION = "0.19.3-0";
+const INSTALL_HINT = `Install Elm ${REQUIRED_ELM_VERSION}: npm install --save-dev elm@${ELM_NPM_VERSION}`;
 const ENTRY_POINT = ".sheaf/gen/SheafMain.elm";
 const COMPILED_OUTPUT = ".sheaf/site.js";
 
