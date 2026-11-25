@@ -106,14 +106,38 @@ blockTests =
             \_ ->
                 Heading { position = at 1, depth = 3, id = "setup", children = [ text "Setup" ] }
                     |> rendersTo "<h3 id=\"setup\">Setup</h3>"
-        , test "a code block with a language" <|
+        , test "a highlighted code block keeps its text exactly, escaped" <|
             \_ ->
-                Code { position = at 1, lang = Just "elm", value = "x = 1" }
-                    |> rendersTo "<pre><code class=\"language-elm\">x = 1\n</code></pre>"
-        , test "a code block without a language" <|
+                Code
+                    { position = at 1
+                    , lang = Just "elm"
+                    , value = "a < b && \"c\"\n\tx\n"
+                    , highlight =
+                        { style = blockStyle
+                        , lines =
+                            [ [ { content = "a", style = "color:#24292E" }, { content = " < b && \"c\"", style = "" } ]
+                            , [ { content = "\tx", style = "color:#D73A49;--shiki-dark:#F97583" } ]
+                            , []
+                            ]
+                        }
+                    }
+                    |> rendersTo
+                        (String.concat
+                            [ "<pre class=\"shiki\" style=\"" ++ blockStyle ++ "\" tabindex=\"0\"><code class=\"language-elm\">"
+                            , "<span class=\"line\"><span style=\"color:#24292E\">a</span><span> &lt; b &amp;&amp; &quot;c&quot;</span></span>\n"
+                            , "<span class=\"line\"><span style=\"color:#D73A49;--shiki-dark:#F97583\">\tx</span></span>\n"
+                            , "<span class=\"line\"></span>"
+                            , "</code></pre>"
+                            ]
+                        )
+        , test "an empty code block has no lines" <|
             \_ ->
-                Code { position = at 1, lang = Nothing, value = "x" }
-                    |> rendersTo "<pre><code>x\n</code></pre>"
+                Code { position = at 1, lang = Just "elm", value = "", highlight = { style = blockStyle, lines = [] } }
+                    |> rendersTo ("<pre class=\"shiki\" style=\"" ++ blockStyle ++ "\" tabindex=\"0\"><code class=\"language-elm\"></code></pre>")
+        , test "a code block without a language has no language class" <|
+            \_ ->
+                Code { position = at 1, lang = Nothing, value = "x", highlight = { style = blockStyle, lines = [ [ { content = "x", style = "" } ] ] } }
+                    |> rendersTo ("<pre class=\"shiki\" style=\"" ++ blockStyle ++ "\" tabindex=\"0\"><code><span class=\"line\"><span>x</span></span></code></pre>")
         , test "a block quote" <|
             \_ ->
                 Blockquote { position = at 1, children = [ paragraph [ text "q" ] ] }
@@ -123,6 +147,11 @@ blockTests =
                 ThematicBreak { position = at 1 }
                     |> rendersTo "<hr>"
         ]
+
+
+blockStyle : String
+blockStyle =
+    "background-color:#fff;--shiki-dark-bg:#24292e;color:#24292e;--shiki-dark:#e1e4e8"
 
 
 inlineTests : Test
@@ -462,8 +491,11 @@ allNodesHtml =
         , "<a href=\"/blog/posts/hello-world/#setup\">setup</a> "
         , "<img src=\"a.png\" alt=\"A cat\" title=\"Cat\"> note"
         , "<sup><a href=\"#user-content-fn-note\" id=\"user-content-fnref-note\" data-footnote-ref>1</a></sup></p>"
-        , "<pre><code class=\"language-elm\">x = 1\n</code></pre>"
-        , "<pre><code>plain\n</code></pre>"
+        , "<pre class=\"shiki\" style=\"" ++ blockStyle ++ "\" tabindex=\"0\"><code class=\"language-elm\"><span class=\"line\">"
+        , "<span style=\"color:#6F42C1;--shiki-dark:#B392F0\">x</span><span style=\"color:#24292E;--shiki-dark:#E1E4E8\"> </span>"
+        , "<span style=\"color:#D73A49;--shiki-dark:#F97583\">=</span><span style=\"color:#24292E;--shiki-dark:#E1E4E8\"> </span>"
+        , "<span style=\"color:#005CC5;--shiki-dark:#79B8FF\">1</span></span></code></pre>"
+        , "<pre class=\"shiki\" style=\"" ++ blockStyle ++ "\" tabindex=\"0\"><code><span class=\"line\"><span>plain</span></span></code></pre>"
         , "<blockquote><p>quoted</p></blockquote>"
         , "<ol start=\"3\"><li class=\"task-list-item\"><input type=\"checkbox\" checked disabled> done</li>"
         , "<li class=\"task-list-item\"><input type=\"checkbox\" disabled> todo</li><li>plain</li></ol>"

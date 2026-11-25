@@ -1,3 +1,4 @@
+import { bundledThemes } from "shiki/themes";
 import type { Diagnostic } from "../diagnostics/diagnostic";
 import { err, ok, type Result } from "../result";
 import { suggestions } from "../suggest";
@@ -9,12 +10,19 @@ export type Config = {
   basePath: string;
   /** IANA timezone name that decides when a date-only post counts as published. */
   timezone: string;
+  /** The Shiki themes code is highlighted with. */
+  highlight: { light: string; dark: string };
 };
 
-// `highlight` and `images` are reserved for later features and ignored for now.
+// `images` is reserved for a later feature and ignored for now.
 const knownKeys = ["siteUrl", "timezone", "highlight", "images"];
 
 const defaultTimezone = "UTC";
+
+const defaultThemes = { light: "github-light", dark: "github-dark" };
+
+/** A problem with one key, before it is located in `sheaf.json`. */
+type Problem = { message: string; hint?: string };
 
 /** Parses the text of `sheaf.json`, reporting every problem found in it at once. */
 export function parseConfig(
@@ -36,26 +44,16 @@ export function parseConfig(
     const reason = error instanceof Error ? error.message : String(error);
     return err([badConfig(`This file is not valid JSON: ${reason}`)]);
   }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+  if (!isObject(parsed)) {
     return err([
       badConfig("The top level of this file must be a JSON object."),
     ]);
   }
-  const fields = parsed as Record<string, unknown>;
+  const fields = parsed;
 
-  const problems: Diagnostic[] = [];
-
-  for (const key of Object.keys(fields)) {
-    if (!knownKeys.includes(key)) {
-      const [closest] = suggestions(key, knownKeys, 1);
-      problems.push(
-        badConfig(
-          `I do not know the key "${key}".`,
-          closest === undefined ? undefined : `Did you mean "${closest}"?`,
-        ),
-      );
-    }
-  }
+  const problems: Diagnostic[] = unknownKeys(fields, knownKeys, "").map(
+    ({ message, hint }) => badConfig(message, hint),
+  );
 
   const siteUrl = parseSiteUrl(fields.siteUrl);
   if (!siteUrl.ok)
@@ -64,13 +62,89 @@ export function parseConfig(
   const timezone = parseTimezone(fields.timezone);
   if (!timezone.ok) problems.push(badConfig(timezone.error));
 
-  if (!siteUrl.ok || !timezone.ok || problems.length > 0) return err(problems);
+  const highlight = parseHighlight(fields.highlight);
+  if (!highlight.ok) {
+    problems.push(
+      ...highlight.error.map(({ message, hint }) => badConfig(message, hint)),
+    );
+  }
+
+  if (!siteUrl.ok || !timezone.ok || !highlight.ok || problems.length > 0) {
+    return err(problems);
+  }
 
   return ok({
     siteUrl: siteUrl.value,
     basePath: basePathOf(siteUrl.value),
     timezone: timezone.value,
+    highlight: highlight.value,
   });
+}
+
+/** `{ "theme": { "light": …, "dark": … } }`, where every part is optional. */
+function parseHighlight(
+  value: unknown,
+): Result<Config["highlight"], Problem[]> {
+  if (value === undefined) return ok(defaultThemes);
+  if (!isObject(value)) {
+    return err([{ message: '"highlight" must be an object.' }]);
+  }
+  const problems = unknownKeys(value, ["theme"], "highlight.");
+  const theme = value.theme ?? {};
+  if (!isObject(theme)) {
+    return err([
+      ...problems,
+      { message: '"highlight.theme" must be an object.' },
+    ]);
+  }
+  problems.push(...unknownKeys(theme, ["light", "dark"], "highlight.theme."));
+  const light = parseTheme(theme.light, "light");
+  const dark = parseTheme(theme.dark, "dark");
+  if (!light.ok) problems.push(light.error);
+  if (!dark.ok) problems.push(dark.error);
+  if (!light.ok || !dark.ok || problems.length > 0) return err(problems);
+  return ok({ light: light.value, dark: dark.value });
+}
+
+function parseTheme(
+  value: unknown,
+  variant: keyof Config["highlight"],
+): Result<string, Problem> {
+  if (value === undefined) return ok(defaultThemes[variant]);
+  if (typeof value !== "string") {
+    return err({ message: `"highlight.theme.${variant}" must be a string.` });
+  }
+  if (Object.hasOwn(bundledThemes, value)) return ok(value);
+  const [closest] = suggestions(value, Object.keys(bundledThemes), 1);
+  return err({
+    message: `The ${variant} theme "${value}" is not one of Shiki's themes.`,
+    hint:
+      closest === undefined
+        ? "The themes are listed at https://shiki.style/themes."
+        : `Did you mean "${closest}"?`,
+  });
+}
+
+function unknownKeys(
+  fields: Record<string, unknown>,
+  known: string[],
+  prefix: string,
+): Problem[] {
+  return Object.keys(fields)
+    .filter((key) => !known.includes(key))
+    .map((key) => {
+      const [closest] = suggestions(key, known, 1);
+      return {
+        message: `I do not know the key "${prefix}${key}".`,
+        ...(closest === undefined
+          ? {}
+          : { hint: `Did you mean "${closest}"?` }),
+      };
+    });
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function parseSiteUrl(

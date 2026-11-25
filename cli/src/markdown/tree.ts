@@ -14,7 +14,7 @@ export type Node = { position: Span } & (
   | { type: "strong"; children: Node[] }
   | { type: "delete"; children: Node[] }
   | { type: "inlineCode"; value: string }
-  | { type: "code"; lang?: string; value: string }
+  | { type: "code"; lang?: string; value: string; highlight?: Highlight }
   | { type: "blockquote"; children: Node[] }
   | {
       type: "list";
@@ -49,6 +49,16 @@ export type Node = { position: Span } & (
     }
   | { type: "leafDirective"; name: string; attributes: DirectiveAttribute[] }
 );
+
+/**
+ * A code block as Shiki highlights it for the light and dark themes: the
+ * block's style, and each line as tokens. Parsing leaves it out; every code
+ * node has it once highlighting has run, and Elm requires it.
+ */
+export type Highlight = { style: string; lines: HighlightToken[][] };
+
+/** A run of code with one style; `style` is `""` when Shiki gives none. */
+export type HighlightToken = { content: string; style: string };
 
 /**
  * An attribute of a directive, in the order they are written. `#x` is `id`,

@@ -1,7 +1,7 @@
 module Sheaf.Internal.Protocol exposing
     ( Request, Build, BuildMode(..), GroupSlug, Document, Date
     , Span, Position, FieldPosition
-    , Node(..), Container, Alignment(..)
+    , Node(..), Container, Alignment(..), Highlight, Token
     , requestDecoder
     , Response, Metadata, Page, Feed, FeedItem, SitemapEntry, Diagnostic, Severity(..), encodeResponse
     )
@@ -16,7 +16,7 @@ It is not exposed by the package.
 
 @docs Request, Build, BuildMode, GroupSlug, Document, Date
 @docs Span, Position, FieldPosition
-@docs Node, Container, Alignment
+@docs Node, Container, Alignment, Highlight, Token
 @docs requestDecoder
 @docs Response, Metadata, Page, Feed, FeedItem, SitemapEntry, Diagnostic, Severity, encodeResponse
 
@@ -366,7 +366,7 @@ type Node
     | Strong Container
     | Delete Container
     | InlineCode { position : Span, value : String }
-    | Code { position : Span, lang : Maybe String, value : String }
+    | Code { position : Span, lang : Maybe String, value : String, highlight : Highlight }
     | Blockquote Container
     | ListBlock { position : Span, ordered : Bool, start : Maybe Int, spread : Bool, children : List Node }
     | ListItem { position : Span, checked : Maybe Bool, children : List Node }
@@ -388,6 +388,19 @@ type Node
 -}
 type alias Container =
     { position : Span, children : List Node }
+
+
+{-| A code block as Shiki highlighted it: the style of the whole block, and
+each line as a list of tokens.
+-}
+type alias Highlight =
+    { style : String, lines : List (List Token) }
+
+
+{-| A run of code with one style. An empty `style` means Shiki gave it none.
+-}
+type alias Token =
+    { content : String, style : String }
 
 
 {-| How a table column is aligned.
@@ -440,10 +453,11 @@ nodeOfType type_ =
                 (Decode.field "value" Decode.string)
 
         "code" ->
-            Decode.map3 (\position lang value -> Code { position = position, lang = lang, value = value })
+            Decode.map4 (\position lang value highlight -> Code { position = position, lang = lang, value = value, highlight = highlight })
                 positionField
                 (optionalField "lang" Decode.string)
                 (Decode.field "value" Decode.string)
+                (Decode.field "highlight" highlightDecoder)
 
         "blockquote" ->
             Decode.map Blockquote containerDecoder
@@ -555,6 +569,22 @@ attributesField =
 containerDecoder : Decoder Container
 containerDecoder =
     Decode.map2 Container positionField childrenField
+
+
+highlightDecoder : Decoder Highlight
+highlightDecoder =
+    Decode.map2 Highlight
+        (Decode.field "style" Decode.string)
+        (Decode.field "lines"
+            (Decode.list
+                (Decode.list
+                    (Decode.map2 Token
+                        (Decode.field "content" Decode.string)
+                        (Decode.field "style" Decode.string)
+                    )
+                )
+            )
+        )
 
 
 alignmentDecoder : Decoder Alignment

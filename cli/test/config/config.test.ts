@@ -38,11 +38,64 @@ describe("parseConfig", () => {
     expect(result.ok && result.value.timezone).toBe("Europe/Lisbon");
   });
 
-  test("accepts highlight and images, which are not used yet", () => {
-    const result = parse(
-      '{"siteUrl":"https://example.com/","highlight":{},"images":{}}',
-    );
+  test("accepts images, which are not used yet", () => {
+    const result = parse('{"siteUrl":"https://example.com/","images":{}}');
     expect(result.ok).toBe(true);
+  });
+
+  test("highlights with the GitHub themes by default", () => {
+    for (const json of [
+      '{"siteUrl":"https://example.com/"}',
+      '{"siteUrl":"https://example.com/","highlight":{}}',
+      '{"siteUrl":"https://example.com/","highlight":{"theme":{}}}',
+    ]) {
+      const result = parse(json);
+      expect(result.ok && result.value.highlight).toEqual({
+        light: "github-light",
+        dark: "github-dark",
+      });
+    }
+  });
+
+  test("keeps the highlight themes it is given", () => {
+    const result = parse(
+      '{"siteUrl":"https://example.com/","highlight":{"theme":{"dark":"nord"}}}',
+    );
+    expect(result.ok && result.value.highlight).toEqual({
+      light: "github-light",
+      dark: "nord",
+    });
+  });
+
+  test("suggests the Shiki theme closest to an unknown one", () => {
+    const errors = errorsOf(
+      '{"siteUrl":"https://example.com/","highlight":{"theme":{"light":"github-lite"}}}',
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.title).toBe("BAD CONFIG");
+    expect(errors[0]?.message).toContain("github-lite");
+    expect(errors[0]?.hint).toContain('"github-light"');
+  });
+
+  test("rejects unknown keys and wrong types under highlight", () => {
+    const errors = errorsOf(
+      '{"siteUrl":"https://example.com/","highlight":{"themes":{},"theme":{"light":1,"darkk":"nord"}}}',
+    );
+    expect(errors.map(({ hint }) => hint)).toEqual([
+      'Did you mean "theme"?',
+      'Did you mean "dark"?',
+      undefined,
+    ]);
+    expect(errors[2]?.message).toBe(
+      '"highlight.theme.light" must be a string.',
+    );
+  });
+
+  test("rejects a highlight that is not an object", () => {
+    const errors = errorsOf(
+      '{"siteUrl":"https://example.com/","highlight":"github-dark"}',
+    );
+    expect(errors[0]?.message).toBe('"highlight" must be an object.');
   });
 
   test("requires siteUrl", () => {

@@ -504,7 +504,34 @@
               }
             },
             "lang": "elm",
-            "value": "x = 1"
+            "value": "x = 1",
+            "highlight": {
+              "style": "background-color:#fff;--shiki-dark-bg:#24292e;color:#24292e;--shiki-dark:#e1e4e8",
+              "lines": [
+                [
+                  {
+                    "content": "x",
+                    "style": "color:#6F42C1;--shiki-dark:#B392F0"
+                  },
+                  {
+                    "content": " ",
+                    "style": "color:#24292E;--shiki-dark:#E1E4E8"
+                  },
+                  {
+                    "content": "=",
+                    "style": "color:#D73A49;--shiki-dark:#F97583"
+                  },
+                  {
+                    "content": " ",
+                    "style": "color:#24292E;--shiki-dark:#E1E4E8"
+                  },
+                  {
+                    "content": "1",
+                    "style": "color:#005CC5;--shiki-dark:#79B8FF"
+                  }
+                ]
+              ]
+            }
           },
           {
             "type": "code",
@@ -518,7 +545,18 @@
                 "column": 4
               }
             },
-            "value": "plain"
+            "value": "plain",
+            "highlight": {
+              "style": "background-color:#fff;--shiki-dark-bg:#24292e;color:#24292e;--shiki-dark:#e1e4e8",
+              "lines": [
+                [
+                  {
+                    "content": "plain",
+                    "style": ""
+                  }
+                ]
+              ]
+            }
           },
           {
             "type": "blockquote",

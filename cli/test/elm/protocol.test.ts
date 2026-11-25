@@ -11,6 +11,12 @@ import {
   type Request,
   type Response,
 } from "../../src/elm/protocol";
+import { HighlightCache } from "../../src/highlight/cache";
+import {
+  createCodeHighlighter,
+  highlightCode,
+  languagesIn,
+} from "../../src/highlight/highlight";
 import { checkLinks } from "../../src/markdown/links";
 import { parseMarkdown } from "../../src/markdown/parse";
 
@@ -76,7 +82,7 @@ describe("encodeRequest", () => {
 });
 
 describe("the all-nodes fixture tree", () => {
-  test("is what the parser and link checker produce for all-nodes.md", () => {
+  test("is what parsing, link checking and highlighting produce for all-nodes.md", async () => {
     const [fixtureDocument] = (fixture("all-nodes-request") as Request)
       .documents;
     if (fixtureDocument === undefined)
@@ -101,7 +107,16 @@ describe("the all-nodes fixture tree", () => {
       [document],
       new ContentFiles([document.sourcePath]),
     );
-    expect(checked).toEqual({ ok: true, value: fixtureDocument.tree });
+    if (!checked.ok) throw new Error("the sample has a broken link");
+    using highlighter = await createCodeHighlighter(
+      { light: "github-light", dark: "github-dark" },
+      languagesIn([checked.value]),
+      new HighlightCache(),
+    );
+    expect(highlightCode(checked.value, document, highlighter)).toEqual({
+      ok: true,
+      value: fixtureDocument.tree,
+    });
   });
 });
 

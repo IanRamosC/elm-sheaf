@@ -14,7 +14,7 @@ import Sheaf.Html as Html exposing (Html)
 import Sheaf.Html.Attributes as Attributes
 import Sheaf.Internal.Component as Component exposing (Component, Kind(..))
 import Sheaf.Internal.Html as Internal
-import Sheaf.Internal.Protocol exposing (Alignment(..), Node(..), Span)
+import Sheaf.Internal.Protocol exposing (Alignment(..), Highlight, Node(..), Span, Token)
 import Sheaf.Internal.Results as Results
 import Sheaf.Ref as Ref exposing (Ref)
 
@@ -86,7 +86,8 @@ type alias Rendered =
 
 {-| Turn a body into HTML, or every problem in it, not just the first.
 
-Code blocks become `pre > code.language-<lang>`, headings get their `id`,
+Code blocks become Shiki's markup, `pre.shiki > code.language-<lang>` with
+a `span.line` per line, headings get their `id`,
 task-list items get a disabled checkbox and footnotes are laid out as GitHub
 does.
 
@@ -173,7 +174,7 @@ renderNode scope node =
             Ok [ Html.code [] [ Html.text code.value ] ]
 
         Code block ->
-            Ok [ codeBlock block.lang block.value ]
+            Ok [ codeBlock block.lang block.highlight ]
 
         Blockquote container ->
             element (Html.blockquote []) (renderNodes scope container.children)
@@ -272,11 +273,12 @@ withTitle title attributes =
     attributes ++ List.filterMap identity [ Maybe.map Attributes.title title ]
 
 
-{-| A trailing newline, as other Markdown renderers emit, so the code ends on
-its own line.
+{-| The markup of Shiki's `codeToHtml`, so that Shiki's documented CSS for
+light and dark themes applies. Lines are joined by newlines, with none after
+the last, as Shiki does.
 -}
-codeBlock : Maybe String -> String -> Html
-codeBlock language source =
+codeBlock : Maybe String -> Highlight -> Html
+codeBlock language highlight =
     let
         languageClass : List Html.Attribute
         languageClass =
@@ -287,7 +289,26 @@ codeBlock language source =
                 Nothing ->
                     []
     in
-    Html.pre [] [ Html.code languageClass [ Html.text (source ++ "\n") ] ]
+    Html.pre
+        [ Attributes.class "shiki"
+        , Attributes.attribute "style" highlight.style
+        , Attributes.attribute "tabindex" "0"
+        ]
+        [ Html.code languageClass
+            (highlight.lines
+                |> List.map (\tokens -> Html.span [ Attributes.class "line" ] (List.map codeToken tokens))
+                |> List.intersperse (Html.text "\n")
+            )
+        ]
+
+
+codeToken : Token -> Html
+codeToken token =
+    if String.isEmpty token.style then
+        Html.span [] [ Html.text token.content ]
+
+    else
+        Html.span [ Attributes.attribute "style" token.style ] [ Html.text token.content ]
 
 
 renderSheafLink :

@@ -23,6 +23,12 @@ import { runElm } from "./elm/run";
 import { atomFeed, rssFeed } from "./emit/feeds";
 import { sitemapXml } from "./emit/sitemap";
 import { type OutputFile, writeGenerated, writeSite } from "./emit/write";
+import { loadHighlightCache, saveHighlightCache } from "./highlight/cache";
+import {
+  createCodeHighlighter,
+  highlightCode,
+  languagesIn,
+} from "./highlight/highlight";
 import { checkLinks } from "./markdown/links";
 import { parseMarkdown } from "./markdown/parse";
 import { collect, err, ok, type Result } from "./result";
@@ -82,6 +88,13 @@ export async function build(
   );
   if (!parsed.ok) return parsed;
 
+  const highlighted = await highlightDocuments(
+    siteRoot,
+    config.value,
+    parsed.value,
+  );
+  if (!highlighted.ok) return highlighted;
+
   const elm = await findElm(siteRoot);
   if (!elm.ok) return elm;
   const compiled = await compileElm(siteRoot, {
@@ -97,7 +110,7 @@ export async function build(
       mode: options.mode,
     },
     collections,
-    parsed.value,
+    highlighted.value,
     slugTable(documents.value),
   );
   const ran = await runElm(compiled.value, request);
@@ -181,4 +194,30 @@ function parseDocuments(
       return checked.ok ? ok({ source, tree: checked.value }) : checked;
     }),
   );
+}
+
+/**
+ * Highlights the code of every document, drafts included, so their errors are
+ * reported in every mode. Only a build with no unknown language saves the
+ * cache, because a failed one has not asked for every entry the site uses.
+ */
+async function highlightDocuments(
+  siteRoot: string,
+  config: Config,
+  documents: ParsedDocument[],
+): Promise<Result<ParsedDocument[], Diagnostic[]>> {
+  const cache = await loadHighlightCache(siteRoot);
+  using highlighter = await createCodeHighlighter(
+    config.highlight,
+    languagesIn(documents.map(({ tree }) => tree)),
+    cache,
+  );
+  const highlighted = collect(
+    documents.map(({ source, tree }) => {
+      const result = highlightCode(tree, source, highlighter);
+      return result.ok ? ok({ source, tree: result.value }) : result;
+    }),
+  );
+  if (highlighted.ok) await saveHighlightCache(siteRoot, cache);
+  return highlighted;
 }

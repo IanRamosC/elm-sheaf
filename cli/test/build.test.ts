@@ -144,6 +144,53 @@ describe("build", () => {
   );
 
   test(
+    "highlights code and caches the tokens",
+    async () => {
+      const root = copyFixture("minimal");
+      writeFileSync(
+        join(root, "content/posts/2026-11-24-code.md"),
+        '---\ntitle: Code\n---\n\n```elm\nmain = text "<&>"\n```\n',
+      );
+
+      const result = await build(root, {
+        mode: "production",
+        write: true,
+        now,
+      });
+
+      expect(titlesOf(result)).toEqual([]);
+      const page = readFileSync(
+        join(root, "dist/posts/code/index.html"),
+        "utf8",
+      );
+      expect(page).toContain('<pre class="shiki" style="background-color:');
+      expect(page).toContain("&quot;&lt;&amp;&gt;&quot;</span>");
+      expect(existsSync(join(root, ".sheaf/cache/highlight.json"))).toBe(true);
+    },
+    SLOW,
+  );
+
+  test(
+    "reports an unknown language in a draft too",
+    async () => {
+      const root = copyFixture("minimal");
+      writeFileSync(
+        join(root, "content/posts/2026-11-24-code.md"),
+        "---\ntitle: Code\ndraft: true\n---\n\n```elmm\nx = 1\n```\n",
+      );
+
+      const result = await build(root, {
+        mode: "production",
+        write: true,
+        now,
+      });
+
+      expect(titlesOf(result)).toEqual(["UNKNOWN LANGUAGE"]);
+    },
+    SLOW,
+  );
+
+  test(
     "check fails on Debug like build does, because both use --optimize",
     async () => {
       const root = copyFixture("minimal");

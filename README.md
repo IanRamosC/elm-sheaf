@@ -39,9 +39,29 @@ Both take `--drafts` to include drafts and documents dated in the future.
 - Head tags for search engines and link previews: description, canonical URL,
   Open Graph, Twitter cards, stylesheets and feed links.
 - Sites served under a base path, such as `https://example.com/blog/`.
+- Code blocks highlighted at build time by [Shiki](https://shiki.style/), in a
+  light and a dark theme (`github-light` and `github-dark` unless `sheaf.json`
+  says otherwise). A block marked with a language Shiki doesn't know is an
+  error; use `text` for a block without highlighting.
 
-Not yet: Markdown directives and components, syntax highlighting, images,
-`sheaf dev` and `sheaf init`.
+  Pages use the light theme. To switch to the dark one with the reader's
+  system setting, add Shiki's CSS to your stylesheet:
+
+  ```css
+  @media (prefers-color-scheme: dark) {
+    .shiki,
+    .shiki span {
+      color: var(--shiki-dark) !important;
+      background-color: var(--shiki-dark-bg) !important;
+      font-style: var(--shiki-dark-font-style) !important;
+      font-weight: var(--shiki-dark-font-weight) !important;
+      text-decoration: var(--shiki-dark-text-decoration) !important;
+    }
+  }
+  ```
+
+Not yet: Markdown directives and components, images, `sheaf dev` and
+`sheaf init`.
 
 ## License
 
