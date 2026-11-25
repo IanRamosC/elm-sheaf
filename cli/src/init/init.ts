@@ -36,7 +36,10 @@ export async function initSite(
     const problem = await notASheafRepository(localRepository);
     if (problem !== undefined) return err([problem]);
   }
-  if (!(await isEmptyOrMissing(folder))) {
+  // Bun on Windows fails to `mkdir` "." even with `recursive`, so every
+  // write below goes to the absolute path.
+  const target = resolve(folder);
+  if (!(await isEmptyOrMissing(target))) {
     return err([
       {
         severity: "error",
@@ -47,19 +50,19 @@ export async function initSite(
     ]);
   }
 
-  await mkdir(folder, { recursive: true });
-  await cp(STARTER, folder, { recursive: true });
+  await mkdir(target, { recursive: true });
+  await cp(STARTER, target, { recursive: true });
   // npm drops files named `.gitignore` from packages, so the starter stores it without the dot.
-  await rename(join(folder, "gitignore"), join(folder, ".gitignore"));
+  await rename(join(target, "gitignore"), join(target, ".gitignore"));
 
-  const welcome = join(folder, "content/posts/welcome.md");
+  const welcome = join(target, "content/posts/welcome.md");
   await writeFile(
     welcome,
     (await readFile(welcome, "utf8")).replaceAll("{{today}}", today),
   );
-  await writeFile(join(folder, "elm.json"), elmJson(localRepository));
+  await writeFile(join(target, "elm.json"), elmJson(localRepository));
   await writeFile(
-    join(folder, "package.json"),
+    join(target, "package.json"),
     packageJson(localRepository, packageManifest.version),
   );
   return ok(undefined);
