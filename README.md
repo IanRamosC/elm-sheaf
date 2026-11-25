@@ -5,6 +5,7 @@
 Static sites with templates in Elm.
 
 [![Licence: BSD-3-Clause](https://img.shields.io/badge/licence-BSD--3--Clause-blue)][licence]
+[![CI](https://github.com/IanRamosC/elm-sheaf/actions/workflows/ci.yml/badge.svg?branch=main)][ci]
 
 Sheaf is a static site generator for Elm developers who want a blog, or a
 small site of their own, without an application framework. Your content is
@@ -188,5 +189,6 @@ your site, in `cli/templates/`, is also offered under the
 [cli]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/cli.md
 [contributing]: https://github.com/IanRamosC/elm-sheaf/blob/main/CONTRIBUTING.md
 [security]: https://github.com/IanRamosC/elm-sheaf/blob/main/SECURITY.md
+[ci]: https://github.com/IanRamosC/elm-sheaf/actions/workflows/ci.yml
 [licence]: https://github.com/IanRamosC/elm-sheaf/blob/main/LICENSE
 [starter-licence]: https://github.com/IanRamosC/elm-sheaf/blob/main/cli/templates/LICENSE

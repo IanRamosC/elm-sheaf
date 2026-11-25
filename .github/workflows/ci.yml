@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+  workflow_call:
+
+# A literal prefix rather than github.workflow: a called workflow sees its
+# caller's name, and would cancel the caller's own run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: cli/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+
+      - name: Install Elm tools
+        run: npm install --global elm@0.19.3-0 elm-test-rs@3.2.0-0 elm-review@2.13.5 elm-format@0.8.8
+
+      - name: Install dependencies
+        working-directory: cli
+        run: bun install --frozen-lockfile
+
+      # Before the tests, which build the fixtures in place and write .sheaf/gen/.
+      - name: Check Elm formatting
+        run: elm-format --validate src tests review/src cli/templates/default/src cli/test/fixtures
+
+      - name: Lint
+        working-directory: cli
+        run: bunx --bun biome check .
+
+      - name: Type-check
+        working-directory: cli
+        run: bunx --bun tsc --noEmit
+
+      - name: Test the CLI
+        working-directory: cli
+        run: bun test
+
+      - name: Test the Elm package
+        run: elm-test-rs
+
+      - name: Review the Elm package
+        run: elm-review
+
+      # Fails when an exposed value has no docs, as `elm publish` would.
+      - name: Build the Elm package docs
+        run: elm make --docs="$RUNNER_TEMP/docs.json"

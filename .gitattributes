@@ -1,0 +1,13 @@
+# Check out every text file with LF endings, on Windows too, so fixtures,
+# snapshots and elm-format see the same bytes on every platform.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

@@ -1,6 +1,6 @@
 {
   "name": "elm-sheaf",
-  "version": "0.1.0",
+  "version": "1.0.0-dev",
   "description": "Static site generator whose templates are written in Elm.",
   "license": "BSD-3-Clause",
   "type": "module",

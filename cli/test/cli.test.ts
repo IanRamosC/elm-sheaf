@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import packageJson from "../package.json";
 import { unsupportedBun } from "../src/cli/main";
 import {
   copyFixture,
@@ -328,7 +329,7 @@ describe("sheaf", () => {
     const { stdout, exitCode } = await sheaf(["--version"], import.meta.dir);
 
     expect(exitCode).toBe(0);
-    expect(stdout.trim()).toBe("0.1.0");
+    expect(stdout.trim()).toBe(packageJson.version);
   });
 });
 
