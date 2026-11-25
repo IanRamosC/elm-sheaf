@@ -7,6 +7,7 @@ import { err, ok, type Result } from "../result";
 import { URL_SCHEMES } from "../url-schemes";
 import { type DocumentDate, publicationDate } from "./dates";
 import type { CoverImage, SourceDocument } from "./document";
+import { isErrno } from "./files";
 import { splitFrontmatter } from "./frontmatter";
 
 /** A Markdown file and its text; `path` is relative to the site root. */
@@ -31,7 +32,7 @@ async function readContentEntries(root: string, recursive: boolean) {
       withFileTypes: true,
     });
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    if (isErrno(error) && error.code === "ENOENT") return [];
     throw error;
   }
 }

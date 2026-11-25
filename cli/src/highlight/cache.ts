@@ -1,6 +1,9 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { isErrno } from "../content/files";
+import type { Diagnostic } from "../diagnostics/diagnostic";
 import type { Highlight, HighlightToken } from "../markdown/tree";
+import { err, ok, type Result } from "../result";
 
 const CACHE_FOLDER = ".sheaf/cache";
 const CACHE_FILE = "highlight.json";
@@ -66,16 +69,33 @@ export async function loadHighlightCache(
 /**
  * Writes the entries this build used. The file is written under another name
  * and renamed into place, so an interrupted build never leaves half a cache.
+ * Failing to save costs the next build a re-highlight, so it is a warning.
  */
 export async function saveHighlightCache(
   siteRoot: string,
   cache: HighlightCache,
-): Promise<void> {
+): Promise<Result<void, Diagnostic>> {
   const folder = join(siteRoot, CACHE_FOLDER);
-  await mkdir(folder, { recursive: true });
   const temporary = join(folder, `${CACHE_FILE}.${crypto.randomUUID()}.tmp`);
-  await writeFile(temporary, JSON.stringify(Object.fromEntries(cache.used())));
-  await rename(temporary, join(folder, CACHE_FILE));
+  try {
+    await mkdir(folder, { recursive: true });
+    await writeFile(
+      temporary,
+      JSON.stringify(Object.fromEntries(cache.used())),
+    );
+    await rename(temporary, join(folder, CACHE_FILE));
+    return ok(undefined);
+  } catch (error) {
+    if (!isErrno(error)) throw error;
+    return err({
+      severity: "warning",
+      title: "CACHE NOT SAVED",
+      message: `I could not save the highlighted code to \`${CACHE_FOLDER}/${CACHE_FILE}\` (${error.code}), so the next build highlights it again.`,
+      hint: `Make sure \`${CACHE_FOLDER}\` is a folder you can write to.`,
+    });
+  } finally {
+    await rm(temporary, { force: true });
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

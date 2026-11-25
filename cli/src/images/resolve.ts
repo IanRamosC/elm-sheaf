@@ -2,6 +2,7 @@ import { constants } from "node:fs";
 import {
   access,
   mkdir,
+  readdir,
   readFile,
   realpath,
   rename,
@@ -11,7 +12,7 @@ import {
 import { join, posix, sep } from "node:path";
 import type { Config } from "../config/config";
 import type { SourceDocument } from "../content/document";
-import type { ContentFiles } from "../content/files";
+import { type ContentFiles, isErrno } from "../content/files";
 import type { Diagnostic, Span } from "../diagnostics/diagnostic";
 import type { DocumentImage } from "../elm/protocol";
 import type { LocalImage, Node } from "../markdown/tree";
@@ -209,11 +210,18 @@ async function locateImage(
       message: `The file is \`${posix.relative(base, lookup.caseOf)}\`, but this refers to \`${posix.relative(base, target)}\`. Linux treats them as different files, so the site would fail to build there.`,
     });
   }
-  const [real, realFolder] = await Promise.all([
-    realpath(join(siteRoot, lookup.found)),
-    realpath(join(siteRoot, folder)),
-  ]);
-  return real.startsWith(realFolder + sep) ? ok(lookup.found) : err(outside);
+  try {
+    const [real, realFolder] = await Promise.all([
+      realpath(join(siteRoot, lookup.found)),
+      realpath(join(siteRoot, folder)),
+    ]);
+    return real.startsWith(realFolder + sep) ? ok(lookup.found) : err(outside);
+  } catch (error) {
+    // Bun resolves a link by opening the file, so some systems fail here
+    // for a file that cannot be read.
+    if (!isErrno(error)) throw error;
+    return err(notReadable(lookup.found, error));
+  }
 }
 
 // Each image holds its source bytes from the read until its variants are
@@ -235,7 +243,13 @@ async function readAndPublish(
   sitePath: string,
   images: Config["images"],
 ): Promise<Result<Published, Problem>> {
-  const bytes = new Uint8Array(await readFile(join(siteRoot, sitePath)));
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(await readFile(join(siteRoot, sitePath)));
+  } catch (error) {
+    if (!isErrno(error)) throw error;
+    return err(notReadable(sitePath, error));
+  }
   const info = await readImageInfo(bytes, sitePath);
   if (!info.ok) return info;
   const { local, files } = planImage(imageHash(bytes), info.value, images);
@@ -246,8 +260,17 @@ async function readAndPublish(
   );
   const missing = files.filter((_, index) => !cached[index]);
   if (missing.length > 0) {
-    const written = await writeToCache(bytes, missing, cache);
-    if (!written.ok) return err(codecProblem(written.error, sitePath));
+    try {
+      const written = await writeToCache(bytes, missing, cache);
+      if (!written.ok) return err(codecProblem(written.error, sitePath));
+    } catch (error) {
+      if (!isErrno(error)) throw error;
+      return err({
+        title: "CACHE NOT WRITABLE",
+        message: `I could not write to \`${CACHE_FOLDER}/\` (${error.code}), where the encoded images are kept.`,
+        hint: `Make sure \`${CACHE_FOLDER}\` is a folder you can write to. It is safe to delete: the next build fills it again.`,
+      });
+    }
   }
   return ok({
     local,
@@ -256,6 +279,41 @@ async function readAndPublish(
       path: `${IMAGE_FOLDER}/${name}`,
     })),
   });
+}
+
+function notReadable(sitePath: string, error: NodeJS.ErrnoException): Problem {
+  return {
+    title: "IMAGE NOT READABLE",
+    message: `I could not read \`${sitePath}\` (${error.code}).`,
+    hint: "Check that the file can be read by the user running Sheaf.",
+  };
+}
+
+/**
+ * Deletes the files of `.sheaf/cache/images/` that no image of the site uses
+ * any more, so the cache does not outgrow the site. `used` must hold the
+ * files of every document, drafts included: a production build that dropped a
+ * draft's variants would only make the next `--drafts` build encode them again.
+ */
+export async function pruneImageCache(
+  siteRoot: string,
+  used: ImageFile[],
+): Promise<void> {
+  const cache = join(siteRoot, CACHE_FOLDER);
+  const keep = new Set(used.map(({ cached }) => cached));
+  let names: string[];
+  try {
+    names = await readdir(cache);
+  } catch (error) {
+    if (isErrno(error) && error.code === "ENOENT") return;
+    throw error;
+  }
+  await Promise.all(
+    names
+      .filter((name) => !keep.has(join(cache, name)))
+      // A file that cannot be deleted only costs disk space, not a build.
+      .map((name) => rm(join(cache, name), { force: true }).catch(() => {})),
+  );
 }
 
 async function readImageInfo(

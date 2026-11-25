@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -264,6 +266,43 @@ describe("the highlight cache", () => {
 
     expect(cache.misses).toBe(1);
     expect(cache.hits).toBe(1);
+  });
+
+  test.skipIf(process.getuid?.() === 0)(
+    "warns when the cache folder cannot be written",
+    async () => {
+      const root = temporarySite();
+      const folder = join(root, ".sheaf/cache");
+      mkdirSync(folder, { recursive: true });
+      chmodSync(folder, 0o555);
+      const cache = new HighlightCache();
+      await highlightsOf(body, cache);
+
+      try {
+        const saved = await saveHighlightCache(root, cache);
+
+        expect(!saved.ok && saved.error).toMatchObject({
+          severity: "warning",
+          title: "CACHE NOT SAVED",
+        });
+      } finally {
+        chmodSync(folder, 0o755);
+      }
+    },
+  );
+
+  test("removes the temporary file when the rename fails", async () => {
+    const root = temporarySite();
+    const folder = join(root, ".sheaf/cache");
+    mkdirSync(join(folder, "highlight.json"), { recursive: true });
+    writeFileSync(join(folder, "highlight.json/occupied"), "");
+    const cache = new HighlightCache();
+    await highlightsOf(body, cache);
+
+    const saved = await saveHighlightCache(root, cache);
+
+    expect(!saved.ok && saved.error.title).toBe("CACHE NOT SAVED");
+    expect(readdirSync(folder)).toEqual(["highlight.json"]);
   });
 
   test("loads as empty when there is no highlight.json", async () => {

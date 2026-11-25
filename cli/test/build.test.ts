@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -587,6 +588,123 @@ describe("the blog fixture", () => {
         ),
       ).not.toEqual([]);
       expect(filesMentioning(root, [hash])).toEqual([]);
+    },
+    SLOW,
+  );
+
+  test(
+    "drops the cached variants of an image the site no longer uses",
+    async () => {
+      const root = copyFixture("blog");
+      const post = join(root, "content/posts/2026-11-19-pictures");
+      const photo = imageHash(readFileSync(join(post, "photo.png")));
+      const cover = imageHash(readFileSync(join(post, "cover.png")));
+      const cached = (hash: string) =>
+        readdirSync(join(root, ".sheaf/cache/images")).filter((name) =>
+          name.startsWith(hash),
+        );
+      expect(titlesOf(await build(root, options(root)))).toEqual([]);
+      expect(cached(photo)).not.toEqual([]);
+
+      rmSync(join(post, "photo.png"));
+      writeFileSync(
+        join(post, "index.md"),
+        readFileSync(join(post, "index.md"), "utf8").replace(
+          "![A photo](photo.png)\n",
+          "",
+        ),
+      );
+      expect(titlesOf(await build(root, options(root)))).toEqual([]);
+
+      expect(cached(photo)).toEqual([]);
+      expect(cached(cover)).not.toEqual([]);
+    },
+    SLOW,
+  );
+
+  test(
+    "keeps a draft's cached variants through a production build",
+    async () => {
+      const root = copyFixture("blog");
+      const image = pngBytes(300, 200);
+      writeFileSync(join(root, "content/posts/sketch.png"), image);
+      writeFileSync(
+        join(root, "content/posts/2026-11-26-sketch.md"),
+        "---\ntitle: Sketch\ndraft: true\n---\n\n![A sketch](sketch.png)\n",
+      );
+      const cached = () =>
+        readdirSync(join(root, ".sheaf/cache/images")).filter((name) =>
+          name.startsWith(imageHash(image)),
+        );
+
+      await build(root, options(root, { mode: "drafts" }));
+      const before = cached();
+      await build(root, options(root));
+
+      expect(before).not.toEqual([]);
+      expect(cached()).toEqual(before);
+    },
+    SLOW,
+  );
+
+  test(
+    "reports a cache that is not a folder as an error",
+    async () => {
+      const root = copyFixture("blog");
+      mkdirSync(join(root, ".sheaf/cache"), { recursive: true });
+      writeFileSync(join(root, ".sheaf/cache/images"), "not a folder");
+
+      const result = await build(root, options(root));
+
+      expect(titlesOf(result)).toContain("CACHE NOT WRITABLE");
+    },
+    SLOW,
+  );
+
+  test.skipIf(process.getuid?.() === 0)(
+    "reports an unreadable image at the image",
+    async () => {
+      const root = copyFixture("blog");
+      const photo = join(root, "content/posts/2026-11-19-pictures/photo.png");
+      chmodSync(photo, 0o000);
+
+      try {
+        const result = await build(root, options(root));
+
+        const diagnostic = result.ok ? undefined : result.error[0];
+        expect(diagnostic?.title).toBe("IMAGE NOT READABLE");
+        expect(diagnostic?.sourcePath).toBe(
+          "content/posts/2026-11-19-pictures/index.md",
+        );
+        expect(diagnostic?.span?.start.line).toBe(10);
+      } finally {
+        chmodSync(photo, 0o644);
+      }
+    },
+    SLOW,
+  );
+
+  test.skipIf(process.getuid?.() === 0)(
+    "warns, and still builds, when the highlight cache cannot be saved",
+    async () => {
+      const root = copyFixture("minimal");
+      writeFileSync(
+        join(root, "content/posts/2026-11-23-hello-world.md"),
+        "---\ntitle: Hello, world\n---\n\n```elm\nx = 1\n```\n",
+      );
+      const cache = join(root, ".sheaf/cache");
+      mkdirSync(cache, { recursive: true });
+      chmodSync(cache, 0o555);
+
+      try {
+        const result = await build(root, options(root));
+
+        expect(result.ok && result.value.warnings.map((w) => w.title)).toEqual([
+          "CACHE NOT SAVED",
+        ]);
+      } finally {
+        chmodSync(cache, 0o755);
+      }
     },
     SLOW,
   );

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+  chmod,
   mkdir,
   mkdtemp,
   readdir,
@@ -14,7 +15,11 @@ import type { Config } from "../../src/config/config";
 import { listFiles } from "../../src/content/files";
 import { loadContent } from "../../src/content/load";
 import { imageOutputs } from "../../src/images/emit";
-import { type ImageFile, resolveImages } from "../../src/images/resolve";
+import {
+  type ImageFile,
+  pruneImageCache,
+  resolveImages,
+} from "../../src/images/resolve";
 import { parseMarkdown } from "../../src/markdown/parse";
 import type { Node } from "../../src/markdown/tree";
 import {
@@ -417,3 +422,67 @@ async function fileIdentity({ cached }: ImageFile) {
   const { ino, mtimeMs } = await stat(cached);
   return { ino, mtimeMs };
 }
+
+describe("cache upkeep", () => {
+  test("pruning keeps the files in use and deletes the rest", async () => {
+    const root = await site({
+      [POST]: "![x](photo.png)\n",
+      "content/posts/a/photo.png": pngBytes(600, 400),
+    });
+    const { files } = await resolved(root, POST);
+    const stale = join(root, ".sheaf/cache/images/0000-480.webp");
+    await writeFile(stale, "old");
+
+    await pruneImageCache(root, files);
+
+    expect(await cachedNames(root)).toEqual(
+      files.map(({ cached }) => basename(cached)).sort(),
+    );
+  });
+
+  test("pruning a site with no cache does nothing", async () => {
+    const root = await site({});
+
+    await pruneImageCache(root, []);
+
+    expect(await cachedNames(root)).toEqual([]);
+  });
+
+  test("reports a cache that is not a folder", async () => {
+    const root = await site({
+      [POST]: "![x](photo.png)\n",
+      "content/posts/a/photo.png": pngBytes(600, 400),
+      ".sheaf/cache/images": "not a folder",
+    });
+
+    expect(await problems(root, POST)).toMatchObject([
+      {
+        title: "CACHE NOT WRITABLE",
+        span: { start: { line: 1, column: 1 } },
+      },
+    ]);
+  });
+
+  test.skipIf(process.getuid?.() === 0)(
+    "reports an image that cannot be read",
+    async () => {
+      const root = await site({
+        [POST]: "Text.\n\n![x](photo.png)\n",
+        "content/posts/a/photo.png": pngBytes(600, 400),
+      });
+      const photo = join(root, "content/posts/a/photo.png");
+      await chmod(photo, 0o000);
+
+      try {
+        expect(await problems(root, POST)).toMatchObject([
+          {
+            title: "IMAGE NOT READABLE",
+            span: { start: { line: 3, column: 1 } },
+          },
+        ]);
+      } finally {
+        await chmod(photo, 0o644);
+      }
+    },
+  );
+});

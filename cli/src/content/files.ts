@@ -49,6 +49,11 @@ export class ContentFiles {
   }
 }
 
+/** Whether `error` is a failed system call, which has a `code` such as `ENOENT`. */
+export function isErrno(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
+}
+
 /** Lists every file under `<root>/content`; see {@link listFiles}. */
 export function listContentFiles(root: string): Promise<ContentFiles> {
   return listFiles(root, "content");
@@ -82,7 +87,7 @@ async function readEntries(folder: string) {
   try {
     return await readdir(folder, { recursive: true, withFileTypes: true });
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    if (isErrno(error) && error.code === "ENOENT") return [];
     throw error;
   }
 }

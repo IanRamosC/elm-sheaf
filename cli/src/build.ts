@@ -4,6 +4,7 @@ import { type Config, parseConfig } from "./config/config";
 import type { SourceDocument } from "./content/document";
 import {
   type ContentFiles,
+  isErrno,
   listContentFiles,
   listFiles,
 } from "./content/files";
@@ -36,7 +37,11 @@ import {
   languagesIn,
 } from "./highlight/highlight";
 import { imageOutputs } from "./images/emit";
-import { type ImageFile, resolveImages } from "./images/resolve";
+import {
+  type ImageFile,
+  pruneImageCache,
+  resolveImages,
+} from "./images/resolve";
 import { checkLinks } from "./markdown/links";
 import { parseMarkdown } from "./markdown/parse";
 import { collect, err, ok, type Result } from "./result";
@@ -110,7 +115,7 @@ export async function build(
   const imaged = await resolveDocumentImages(
     siteRoot,
     config.value,
-    highlighted.value,
+    highlighted.value.documents,
   );
   if (!imaged.ok) return imaged;
 
@@ -152,7 +157,10 @@ export async function build(
   if (options.output !== undefined) {
     await writeSite(options.output, outputs, staticFiles.value);
   }
-  return ok({ pages: pages.length, warnings: diagnostics });
+  return ok({
+    pages: pages.length,
+    warnings: [...highlighted.value.warnings, ...diagnostics],
+  });
 }
 
 function outputFiles(
@@ -201,7 +209,7 @@ async function readConfig(
   try {
     text = await readFile(join(siteRoot, "sheaf.json"), "utf8");
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    if (!isErrno(error) || error.code !== "ENOENT") throw error;
     return err([
       {
         severity: "error",
@@ -239,7 +247,9 @@ async function highlightDocuments(
   siteRoot: string,
   config: Config,
   documents: ParsedDocument[],
-): Promise<Result<ParsedDocument[], Diagnostic[]>> {
+): Promise<
+  Result<{ documents: ParsedDocument[]; warnings: Diagnostic[] }, Diagnostic[]>
+> {
   const cache = await loadHighlightCache(siteRoot);
   using highlighter = await createCodeHighlighter(
     config.highlight,
@@ -252,14 +262,19 @@ async function highlightDocuments(
       return result.ok ? ok({ source, tree: result.value }) : result;
     }),
   );
-  if (highlighted.ok) await saveHighlightCache(siteRoot, cache);
-  return highlighted;
+  if (!highlighted.ok) return highlighted;
+  const saved = await saveHighlightCache(siteRoot, cache);
+  return ok({
+    documents: highlighted.value,
+    warnings: saved.ok ? [] : [saved.error],
+  });
 }
 
 /**
  * Resolves the images of every document, drafts included, so their errors are
  * reported in every mode. Only the files of documents in this build's output
- * are published, so a draft's images never reach a production `dist/`.
+ * are published, so a draft's images never reach a production `dist/`. The
+ * cache keeps the files of all of them and drops the rest.
  */
 async function resolveDocumentImages(
   siteRoot: string,
@@ -286,12 +301,17 @@ async function resolveDocumentImages(
           tree: resolved.value.tree,
           ...(image && { image }),
         },
+        imageFiles,
         published: source.excluded ? [] : imageFiles,
       });
     }),
   );
   const resolved = collect(results);
   if (!resolved.ok) return resolved;
+  await pruneImageCache(
+    siteRoot,
+    resolved.value.flatMap(({ imageFiles }) => imageFiles),
+  );
   return ok({
     documents: resolved.value.map(({ document }) => document),
     published: resolved.value.flatMap(({ published }) => published),
