@@ -4,6 +4,10 @@
   "description": "Static site generator whose templates are written in Elm.",
   "license": "BSD-3-Clause",
   "type": "module",
+  "files": [
+    "src",
+    "templates"
+  ],
   "bin": {
     "sheaf": "src/index.ts"
   },

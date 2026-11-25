@@ -1,0 +1,275 @@
+/* biome-ignore-all lint/complexity/noImportantStyles: Shiki sets the light colours inline, which only !important overrides. */
+
+/*
+ * Contrast ratios (WCAG 2.1; AA asks 4.5:1 for text):
+ *
+ *               on --bg   on --surface
+ *   light
+ *     --text     15.81     14.22
+ *     --muted     6.25      5.63
+ *     --accent    6.28      5.65
+ *     --warning   6.39      5.75
+ *   dark
+ *     --text     13.84     11.96
+ *     --muted     7.36      6.36
+ *     --accent    8.63      7.46
+ *     --warning   8.52      7.36
+ *
+ * Recompute them after changing a colour.
+ */
+:root {
+  color-scheme: light dark;
+  --bg: #fbfaf7;
+  --surface: #f0eee8;
+  --text: #1d1f23;
+  --muted: #595e66;
+  --accent: #245f9e;
+  --warning: #8f4a00;
+  --measure: 42rem;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181c;
+    --surface: #22252b;
+    --text: #e4e3df;
+    --muted: #a2a7b0;
+    --accent: #8ab8f0;
+    --warning: #e9a65a;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+}
+
+/* Page */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 0 1.25rem;
+  background: var(--bg);
+  color: var(--text);
+  font: 1.125rem / 1.65 var(--sans);
+  overflow-wrap: break-word;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 0.15em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -10rem;
+  padding: 0.5rem 1rem;
+  background: var(--surface);
+}
+
+.skip-link:focus {
+  top: 1rem;
+}
+
+.site-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  padding: 2rem 0;
+}
+
+.site-title {
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.site-header ul {
+  display: flex;
+  gap: 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-footer {
+  margin-top: 4rem;
+  padding: 1.5rem 0 3rem;
+  border-top: 1px solid var(--surface);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.site-footer p {
+  margin: 0.25rem 0;
+}
+
+/* Text */
+
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: 2rem;
+  margin: 0 0 0.5rem;
+}
+
+h2 {
+  font-size: 1.4rem;
+  margin: 2.5rem 0 0.75rem;
+}
+
+img,
+picture,
+svg,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+blockquote {
+  margin: 1.5rem 0;
+  padding-left: 1.25rem;
+  border-left: 3px solid var(--surface);
+  color: var(--muted);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--surface);
+  text-align: left;
+}
+
+/* Code */
+
+code,
+pre {
+  font-family: var(--mono);
+  font-size: 0.9em;
+}
+
+:not(pre) > code {
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+pre {
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  border-radius: 6px;
+  line-height: 1.5;
+}
+
+/* Shiki's documented CSS for dark themes; the light ones are inline. */
+@media (prefers-color-scheme: dark) {
+  .shiki,
+  .shiki span {
+    color: var(--shiki-dark) !important;
+    background-color: var(--shiki-dark-bg) !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
+  }
+}
+
+/* Posts */
+
+.byline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0 0 2rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.post-list,
+.archive,
+.tag-index {
+  padding: 0;
+  list-style: none;
+}
+
+.post-list li {
+  margin-bottom: 2rem;
+}
+
+.post-list h2 {
+  margin: 0;
+}
+
+.post-list time,
+.archive time {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.post-list p {
+  margin: 0.25rem 0 0;
+}
+
+.archive li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.archive time {
+  min-width: 10rem;
+}
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2rem;
+}
+
+.callout {
+  margin: 1.5rem 0;
+  padding: 0.75rem 1.25rem;
+  border-left: 4px solid var(--accent);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.callout.warning {
+  border-left-color: var(--warning);
+}
+
+.callout-label {
+  margin: 0;
+}
+
+.callout.warning .callout-label {
+  color: var(--warning);
+}

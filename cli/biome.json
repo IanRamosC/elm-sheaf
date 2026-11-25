@@ -4,6 +4,7 @@
     "includes": [
       "**",
       "!test/fixtures/**/content",
+      "!templates/default/content",
       "!**/.sheaf",
       "!**/dist",
       "!**/elm-stuff"
