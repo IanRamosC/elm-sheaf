@@ -18,6 +18,7 @@
   "scripts": {
     "test": "bun test",
     "embed-fixtures": "bun scripts/embed-protocol-fixtures.ts",
+    "screenshots": "bun scripts/screenshots.ts",
     "check": "bunx --bun biome check . && bunx --bun tsc --noEmit"
   },
   "devDependencies": {

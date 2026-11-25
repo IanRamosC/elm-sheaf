@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img">
+  <title>Sheaf: static sites with templates in Elm</title>
+  <rect width="1280" height="640" fill="#24599a"/>
+  <g transform="translate(120 160) scale(5)">
+    <rect x="4" y="4" width="56" height="56" rx="14" fill="none" stroke="#fbfaf7" stroke-width="1.2" opacity="0.35"/>
+    <g fill="none" stroke="#fbfaf7" stroke-width="7">
+      <path d="M47 17.5 H28"/>
+      <path d="M28 17.5 A7 7 0 0 0 28 31.5" opacity="0.62"/>
+      <path d="M28 31.5 H36"/>
+      <path d="M36 31.5 A7 7 0 0 1 36 45.5" opacity="0.62"/>
+      <path d="M36 45.5 H17"/>
+    </g>
+  </g>
+  <g fill="#fbfaf7" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+    <text x="500" y="330" font-size="150" font-weight="700" letter-spacing="-4">sheaf</text>
+    <text x="504" y="410" font-size="44" opacity="0.85">Static sites with templates in Elm</text>
+  </g>
+</svg>

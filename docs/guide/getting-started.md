@@ -66,6 +66,12 @@ which downloads Elm 0.19.3. It copies a
 `http://127.0.0.1:4000/`. Open it, then edit `content/posts/welcome.md`: the
 site rebuilds and the page reloads when you save.
 
+The welcome post follows the reader's colour scheme:
+
+![The welcome post in the light colour scheme](../images/post-light.png)
+
+![The welcome post in the dark colour scheme](../images/post-dark.png)
+
 ## What's in the site
 
 ```

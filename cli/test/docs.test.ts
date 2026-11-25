@@ -227,3 +227,90 @@ describe("the documentation", () => {
     expect(broken).toEqual([]);
   });
 });
+
+const RAW = "https://raw.githubusercontent.com/IanRamosC/elm-sheaf/main/";
+
+/**
+ * The repository paths of the images a Markdown file shows, written either
+ * relative to the file or as a `raw.githubusercontent.com` URL on `main`.
+ * Images hosted elsewhere, such as badges, are left out.
+ */
+function imagesShownBy(path: string): string[] {
+  const prose = splitMarkdown(read(path)).prose.join("\n");
+  const definitions = new Map(
+    [...prose.matchAll(/^\s*\[([^\]]+)\]:\s*(\S+)/gm)].map((match) => [
+      (match[1] ?? "").toLowerCase(),
+      match[2] ?? "",
+    ]),
+  );
+  const targets = [
+    ...[...prose.matchAll(/!\[[^\]]*\]\(([^)\s]+)/g)].map(
+      (match) => match[1] ?? "",
+    ),
+    ...[...prose.matchAll(/!\[[^\]]*\]\[([^\]]+)\]/g)].map(
+      (match) => definitions.get((match[1] ?? "").toLowerCase()) ?? "",
+    ),
+  ];
+  return targets.flatMap((target) => {
+    if (target.startsWith(RAW)) return [target.slice(RAW.length)];
+    if (/^[a-z][a-z0-9+.-]*:/i.test(target)) return [];
+    return [relative(REPO, join(dirname(path), target))];
+  });
+}
+
+describe("the repository's images", () => {
+  const ASSETS = join(REPO, ".github/assets");
+  const IMAGES = join(REPO, "docs/images");
+  const filesIn = (directory: string, extension: string) =>
+    existsSync(directory) ? filesUnder(directory, extension) : [];
+
+  test("include every image the README and the guide show", () => {
+    const shown = [join(REPO, "README.md"), ...guidePages()].flatMap((path) =>
+      imagesShownBy(path).map((image) => ({ page: path, image })),
+    );
+    expect(shown.map(({ image }) => image)).toContain(
+      ".github/assets/logo.svg",
+    );
+    const missing = shown
+      .filter(({ image }) => !existsSync(join(REPO, image)))
+      .map(({ page, image }) => `${relative(REPO, page)}: ${image}`);
+    expect(missing).toEqual([]);
+  });
+
+  test("draw each icon on a 64 by 64 grid, with a title", () => {
+    const icons = filesIn(ASSETS, ".svg").filter(
+      (path) => !path.endsWith("social-preview.svg"),
+    );
+    expect(icons.map((path) => relative(ASSETS, path)).sort()).toEqual([
+      "favicon.svg",
+      "logo-dark.svg",
+      "logo.svg",
+    ]);
+    const malformed = icons
+      .filter((path) => {
+        const svg = read(path);
+        return (
+          !svg.includes('viewBox="0 0 64 64"') ||
+          !/<title>[^<]+<\/title>/.test(svg)
+        );
+      })
+      .map((path) => relative(REPO, path));
+    expect(malformed).toEqual([]);
+  });
+
+  test("keep every PNG under 300 KB", () => {
+    const pngs = [...filesIn(ASSETS, ".png"), ...filesIn(IMAGES, ".png")];
+    expect(pngs.length).toBeGreaterThan(0);
+    const large = pngs
+      .filter((path) => Bun.file(path).size >= 300 * 1024)
+      .map((path) => `${relative(REPO, path)}: ${Bun.file(path).size} bytes`);
+    expect(large).toEqual([]);
+  });
+});
+
+test("the code of conduct names no email address", () => {
+  const path = join(REPO, "CODE_OF_CONDUCT.md");
+  expect(existsSync(path)).toBe(true);
+  const text = existsSync(path) ? read(path) : "";
+  expect(text.match(/[\w.+-]+@[\w-]+\.[\w.]+/g) ?? []).toEqual([]);
+});

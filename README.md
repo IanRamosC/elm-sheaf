@@ -1,4 +1,10 @@
+![Sheaf](https://raw.githubusercontent.com/IanRamosC/elm-sheaf/main/.github/assets/logo.svg)
+
 # Sheaf
+
+Static sites with templates in Elm.
+
+[![Licence: BSD-3-Clause](https://img.shields.io/badge/licence-BSD--3--Clause-blue)][licence]
 
 Sheaf is a static site generator whose templates are written in Elm. Your
 content is Markdown with frontmatter, your pages are typed Elm functions, and
@@ -20,6 +26,8 @@ This document has a `sumary` field, but its collection does not declare one.
 
 Did you mean `summary`?
 ```
+
+![The home page of the starter blog that sheaf init creates](https://raw.githubusercontent.com/IanRamosC/elm-sheaf/main/docs/images/home-light.png)
 
 ## A short example
 
@@ -63,6 +71,27 @@ preset, `Sheaf.Blog`, which makes posts, pages, a paginated index, tag pages,
 an archive, RSS and Atom feeds and a sitemap from a handful of layouts. Links
 between documents, written `pages:about` in Markdown or
 `Sheaf.link Content.Pages.about` in Elm, are checked when the site is built.
+
+## Why Sheaf?
+
+Sheaf is for Elm developers who want a blog or a content site whose links and
+frontmatter are checked at build time and whose pages carry no JavaScript,
+with templates in the language they already know. Other tools may suit you
+better:
+
+- [elm-pages][elm-pages] is a hybrid framework: its routes can be pre-rendered
+  or rendered on a server, and its pages become a full Elm application in the
+  browser. Choose it for server-rendered or interactive pages; Sheaf only
+  builds static ones.
+- [Elmstatic][elmstatic] also renders Elm to HTML. Its last release, 0.7.3,
+  came out in August 2021.
+- [Hugo][hugo], [Zola][zola], [Eleventy][eleventy] and [Astro][astro] are
+  mature and do far more. Their templates are written in Go templates, Tera, a
+  choice of languages such as Nunjucks and Liquid, and Astro components. Some
+  check part of what Sheaf checks: Hugo [fails the build][hugo-ref] on a broken
+  `ref` link, Zola on a [broken internal link][zola-links], and Astro
+  [validates frontmatter][astro-schema] against a schema. Sheaf's templates are
+  Elm, so the compiler checks them along with everything they use.
 
 ## Status
 
@@ -140,6 +169,15 @@ your site, in `cli/templates/`, is also offered under the
 
 <!-- Full URLs, because this README is also shown on npm and on the Elm package website. -->
 
+[elm-pages]: https://elm-pages.com/docs/what-is-elm-pages
+[elmstatic]: https://github.com/alexkorban/elmstatic
+[hugo]: https://gohugo.io/templates/introduction/
+[hugo-ref]: https://gohugo.io/methods/page/ref/
+[zola]: https://www.getzola.org/documentation/templates/overview/
+[zola-links]: https://www.getzola.org/documentation/content/linking/
+[eleventy]: https://www.11ty.dev/docs/languages/
+[astro]: https://docs.astro.build/
+[astro-schema]: https://docs.astro.build/en/guides/content-collections/
 [getting-started]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/getting-started.md
 [content]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/content.md
 [templates]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/templates.md
