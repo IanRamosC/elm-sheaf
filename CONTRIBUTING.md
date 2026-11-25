@@ -17,7 +17,7 @@ You need:
 - Elm 0.19.3 and the Elm tools, installed with npm:
 
   ```sh
-  npm install -g elm@0.19.3-0 elm-test-rs elm-review elm-format
+  npm install -g elm@0.19.3-0 elm-test-rs@3.2.0-0 elm-review@2.13.5 elm-format@0.8.8
   ```
 
   The Elm package is tested with `elm-test-rs`, because older `elm-test`
