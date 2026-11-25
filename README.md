@@ -1,105 +1,153 @@
 # Sheaf
 
-Sheaf is a static site generator whose templates are written in Elm. You describe
-your site's pages as typed Elm functions, keep your content in Markdown with
-frontmatter, and Sheaf renders the whole site to plain HTML files.
+Sheaf is a static site generator whose templates are written in Elm. Your
+content is Markdown with frontmatter, your pages are typed Elm functions, and
+the result is a folder of plain HTML and CSS with no JavaScript in it.
 
-The repository holds two packages:
+It is for Elm developers who want a blog, or a small site of their own, without
+an application framework. Sheaf checks what a static site usually gets wrong
+before it ships: a misspelled frontmatter field, a link to a post that doesn't
+exist, a code block in a language it can't highlight, or an image that isn't
+there all fail the build with a message that points at the line.
 
-- the root is the Elm package `ianramosc/elm-sheaf`, the library your templates import;
-- `cli/` is the npm package `elm-sheaf`, the Bun and TypeScript host that builds the site.
+```
+-- UNKNOWN FIELD ---------------------------------- content/posts/welcome.md:4:1
 
-## Start a new site
+This document has a `sumary` field, but its collection does not declare one.
+
+    4| sumary: What's here, and what to change first.
+       ^^^^^^
+
+Did you mean `summary`?
+```
+
+## A short example
+
+A post is a Markdown file in `content/posts/`, with directives for components
+that you write in Elm:
+
+```markdown
+---
+title: Welcome to your blog
+date: 2026-11-25
+summary: What's here, and what to change first.
+tags: [Sheaf]
+---
+
+:::callout{kind=note}
+`bunx sheaf dev` rebuilds the site and reloads the browser whenever you save.
+:::
+```
+
+`src/Site.elm` declares what the frontmatter holds, and which templates render
+it:
+
+```elm
+type alias PostMeta =
+    { title : String
+    , summary : Maybe String
+    , tags : List String
+    }
+
+
+postFrontmatter : Frontmatter PostMeta
+postFrontmatter =
+    Frontmatter.succeed PostMeta
+        |> Frontmatter.required "title" Frontmatter.string
+        |> Frontmatter.optional "summary" Frontmatter.string
+        |> Frontmatter.withDefault "tags" [] (Frontmatter.list Frontmatter.string)
+```
+
+Both come from the starter that `sheaf init` writes. The starter uses the blog
+preset, `Sheaf.Blog`, which makes posts, pages, a paginated index, tag pages,
+an archive, RSS and Atom feeds and a sitemap from a handful of layouts. Links
+between documents, written `pages:about` in Markdown or
+`Sheaf.link Content.Pages.about` in Elm, are checked when the site is built.
+
+## Status
+
+Sheaf is not released yet. Neither the npm package `elm-sheaf` nor the Elm
+package `ianramosc/elm-sheaf` is published, so for now you run the CLI from a
+clone of this repository and create sites with `--local`, which points them at
+that clone. Such a site can't be built on a host yet, so delete the starter's
+`.github/workflows/deploy.yml` until the packages are published.
+[Getting started][getting-started] walks through it. Expect the API to change
+before the first release.
+
+## Requirements
+
+- [Bun](https://bun.sh) 1.4.5 or newer.
+- [Elm 0.19.3](https://guide.elm-lang.org/install/elm.html). Sheaf looks for
+  `elm` in your site's `node_modules/.bin`, then on your `PATH`. A site made by
+  `sheaf init` has Elm in its `package.json`, so `bun install` usually provides
+  it.
+
+## Quick start
 
 ```sh
-bunx elm-sheaf init my-blog
+git clone https://github.com/IanRamosC/elm-sheaf.git
+cd elm-sheaf/cli
+bun install
+cd ../..
+bun elm-sheaf/cli/src/index.ts init my-blog --local elm-sheaf
 cd my-blog
 bun install
 bunx sheaf dev
 ```
 
-`init` creates the folder if it's missing and refuses one that has anything in it,
-hidden files included. This works once both packages are published; until then, point
-`--local` at a checkout of this repository:
+`sheaf dev` prints the address it serves the site at, such as
+`http://127.0.0.1:4000/`. Edit `content/posts/welcome.md` and the page reloads.
 
-```sh
-bun run /path/to/sheaf/cli/src/index.ts init my-blog --local /path/to/sheaf
-```
-
-`bun install` copies a `file:` dependency, so after editing the repository's `cli/`, run
-`bun install` again in the site.
-
-## Requirements and commands
-
-Sheaf needs [Elm 0.19.3](https://guide.elm-lang.org/install/elm.html) and
-[Bun](https://bun.sh) 1.4.5 or newer. It finds `elm` in your site's
-`node_modules/.bin` or on your `PATH`.
+## Commands
 
 Run these in your site's folder:
 
-- `sheaf build` renders the site into `dist/`;
-- `sheaf check` runs every build stage, reporting every problem it finds,
-  without writing `dist/`.
+- `sheaf dev` serves the site with drafts, rebuilds it on every change and
+  reloads the open pages.
+- `sheaf build` renders the site into `dist/`.
+- `sheaf check` runs the build and reports the problems it finds, stage by
+  stage, without writing `dist/`.
+- `sheaf init <folder>` creates a new site from the starter.
 
-Both take `--drafts` to include drafts and documents dated in the future, and
-`--site-url <url>` to use that `siteUrl` instead of the one in `sheaf.json`.
+The [CLI reference][cli] lists every option, exit code and diagnostic.
 
-`sheaf dev` serves the site with drafts and rebuilds it on every change, reloading
-the open pages. It takes `--port <n>` and otherwise uses the first free port from 4000.
-Each open tab holds one live-reload connection, and browsers allow six connections per
-origin over HTTP/1.1, so with more than six tabs open on the site, the extra ones stop
-loading until you close some.
+## The guide
 
-## What works today
+- [Getting started][getting-started]: from nothing to a site on your screen.
+- [Content][content]: collections, frontmatter, drafts, dates and links.
+- [Templates][templates]: `Site.elm`, the `Sheaf` modules and the blog preset.
+- [Configuration][configuration]: `sheaf.json`.
+- [Static files and images][static-files-and-images].
+- [Deploying][deploying] to GitHub Pages, Netlify or Cloudflare Pages.
+- [CLI reference][cli].
 
-- Markdown collections with typed frontmatter, checked links between documents,
-  and drafts and future-dated posts left out of production builds.
-- Routes for a single page, a page per document, paginated lists, pages grouped
-  by a frontmatter value such as tags, one page of every document or every
-  group, and the 404 page. Tags that differ only in case or accents share a
-  page, and links to tag pages are checked.
-- The `Sheaf.Blog` preset: posts, pages, a paginated index, tag pages, an
-  archive and a 404 page from a handful of layouts. It uses only the public
-  API, so a site can do the same without it, or add routes and feeds next to it.
-- RSS and Atom feeds with each post's full HTML and absolute links, and a
-  `sitemap.xml` of every page but the 404 page.
-- Head tags for search engines and link previews: description, canonical URL,
-  Open Graph, Twitter cards, stylesheets and feed links.
-- Sites served under a base path, such as `https://example.com/blog/`.
-- Components: Markdown directives such as `:::callout{kind="note"}` render
-  with views written in Elm, and their attributes are decoded into your own
-  types. An unknown component or attribute is an error, with a suggestion when
-  the name is close to one the site has.
-- Code blocks highlighted at build time by [Shiki](https://shiki.style/), in a
-  light and a dark theme (`github-light` and `github-dark` unless `sheaf.json`
-  says otherwise). A block marked with a language Shiki doesn't know is an
-  error; use `text` for a block without highlighting.
+## Contributing
 
-  Pages use the light theme. To switch to the dark one with the reader's
-  system setting, add Shiki's CSS to your stylesheet:
+Bug reports, ideas and pull requests are welcome. [CONTRIBUTING.md][contributing]
+explains how to set up the repository and run the checks. Report security
+problems privately, as [SECURITY.md][security] describes.
 
-  ```css
-  @media (prefers-color-scheme: dark) {
-    .shiki,
-    .shiki span {
-      color: var(--shiki-dark) !important;
-      background-color: var(--shiki-dark-bg) !important;
-      font-style: var(--shiki-dark-font-style) !important;
-      font-weight: var(--shiki-dark-font-weight) !important;
-      text-decoration: var(--shiki-dark-text-decoration) !important;
-    }
-  }
-  ```
+## Licence
 
-- Local images, from `content/` or `static/`, resized to several widths and
-  written as WebP next to their own format, in a `<picture>` with their width
-  and height so the page doesn't move as they load. A document's cover comes
-  from its `image` frontmatter key, for its layout and link previews. Images
-  are encoded once and kept in `.sheaf/cache/`.
+Sites generated with Sheaf belong entirely to you. Sheaf puts no licence,
+attribution or branding requirements on your content or on the output it
+produces.
 
-## License
+The Elm package (the repository root) and the CLI (`cli/`) are released under
+the [BSD-3-Clause licence][licence]. The starter that `sheaf init` copies into
+your site, in `cli/templates/`, is also offered under the
+[0BSD licence][starter-licence], so your site needn't carry any notice.
 
-Sites generated with Sheaf belong entirely to you. Sheaf puts no license, attribution
-or branding requirements on your content or on the output it produces.
+<!-- Full URLs, because this README is also shown on npm and on the Elm package website. -->
 
-Sheaf itself is released under the BSD-3-Clause license.
+[getting-started]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/getting-started.md
+[content]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/content.md
+[templates]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/templates.md
+[configuration]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/configuration.md
+[static-files-and-images]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/static-files-and-images.md
+[deploying]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/deploying.md
+[cli]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/cli.md
+[contributing]: https://github.com/IanRamosC/elm-sheaf/blob/main/CONTRIBUTING.md
+[security]: https://github.com/IanRamosC/elm-sheaf/blob/main/SECURITY.md
+[licence]: https://github.com/IanRamosC/elm-sheaf/blob/main/LICENSE
+[starter-licence]: https://github.com/IanRamosC/elm-sheaf/blob/main/cli/templates/LICENSE

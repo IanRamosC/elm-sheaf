@@ -1,0 +1,68 @@
+name: Bug report
+description: Sheaf did something wrong, or reported a problem that isn't there.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting this. For a security problem, don't open an issue: see [SECURITY.md](https://github.com/IanRamosC/elm-sheaf/blob/main/SECURITY.md).
+  - type: input
+    id: sheaf-version
+    attributes:
+      label: Sheaf version
+      description: The output of `bunx sheaf --version`, or the commit of your clone if you use `--local`.
+    validations:
+      required: true
+  - type: input
+    id: bun-version
+    attributes:
+      label: Bun version
+      description: The output of `bun --version`.
+    validations:
+      required: true
+  - type: input
+    id: elm-version
+    attributes:
+      label: Elm version
+      description: The output of `elm --version`, run in your site's folder.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      description: Such as macOS 15 on Apple silicon, Ubuntu 24.04 or Windows 11.
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      description: The command you ran, with its options.
+      placeholder: bunx sheaf build --drafts
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What Sheaf did or printed.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Diagnostic output
+      description: Everything Sheaf printed, as text rather than a screenshot.
+      render: text
+  - type: textarea
+    id: site
+    attributes:
+      label: A minimal site
+      description: The smallest site that shows the problem, as a link to a repository or as its files pasted here. Either this or the output above is needed.
