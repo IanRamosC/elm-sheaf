@@ -49,6 +49,13 @@ folder in its `source-directories`, in place of a dependency on
 absolute path, so the site works only on the machine that made it until the
 packages are published.
 
+Every Sheaf command checks `elm.json` before it generates anything. The file
+must get the Sheaf Elm package exactly once: either `ianramosc/elm-sheaf` among
+its direct dependencies at a version from 1.0.0 up to, but not including, 2.0.0,
+or, as `--local` sets up, a source directory that holds `Sheaf.elm`. A site with
+neither is `SHEAF PACKAGE MISSING`, one with both is `SHEAF PACKAGE TWICE`, and
+a version outside the range is `UNSUPPORTED SHEAF VERSION`.
+
 Then install the site's dependencies and start the development server:
 
 ```sh

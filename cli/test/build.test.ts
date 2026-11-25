@@ -10,9 +10,10 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { type BuildOptions, build } from "../src/build";
 import { imageHash } from "../src/images/codec";
+import { initSite } from "../src/init/init";
 import {
   copyFixture,
   fixturePath,
@@ -373,6 +374,58 @@ describe("build", () => {
     const result = await build(root, options(root, { output: undefined }));
 
     expect(titlesOf(result)).toEqual(["NO SHEAF.JSON"]);
+  });
+
+  describe("Elm package check", () => {
+    const REPO = resolve(import.meta.dir, "../..");
+
+    test(
+      "builds a copy whose source directory for Sheaf is absolute",
+      async () => {
+        const root = copyFixture("minimal");
+
+        const result = await build(root, options(root));
+
+        expect(result.ok).toBe(true);
+      },
+      SLOW,
+    );
+
+    test(
+      "builds a site made by init --local",
+      async () => {
+        const root = join(copyFixture("minimal"), "made");
+        const made = await initSite(root, { local: REPO, today: "2026-01-02" });
+        expect(made.ok).toBe(true);
+
+        const result = await build(root, options(root));
+
+        expect(titlesOf(result)).toEqual([]);
+        expect(result.ok).toBe(true);
+      },
+      SLOW,
+    );
+
+    test("rejects a site with no Sheaf package", async () => {
+      const root = copyFixture("minimal");
+      const path = join(root, "elm.json");
+      const elm = JSON.parse(readFileSync(path, "utf8"));
+      elm["source-directories"] = ["src", ".sheaf/gen"];
+      writeFileSync(path, JSON.stringify(elm));
+
+      const result = await build(root, options(root, { output: undefined }));
+
+      expect(titlesOf(result)).toEqual(["SHEAF PACKAGE MISSING"]);
+    });
+
+    test("reports a site without elm.json", async () => {
+      const root = copyFixture("minimal");
+      rmSync(join(root, "elm.json"));
+
+      const result = await build(root, options(root, { output: undefined }));
+
+      expect(titlesOf(result)).toEqual(["BAD ELM JSON"]);
+    });
   });
 });
 

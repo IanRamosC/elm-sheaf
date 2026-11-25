@@ -128,6 +128,10 @@ titles.
 | `NOT A SHEAF REPOSITORY` | The `--local` path has no `src/Sheaf.elm` and `cli/package.json`. |
 | `ELM NOT FOUND` | There is no `elm` in the site's `node_modules/.bin` or on the `PATH`. |
 | `WRONG ELM VERSION` | The `elm` Sheaf found isn't 0.19.3. |
+| `BAD ELM JSON` | The site's `elm.json` is missing, can't be read, or isn't a valid JSON object. |
+| `UNSUPPORTED SHEAF VERSION` | `elm.json` depends on a version of `ianramosc/elm-sheaf` outside `1.0.0 <= v < 2.0.0`, or one that isn't `MAJOR.MINOR.PATCH`. |
+| `SHEAF PACKAGE MISSING` | `elm.json` has no `ianramosc/elm-sheaf` dependency, and none of its `source-directories` holds `Sheaf.elm`. |
+| `SHEAF PACKAGE TWICE` | `elm.json` has the dependency and also a source directory that holds `Sheaf.elm`, as after leaving `--local`. Elm would find every Sheaf module twice. |
 
 ### Content and frontmatter
 

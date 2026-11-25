@@ -1,5 +1,6 @@
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { type Config, parseConfig } from "./config/config";
 import type { SourceDocument } from "./content/document";
 import {
@@ -19,6 +20,7 @@ import type { Diagnostic } from "./diagnostics/diagnostic";
 import { compileElm, findElm } from "./elm/compile";
 import { generateElm } from "./elm/generate";
 import { assignValueNames } from "./elm/names";
+import { checkElmPackage } from "./elm/package-version";
 import {
   encodeRequest,
   type ParsedDocument,
@@ -77,6 +79,9 @@ export async function build(
 ): Promise<Result<BuildSuccess, Diagnostic[]>> {
   const config = await readConfig(siteRoot, options.siteUrl);
   if (!config.ok) return config;
+
+  const elmPackage = await readElmPackage(siteRoot);
+  if (!elmPackage.ok) return elmPackage;
 
   const files = await readContentFiles(siteRoot);
   const collections = await readCollectionNames(siteRoot);
@@ -218,6 +223,28 @@ async function readConfig(
   return parseConfig(text, "sheaf.json", {
     ...(siteUrl === undefined ? {} : { siteUrl }),
   });
+}
+
+async function readElmPackage(
+  siteRoot: string,
+): Promise<Result<void, Diagnostic[]>> {
+  let text: string;
+  try {
+    text = await readFile(join(siteRoot, "elm.json"), "utf8");
+  } catch (error) {
+    if (!isErrno(error)) throw error;
+    return err([
+      {
+        severity: "error",
+        title: "BAD ELM JSON",
+        message: `elm.json in ${siteRoot} could not be read: ${error.code}.`,
+      },
+    ]);
+  }
+  // `resolve` keeps the absolute directories that `init --local` writes.
+  return checkElmPackage(text, (directory) =>
+    existsSync(resolve(siteRoot, directory, "Sheaf.elm")),
+  );
 }
 
 function parseDocuments(
