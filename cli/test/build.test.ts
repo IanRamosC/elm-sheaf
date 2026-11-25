@@ -10,7 +10,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import { type BuildOptions, build } from "../src/build";
 import { imageHash } from "../src/images/codec";
 import {
@@ -375,11 +375,13 @@ describe("build", () => {
   });
 });
 
-/** Every file under `dir`, as sorted paths relative to it. */
+/** Every file under `dir`, as sorted paths relative to it, with `/` separators. */
 function filesUnder(dir: string): string[] {
   return readdirSync(dir, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
-    .map((entry) => relative(dir, join(entry.parentPath, entry.name)))
+    .map((entry) =>
+      relative(dir, join(entry.parentPath, entry.name)).split(sep).join("/"),
+    )
     .sort();
 }
 
