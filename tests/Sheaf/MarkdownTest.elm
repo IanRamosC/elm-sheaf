@@ -8,6 +8,7 @@ import Sheaf.Component as Component exposing (Component)
 import Sheaf.Html as Html
 import Sheaf.Html.Attributes as Attributes
 import Sheaf.Internal.Component as Internal
+import Sheaf.Internal.Html as InternalHtml exposing (Url(..))
 import Sheaf.Internal.Markdown as Markdown exposing (Problem(..))
 import Sheaf.Internal.Protocol as Protocol exposing (Alignment(..), Node(..))
 import Sheaf.Ref as Ref exposing (Ref)
@@ -179,8 +180,8 @@ inlineTests =
                     |> rendersTo "<p><a href=\"https://example.com\" title=\"Ex\">e</a></p>"
         , test "an image" <|
             \_ ->
-                paragraph [ Image { position = at 1, url = "a.png", alt = "A cat", title = Nothing } ]
-                    |> rendersTo "<p><img src=\"a.png\" alt=\"A cat\"></p>"
+                paragraph [ Image { position = at 1, url = "a.png", alt = "A cat", title = Nothing, local = Nothing } ]
+                    |> rendersTo "<p><img src=\"a.png\" alt=\"A cat\" loading=\"lazy\" decoding=\"async\"></p>"
         ]
 
 
@@ -454,7 +455,16 @@ fixtureTests =
                     { resolve = helloWorldAt "/blog/posts/hello-world/"
                     , components = Internal.byName [ calloutComponent, youtubeComponent ]
                     }
-                |> Result.map (List.map Html.toString >> String.concat)
+                |> Result.map (List.map (InternalHtml.resolveUrls underBlog >> Html.toString) >> String.concat)
+
+        underBlog : Url -> Maybe String
+        underBlog url =
+            case url of
+                SitePath path ->
+                    Just ("/blog" ++ path)
+
+                _ ->
+                    Nothing
     in
     describe "a decoded request"
         [ test "every node type renders" <|
@@ -489,7 +499,9 @@ allNodesHtml =
         , "<p>Plain <em>em</em> <strong>strong</strong> <del>del</del> <code>x &lt; y</code><br>"
         , "<a href=\"https://example.com\" title=\"Example\">ext</a> "
         , "<a href=\"/blog/posts/hello-world/#setup\">setup</a> "
-        , "<img src=\"a.png\" alt=\"A cat\" title=\"Cat\"> note"
+        , "<picture><source type=\"image/webp\" srcset=\"/blog/_sheaf/images/db8ae27b0a2081d8-480.webp 480w, /blog/_sheaf/images/db8ae27b0a2081d8-600.webp 600w\" sizes=\"(min-width: 600px) 600px, 100vw\">"
+        , "<img src=\"/blog/_sheaf/images/db8ae27b0a2081d8-600.png\" srcset=\"/blog/_sheaf/images/db8ae27b0a2081d8-480.png 480w, /blog/_sheaf/images/db8ae27b0a2081d8-600.png 600w\" sizes=\"(min-width: 600px) 600px, 100vw\""
+        , " width=\"600\" height=\"400\" alt=\"A cat\" loading=\"lazy\" decoding=\"async\" title=\"Cat\"></picture> note"
         , "<sup><a href=\"#user-content-fn-note\" id=\"user-content-fnref-note\" data-footnote-ref>1</a></sup></p>"
         , "<pre class=\"shiki\" style=\"" ++ blockStyle ++ "\" tabindex=\"0\"><code class=\"language-elm\"><span class=\"line\">"
         , "<span style=\"color:#6F42C1;--shiki-dark:#B392F0\">x</span><span style=\"color:#24292E;--shiki-dark:#E1E4E8\"> </span>"

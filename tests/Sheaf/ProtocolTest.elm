@@ -104,6 +104,38 @@ requestTests =
                         (Ok
                             [ [ "heading", "paragraph", "code", "code", "blockquote", "list", "list", "thematicBreak", "table", "containerDirective", "leafDirective", "footnoteDefinition" ] ]
                         )
+        , test "decodes a document's image as the host resolved it" <|
+            \_ ->
+                let
+                    files : String -> List { path : String, width : Int }
+                    files extension =
+                        List.map (\width -> { path = "/_sheaf/images/db8ae27b0a2081d8-" ++ String.fromInt width ++ "." ++ extension, width = width }) [ 480, 600 ]
+                in
+                decodeRequest ProtocolFixtures.allNodesRequest
+                    |> Result.map (.documents >> List.map .image)
+                    |> Expect.equal
+                        (Ok
+                            [ Just
+                                { url = "a.png"
+                                , alt = "A cat"
+                                , local =
+                                    Just
+                                        { src = "/_sheaf/images/db8ae27b0a2081d8-600.png"
+                                        , width = 600
+                                        , height = 400
+                                        , variants =
+                                            [ { mediaType = "image/png", files = files "png" }
+                                            , { mediaType = "image/webp", files = files "webp" }
+                                            ]
+                                        }
+                                }
+                            ]
+                        )
+        , test "a document without an image has none" <|
+            \_ ->
+                decodeRequest ProtocolFixtures.minimalRequest
+                    |> Result.map (.documents >> List.map .image)
+                    |> Expect.equal (Ok [ Nothing ])
         , test "rejects another protocol version" <|
             \_ ->
                 ProtocolFixtures.minimalRequest

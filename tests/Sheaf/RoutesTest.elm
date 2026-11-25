@@ -305,6 +305,12 @@ badRouteTests =
         , rejects "a single page fills no placeholder"
             (Route.single "/x/:slug/" (page []))
             "The route `/x/:slug/` has the placeholder `:slug`, which this kind of route does not fill"
+        , rejects "a route may not be in the folder of Sheaf's own files"
+            (Route.single "/_sheaf/x/" (page []))
+            "The route `/_sheaf/x/` is in `/_sheaf/`, which is reserved for files Sheaf writes"
+        , rejects "a route may not be the folder of Sheaf's own files"
+            (Route.single "/_sheaf/" (page []))
+            "The route `/_sheaf/` is in `/_sheaf/`, which is reserved for files Sheaf writes"
         , rejects "a page of all items fills no placeholder"
             (Route.allItems "/x/:slug/" posts (\_ -> page []))
             "has the placeholder `:slug`"

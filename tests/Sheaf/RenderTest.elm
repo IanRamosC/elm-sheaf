@@ -406,7 +406,7 @@ linkProblemTests =
                         }
         , test "a link to a collection without an item route has no page" <|
             \_ ->
-                request [ "notes" ] [ { collection = "notes", slug = "hello", date = Nothing, updated = Nothing, excluded = False, frontmatter = [], positions = [], body = [] } ]
+                request [ "notes" ] [ { collection = "notes", slug = "hello", date = Nothing, updated = Nothing, excluded = False, frontmatter = [], positions = [], image = Nothing, body = [] } ]
                     |> render [ homeLinkingTo "notes/hello" ]
                     |> .diagnostics
                     |> List.filter (\diagnostic -> diagnostic.title == "NO PAGE FOR LINK")

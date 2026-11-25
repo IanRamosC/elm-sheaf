@@ -8,6 +8,7 @@ module Sheaf.Document exposing (Document)
 
 import Sheaf.Date exposing (Date)
 import Sheaf.Html exposing (Html)
+import Sheaf.Image exposing (Image)
 import Sheaf.Ref exposing (Ref)
 
 
@@ -19,6 +20,8 @@ import Sheaf.Ref exposing (Ref)
   - `updated` comes from the `updated` frontmatter key, or is `date` when there
     is none.
   - `meta` is its frontmatter, decoded by its collection.
+  - `image` comes from the `image` frontmatter key; see
+    [`Sheaf.Image`](Sheaf-Image).
   - `body` is its Markdown, rendered, with links to other documents resolved.
 
 -}
@@ -28,5 +31,6 @@ type alias Document meta =
     , date : Maybe Date
     , updated : Maybe Date
     , meta : meta
+    , image : Maybe Image
     , body : List Html
     }

@@ -1,5 +1,6 @@
 module Sheaf.Internal.Protocol exposing
     ( Request, Build, BuildMode(..), GroupSlug, Document, Date
+    , DocumentImage, LocalImage, ImageVariant
     , Span, Position, FieldPosition
     , Node(..), Container, Alignment(..), Highlight, Token
     , requestDecoder
@@ -15,6 +16,7 @@ change to one side is a change to the other.
 It is not exposed by the package.
 
 @docs Request, Build, BuildMode, GroupSlug, Document, Date
+@docs DocumentImage, LocalImage, ImageVariant
 @docs Span, Position, FieldPosition
 @docs Node, Container, Alignment, Highlight, Token
 @docs requestDecoder
@@ -87,7 +89,43 @@ type alias Document =
     , excluded : Bool
     , frontmatter : Decode.Value
     , frontmatterPositions : Dict String FieldPosition
+    , image : Maybe DocumentImage
     , tree : Node
+    }
+
+
+{-| A document's `image` key. `url` is the value as written; `local` is there
+for an image in `content/` or `static/`, and not for an http(s) URL.
+-}
+type alias DocumentImage =
+    { url : String
+    , alt : String
+    , local : Maybe LocalImage
+    }
+
+
+{-| A local image as published, with paths from the root of the site that do
+not have the base path yet.
+
+`src` is the original format at the largest width, and `width` and `height`
+are that file's. The first variant is the original format and each other one
+a configured format. GIF and SVG files are published unchanged, so they have
+no variants.
+
+-}
+type alias LocalImage =
+    { src : String
+    , width : Int
+    , height : Int
+    , variants : List ImageVariant
+    }
+
+
+{-| One format of an image, at every width it is written in, narrowest first.
+-}
+type alias ImageVariant =
+    { mediaType : String
+    , files : List { path : String, width : Int }
     }
 
 
@@ -202,7 +240,39 @@ documentDecoder =
         |> andMap (Decode.field "excluded" Decode.bool)
         |> andMap (Decode.field "frontmatter" Decode.value)
         |> andMap (Decode.field "frontmatterPositions" fieldPositionsDecoder)
+        |> andMap (optionalField "image" documentImageDecoder)
         |> andMap (Decode.field "tree" nodeDecoder)
+
+
+documentImageDecoder : Decoder DocumentImage
+documentImageDecoder =
+    Decode.map3 DocumentImage
+        (Decode.field "url" Decode.string)
+        (Decode.field "alt" Decode.string)
+        (optionalField "local" localImageDecoder)
+
+
+localImageDecoder : Decoder LocalImage
+localImageDecoder =
+    Decode.map4 LocalImage
+        (Decode.field "src" Decode.string)
+        (Decode.field "width" Decode.int)
+        (Decode.field "height" Decode.int)
+        (Decode.field "variants"
+            (Decode.list
+                (Decode.map2 ImageVariant
+                    (Decode.field "mediaType" Decode.string)
+                    (Decode.field "files"
+                        (Decode.list
+                            (Decode.map2 (\path width -> { path = path, width = width })
+                                (Decode.field "path" Decode.string)
+                                (Decode.field "width" Decode.int)
+                            )
+                        )
+                    )
+                )
+            )
+        )
 
 
 andMap : Decoder a -> Decoder (a -> b) -> Decoder b
@@ -374,7 +444,7 @@ type Node
     | Break { position : Span }
     | Link { position : Span, url : String, title : Maybe String, children : List Node }
     | SheafLink { position : Span, collection : String, slug : String, fragment : Maybe String, title : Maybe String, children : List Node }
-    | Image { position : Span, url : String, alt : String, title : Maybe String }
+    | Image { position : Span, url : String, alt : String, title : Maybe String, local : Maybe LocalImage }
     | Table { position : Span, align : List (Maybe Alignment), children : List Node }
     | TableRow Container
     | TableCell Container
@@ -499,11 +569,12 @@ nodeOfType type_ =
                 |> andMap childrenField
 
         "image" ->
-            Decode.map4 (\position url alt title -> Image { position = position, url = url, alt = alt, title = title })
+            Decode.map5 (\position url alt title local -> Image { position = position, url = url, alt = alt, title = title, local = local })
                 positionField
                 (Decode.field "url" Decode.string)
                 (Decode.field "alt" Decode.string)
                 (optionalField "title" Decode.string)
+                (optionalField "local" localImageDecoder)
 
         "table" ->
             Decode.map3 (\position align children -> Table { position = position, align = align, children = children })

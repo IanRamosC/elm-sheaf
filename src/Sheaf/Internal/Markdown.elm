@@ -14,6 +14,7 @@ import Sheaf.Html as Html exposing (Html)
 import Sheaf.Html.Attributes as Attributes
 import Sheaf.Internal.Component as Component exposing (Component, Kind(..))
 import Sheaf.Internal.Html as Internal
+import Sheaf.Internal.Image as Image
 import Sheaf.Internal.Protocol exposing (Alignment(..), Highlight, Node(..), Span, Token)
 import Sheaf.Internal.Results as Results
 import Sheaf.Ref as Ref exposing (Ref)
@@ -198,7 +199,7 @@ renderNode scope node =
             renderSheafLink scope link
 
         Image image ->
-            Ok [ Html.img (withTitle image.title [ Attributes.src image.url, Attributes.alt image.alt ]) [] ]
+            Ok [ Image.view (withTitle image.title []) (Image.fromProtocol image) ]
 
         Table table ->
             renderTable scope table.align table.children

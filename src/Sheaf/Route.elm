@@ -68,6 +68,7 @@ import Sheaf.Document exposing (Document)
 import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Date as InternalDate
 import Sheaf.Internal.Frontmatter as Frontmatter exposing (Problem)
+import Sheaf.Internal.Image as Image
 import Sheaf.Internal.Protocol as Protocol
 import Sheaf.Internal.Results as Results
 import Sheaf.Internal.Site as Site exposing (FrontmatterProblems, ListedDocument)
@@ -294,6 +295,7 @@ decode (Site.Collection collection) document =
                 , date = date
                 , updated = updated
                 , meta = meta
+                , image = Maybe.map Image.fromProtocol document.image
                 , body = body
                 }
             )

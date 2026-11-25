@@ -4,7 +4,7 @@ import Expect
 import Fuzz
 import Sheaf.Html as Html exposing (div, img, p, text)
 import Sheaf.Html.Attributes as Attributes exposing (attribute, class, siteHref, siteSrc, src)
-import Sheaf.Internal.Html exposing (HtmlProblem(..), problems)
+import Sheaf.Internal.Html exposing (HtmlProblem(..), problems, rewriteUrls, siteSrcset)
 import Test exposing (Test, describe, fuzz, test)
 
 
@@ -14,6 +14,7 @@ suite =
         [ renderingTests
         , escapingTests
         , problemTests
+        , rewriteTests
         , documentTests
         ]
 
@@ -106,6 +107,10 @@ problemTests =
             \_ ->
                 problems (img [ siteSrc "//cdn.example.com/x" ] [])
                     |> Expect.equal [ InvalidSitePath { tag = "img", name = "src", path = "//cdn.example.com/x" } ]
+        , test "reports a srcset path that is not a site path" <|
+            \_ ->
+                problems (img [ siteSrcset [ { path = "/a.png", width = 1 }, { path = "b.png", width = 2 } ] ] [])
+                    |> Expect.equal [ InvalidSitePath { tag = "img", name = "srcset", path = "b.png" } ]
         , test "toString leaves out a site path that is not resolved" <|
             \_ ->
                 Html.toString (Html.a [ siteHref "/archive/", class "a" ] [])
@@ -118,6 +123,34 @@ problemTests =
             \_ ->
                 Html.toString (div [] [ Html.node "my tag" [] [ text "x" ], Html.node "style" [] [ text "a > b" ], text "y" ])
                     |> Expect.equal "<div>y</div>"
+        ]
+
+
+rewriteTests : Test
+rewriteTests =
+    let
+        rewritesSrcset : String -> String -> Test
+        rewritesSrcset srcset rewritten =
+            test ("`" ++ srcset ++ "`") <|
+                \_ ->
+                    img [ attribute "srcset" srcset ] []
+                        |> rewriteUrls (\url -> "<" ++ url ++ ">")
+                        |> Html.toString
+                        |> Expect.equal ("<img srcset=\"" ++ rewritten ++ "\">")
+    in
+    describe "rewriteUrls"
+        [ test "rewrites href and src, and leaves other attributes" <|
+            \_ ->
+                Html.a [ Attributes.href "a" ] [ img [ src "b", class "c" ] [] ]
+                    |> rewriteUrls String.toUpper
+                    |> Html.toString
+                    |> Expect.equal "<a href=\"A\"><img src=\"B\" class=\"c\"></a>"
+        , describe "rewrites each URL of a srcset"
+            [ rewritesSrcset "a.png 480w, b.png 960w" "&lt;a.png&gt; 480w, &lt;b.png&gt; 960w"
+            , rewritesSrcset "a.png 1x,b.png 2x" "&lt;a.png&gt; 1x, &lt;b.png&gt; 2x"
+            , rewritesSrcset " a.png, b.png 2x " "&lt;a.png&gt;, &lt;b.png&gt; 2x"
+            , rewritesSrcset "data:image/png;base64,AA 1x" "&lt;data:image/png;base64,AA&gt; 1x"
+            ]
         ]
 
 

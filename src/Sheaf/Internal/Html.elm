@@ -1,6 +1,7 @@
 module Sheaf.Internal.Html exposing
     ( Html, Attribute, Url(..), GroupLink, HtmlProblem(..)
-    , text, node, attribute, booleanAttribute, sitePathAttribute, link, groupLink
+    , text, node, attribute, booleanAttribute, sitePathAttribute, siteSrcset, link, groupLink
+    , attributeName
     , urls, resolveUrls, rewriteUrls
     , toString, document, problems
     )
@@ -11,7 +12,8 @@ It is not exposed by the package so templates cannot build or inspect the tree
 directly.
 
 @docs Html, Attribute, Url, GroupLink, HtmlProblem
-@docs text, node, attribute, booleanAttribute, sitePathAttribute, link, groupLink
+@docs text, node, attribute, booleanAttribute, sitePathAttribute, siteSrcset, link, groupLink
+@docs attributeName
 @docs urls, resolveUrls, rewriteUrls
 @docs toString, document, problems
 
@@ -31,12 +33,13 @@ type Html
 
 
 {-| An attribute of an element. A `Deferred` value is a URL that is not known
-until the whole site is rendered.
+until the whole site is rendered, and so is each path of a `SiteSrcset`.
 -}
 type Attribute
     = Valued String String
     | Flag String Bool
     | Deferred String Url
+    | SiteSrcset (List { path : String, width : Int })
 
 
 {-| A URL that only the renderer can write, because it depends on the site's
@@ -106,6 +109,14 @@ sitePathAttribute name path =
     Deferred name (SitePath path)
 
 
+{-| A `srcset` of files at the given widths, with paths from the root of the
+site that [`resolveUrls`](#resolveUrls) gives the base path.
+-}
+siteSrcset : List { path : String, width : Int } -> Attribute
+siteSrcset =
+    SiteSrcset
+
+
 {-| A link to a document, resolved to an `<a href>` by
 [`resolveUrls`](#resolveUrls).
 -}
@@ -135,20 +146,23 @@ urls html =
             []
 
         Element _ attributes children ->
-            List.filterMap deferredUrl attributes ++ List.concatMap urls children
+            List.concatMap deferredUrls attributes ++ List.concatMap urls children
 
         Link url children ->
             url :: List.concatMap urls children
 
 
-deferredUrl : Attribute -> Maybe Url
-deferredUrl attr =
+deferredUrls : Attribute -> List Url
+deferredUrls attr =
     case attr of
         Deferred _ url ->
-            Just url
+            [ url ]
+
+        SiteSrcset candidates ->
+            List.map (.path >> SitePath) candidates
 
         _ ->
-            Nothing
+            []
 
 
 {-| Write every URL the tree leaves to the renderer, in one pass, so that
@@ -183,12 +197,19 @@ resolveAttribute resolve attr =
                 |> Maybe.map (Valued name)
                 |> Maybe.withDefault attr
 
+        SiteSrcset candidates ->
+            candidates
+                |> List.map (\{ path, width } -> Maybe.map (\url -> url ++ " " ++ String.fromInt width ++ "w") (resolve (SitePath path)))
+                |> List.foldr (Maybe.map2 (::)) (Just [])
+                |> Maybe.map (String.join ", " >> Valued "srcset")
+                |> Maybe.withDefault attr
+
         _ ->
             attr
 
 
-{-| Rewrite the value of every `href` and `src` the tree already has, as a
-feed does to make each of them absolute.
+{-| Rewrite the value of every `href` and `src`, and every URL of a `srcset`,
+that the tree already has, as a feed does to make each of them absolute.
 -}
 rewriteUrls : (String -> String) -> Html -> Html
 rewriteUrls rewrite html =
@@ -212,11 +233,83 @@ rewriteAttribute rewrite attr =
             if name == "href" || name == "src" then
                 Valued name (rewrite value)
 
+            else if name == "srcset" then
+                Valued name (rewriteSrcset rewrite value)
+
             else
                 attr
 
         _ ->
             attr
+
+
+rewriteSrcset : (String -> String) -> String -> String
+rewriteSrcset rewrite srcset =
+    srcsetCandidates (String.toList srcset)
+        |> List.map
+            (\( url, descriptors ) ->
+                if String.isEmpty descriptors then
+                    rewrite url
+
+                else
+                    rewrite url ++ " " ++ descriptors
+            )
+        |> String.join ", "
+
+
+{-| The URL and descriptors of each candidate of a `srcset`, split as HTML
+does: a URL runs to the next whitespace, and a comma at its end ends the
+candidate, so the commas inside a `data:` URL stay part of it.
+-}
+srcsetCandidates : List Char -> List ( String, String )
+srcsetCandidates chars =
+    case dropWhile (\c -> isSpace c || c == ',') chars of
+        [] ->
+            []
+
+        start ->
+            let
+                ( url, afterUrl ) =
+                    span (not << isSpace) start
+            in
+            if String.endsWith "," (String.fromList url) then
+                ( String.fromList (dropTrailingCommas url), "" ) :: srcsetCandidates afterUrl
+
+            else
+                let
+                    ( descriptors, rest ) =
+                        span ((/=) ',') afterUrl
+                in
+                ( String.fromList url, String.trim (String.fromList descriptors) ) :: srcsetCandidates rest
+
+
+dropTrailingCommas : List Char -> List Char
+dropTrailingCommas =
+    List.reverse >> dropWhile ((==) ',') >> List.reverse
+
+
+span : (a -> Bool) -> List a -> ( List a, List a )
+span keep list =
+    case list of
+        first :: rest ->
+            if keep first then
+                Tuple.mapFirst ((::) first) (span keep rest)
+
+            else
+                ( [], list )
+
+        [] ->
+            ( [], [] )
+
+
+dropWhile : (a -> Bool) -> List a -> List a
+dropWhile drop list =
+    Tuple.second (span drop list)
+
+
+isSpace : Char -> Bool
+isSpace c =
+    c == ' ' || c == '\t' || c == '\n' || c == '\u{000C}' || c == '\u{000D}'
 
 
 
@@ -265,10 +358,18 @@ attributeProblem tag attr =
                 else
                     Just (InvalidSitePath { tag = tag, name = name, path = path })
 
+            SiteSrcset candidates ->
+                candidates
+                    |> List.filter (not << Path.isSitePath << .path)
+                    |> List.head
+                    |> Maybe.map (\{ path } -> InvalidSitePath { tag = tag, name = "srcset", path = path })
+
             _ ->
                 Nothing
 
 
+{-| The name of an attribute, as it is written.
+-}
 attributeName : Attribute -> String
 attributeName attr =
     case attr of
@@ -280,6 +381,9 @@ attributeName attr =
 
         Deferred name _ ->
             name
+
+        SiteSrcset _ ->
+            "srcset"
 
 
 isValidTagName : String -> Bool
@@ -374,6 +478,9 @@ renderAttribute attr =
                 ""
 
             Deferred _ _ ->
+                ""
+
+            SiteSrcset _ ->
                 ""
 
 

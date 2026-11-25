@@ -8,6 +8,7 @@ module RenderFixtures exposing
     , footnoteReference
     , headAt
     , image
+    , imageWith
     , leafDirective
     , link
     , markdownLink
@@ -15,6 +16,7 @@ module RenderFixtures exposing
     , page
     , paragraph
     , paths
+    , photo
     , post
     , postMeta
     , postPage
@@ -116,6 +118,7 @@ type alias Source =
     , excluded : Bool
     , frontmatter : List ( String, Value )
     , positions : List ( String, Span )
+    , image : Maybe Value
     , body : List Value
     }
 
@@ -129,6 +132,7 @@ post slug =
     , excluded = False
     , frontmatter = [ ( "title", Encode.string slug ) ]
     , positions = []
+    , image = Nothing
     , body = [ paragraph [ textNode "Hi" ] ]
     }
 
@@ -196,18 +200,25 @@ requestWith { basePath, slugs } collections sources =
 encodeSource : Source -> Value
 encodeSource source =
     Encode.object
-        [ ( "id", Encode.string (source.collection ++ "/" ++ source.slug) )
-        , ( "collection", Encode.string source.collection )
-        , ( "sourcePath", Encode.string (sourcePathOf source) )
-        , ( "slug", Encode.string source.slug )
-        , ( "date", encodeDate source.date )
-        , ( "updated", encodeDate source.updated )
-        , ( "draft", Encode.bool source.excluded )
-        , ( "excluded", Encode.bool source.excluded )
-        , ( "frontmatter", Encode.object source.frontmatter )
-        , ( "frontmatterPositions", Encode.list (\( path, at ) -> Encode.object [ ( "path", Encode.string path ), ( "value", encodeSpan at ) ]) source.positions )
-        , ( "tree", markdownNode "root" [ ( "children", Encode.list identity source.body ) ] )
-        ]
+        ([ ( "id", Encode.string (source.collection ++ "/" ++ source.slug) )
+         , ( "collection", Encode.string source.collection )
+         , ( "sourcePath", Encode.string (sourcePathOf source) )
+         , ( "slug", Encode.string source.slug )
+         , ( "date", encodeDate source.date )
+         , ( "updated", encodeDate source.updated )
+         , ( "draft", Encode.bool source.excluded )
+         , ( "excluded", Encode.bool source.excluded )
+         , ( "frontmatter", Encode.object source.frontmatter )
+         , ( "frontmatterPositions", Encode.list (\( path, at ) -> Encode.object [ ( "path", Encode.string path ), ( "value", encodeSpan at ) ]) source.positions )
+         , ( "tree", markdownNode "root" [ ( "children", Encode.list identity source.body ) ] )
+         ]
+            ++ optional "image" source.image
+        )
+
+
+optional : String -> Maybe Value -> List ( String, Value )
+optional name =
+    Maybe.map (\value -> [ ( name, value ) ]) >> Maybe.withDefault []
 
 
 encodeDate : Maybe String -> Value
@@ -322,9 +333,52 @@ link url =
     markdownNode "link" [ ( "url", Encode.string url ), ( "children", Encode.list identity [ textNode "link" ] ) ]
 
 
+{-| A Markdown image of `url` that is not in the site, as a remote one is.
+-}
 image : String -> Value
 image url =
-    markdownNode "image" [ ( "url", Encode.string url ), ( "alt", Encode.string "" ) ]
+    imageWith { url = url, alt = "", title = Nothing, local = Nothing }
+
+
+{-| A Markdown image, with what the host found for a local one.
+-}
+imageWith : { url : String, alt : String, title : Maybe String, local : Maybe Value } -> Value
+imageWith fields =
+    markdownNode "image"
+        ([ ( "url", Encode.string fields.url ), ( "alt", Encode.string fields.alt ) ]
+            ++ optional "title" (Maybe.map Encode.string fields.title)
+            ++ optional "local" fields.local
+        )
+
+
+{-| What the host sends for a 1200×800 PNG whose hash is `h`, with the
+configured widths 480, 960 and 1600 and the format WebP.
+-}
+photo : Value
+photo =
+    let
+        variant : String -> String -> Value
+        variant mediaType extension =
+            Encode.object
+                [ ( "mediaType", Encode.string mediaType )
+                , ( "files"
+                  , Encode.list
+                        (\width ->
+                            Encode.object
+                                [ ( "path", Encode.string ("/_sheaf/images/h-" ++ String.fromInt width ++ "." ++ extension) )
+                                , ( "width", Encode.int width )
+                                ]
+                        )
+                        [ 480, 960, 1200 ]
+                  )
+                ]
+    in
+    Encode.object
+        [ ( "src", Encode.string "/_sheaf/images/h-1200.png" )
+        , ( "width", Encode.int 1200 )
+        , ( "height", Encode.int 800 )
+        , ( "variants", Encode.list identity [ variant "image/png" "png", variant "image/webp" "webp" ] )
+        ]
 
 
 {-| A leaf directive without attributes, written at `at`.

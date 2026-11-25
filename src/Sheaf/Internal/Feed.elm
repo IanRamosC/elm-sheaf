@@ -9,7 +9,7 @@ module Sheaf.Internal.Feed exposing (Context, render, outputs)
 import Dict exposing (Dict)
 import Sheaf.Internal.AbsoluteUrl as AbsoluteUrl
 import Sheaf.Internal.Frontmatter exposing (Problem)
-import Sheaf.Internal.Html as Html
+import Sheaf.Internal.Html as Html exposing (Url(..))
 import Sheaf.Internal.Listing as Listing exposing (Body)
 import Sheaf.Internal.Output exposing (Output(..))
 import Sheaf.Internal.Path as Path
@@ -103,13 +103,26 @@ itemOf context pattern describe { document, body } =
                         , url = context.origin ++ path
                         , title = description.title
                         , summary = description.summary
-                        , html = String.concat (List.map (Html.rewriteUrls absolute >> Html.toString) body)
+                        , html = String.concat (List.map (Html.resolveUrls (sitePath context.basePath) >> Html.rewriteUrls absolute >> Html.toString) body)
                         , date = date.posix
                         , updated = (Maybe.withDefault date document.updated).posix
                         }
                     )
                     document.date
             )
+
+
+{-| A body's images are site paths, which only need the base path. Its links
+to documents were written when it was rendered.
+-}
+sitePath : String -> Url -> Maybe String
+sitePath basePath url =
+    case url of
+        SitePath path ->
+            Just (Path.join basePath path)
+
+        _ ->
+            Nothing
 
 
 allOf : List (Maybe a) -> Maybe (List a)

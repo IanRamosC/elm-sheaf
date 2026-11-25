@@ -60,8 +60,7 @@ Both take `--drafts` to include drafts and documents dated in the future.
   }
   ```
 
-Not yet: Markdown directives and components, images, `sheaf dev` and
-`sheaf init`.
+Not yet: Markdown directives and components, `sheaf dev` and `sheaf init`.
 
 ## License
 

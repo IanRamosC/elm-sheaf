@@ -23,27 +23,55 @@ type Subject
 
 type RouteProblem
     = BadPattern Pattern.Problem
+    | Reserved
     | TooFewPerPage Int
 
 
 routeProblem : Route -> Maybe RouteProblem
 routeProblem route =
-    case Maybe.andThen (\( kind, pattern ) -> Pattern.problem kind pattern) (Site.patternOf route) of
-        Just problem ->
-            Just (BadPattern problem)
+    case Site.patternOf route of
+        Just ( kind, pattern ) ->
+            case Pattern.problem kind pattern of
+                Just problem ->
+                    Just (BadPattern problem)
+
+                Nothing ->
+                    if isReserved pattern then
+                        Just Reserved
+
+                    else
+                        perPageProblem route
 
         Nothing ->
-            Site.perPageOf route
-                |> Maybe.andThen
-                    (\perPage ->
-                        -- Cutting a list into pieces of none never ends, and the
-                        -- host cannot stop the worker while it runs.
-                        if perPage < 1 then
-                            Just (TooFewPerPage perPage)
+            perPageProblem route
 
-                        else
-                            Nothing
-                    )
+
+perPageProblem : Route -> Maybe RouteProblem
+perPageProblem route =
+    Site.perPageOf route
+        |> Maybe.andThen
+            (\perPage ->
+                -- Cutting a list into pieces of none never ends, and the
+                -- host cannot stop the worker while it runs.
+                if perPage < 1 then
+                    Just (TooFewPerPage perPage)
+
+                else
+                    Nothing
+            )
+
+
+{-| Sheaf writes its own files, such as images, under `/_sheaf/`. Case is
+ignored, because on a file system that ignores it `/_Sheaf/` is that folder.
+-}
+isReserved : String -> Bool
+isReserved pattern =
+    let
+        lower : String
+        lower =
+            String.toLower pattern
+    in
+    lower == "/_sheaf" || String.startsWith "/_sheaf/" lower
 
 
 {-| Why a route makes no pages, if it breaks a rule.
@@ -129,6 +157,10 @@ diagnostic subject problem =
 
         BadPattern Pattern.NotAFile ->
             breaks "ends with `/`, but a feed is a file" fileHint
+
+        Reserved ->
+            breaks "is in `/_sheaf/`, which is reserved for files Sheaf writes"
+                (Just "Choose a pattern that does not start with `/_sheaf/`.")
 
         TooFewPerPage perPage ->
             breaks ("has `perPage = " ++ String.fromInt perPage ++ "`, but `perPage` must be at least 1") Nothing

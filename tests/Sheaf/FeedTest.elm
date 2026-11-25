@@ -2,7 +2,7 @@ module Sheaf.FeedTest exposing (suite)
 
 import Expect
 import Json.Encode exposing (Value)
-import RenderFixtures exposing (Source, bodyAt, draft, footnoteDefinition, footnoteReference, image, link, markdownLink, page, paragraph, paths, post, postRoute, posts, renderWithFeeds, request, requestUnder, span, textNode, titles)
+import RenderFixtures exposing (Source, bodyAt, draft, footnoteDefinition, footnoteReference, image, imageWith, link, markdownLink, page, paragraph, paths, photo, post, postRoute, posts, renderWithFeeds, request, requestUnder, span, textNode, titles)
 import Sheaf
 import Sheaf.Collection as Collection
 import Sheaf.Feed as Feed exposing (Feed)
@@ -167,7 +167,26 @@ absoluteUrlTests =
             \_ ->
                 linkingTo [ paragraph [ image "x.png" ] ]
                     |> itemHtml
-                    |> Expect.equal [ "<p><img src=\"https://example.com/blog/posts/a/x.png\" alt=\"\"></p>" ]
+                    |> Expect.equal [ "<p><img src=\"https://example.com/blog/posts/a/x.png\" alt=\"\" loading=\"lazy\" decoding=\"async\"></p>" ]
+        , test "a local image's source and every candidate of its srcsets are absolute" <|
+            \_ ->
+                let
+                    srcset : String -> String
+                    srcset extension =
+                        [ 480, 960, 1200 ]
+                            |> List.map (\width -> "https://example.com/blog/_sheaf/images/h-" ++ String.fromInt width ++ "." ++ extension ++ " " ++ String.fromInt width ++ "w")
+                            |> String.join ", "
+                in
+                linkingTo [ paragraph [ imageWith { url = "photo.png", alt = "", title = Nothing, local = Just photo } ] ]
+                    |> itemHtml
+                    |> List.map
+                        (\html ->
+                            List.map (\part -> String.contains part html)
+                                [ "<source type=\"image/webp\" srcset=\"" ++ srcset "webp" ++ "\""
+                                , "<img src=\"https://example.com/blog/_sheaf/images/h-1200.png\" srcset=\"" ++ srcset "png" ++ "\""
+                                ]
+                        )
+                    |> Expect.equal [ [ True, True ] ]
         , test "a footnote reference points into the item's page" <|
             \_ ->
                 linkingTo [ paragraph [ textNode "Hi", footnoteReference "1" ], footnoteDefinition "1" "Note." ]
