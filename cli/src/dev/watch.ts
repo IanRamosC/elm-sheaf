@@ -1,5 +1,6 @@
 import { type FSWatcher, readFileSync, statSync, watch } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { isErrno } from "../content/files";
 
 const debounceMilliseconds = 100;
 
@@ -93,30 +94,37 @@ export function watchSite(
         watchers.delete(key);
       }
     }
+    let vanished = false;
     for (const [key, { folder, recursive }] of wanted) {
       if (!watchers.has(key)) {
-        watchers.set(key, open(key, folder, recursive));
+        const watcher = open(key, folder, recursive);
+        if (watcher === undefined) {
+          vanished ||= folder !== root;
+        } else {
+          watchers.set(key, watcher);
+        }
       }
     }
+    // Looking again finds the folder missing, so its parent is watched instead.
+    // Without the site root there is nothing left to wait on.
+    if (vanished) refresh();
   }
 
-  function open(key: string, folder: string, recursive: boolean): FSWatcher {
-    const watcher = watch(folder, { recursive }, (_event, filename) => {
-      if (filename === null) return;
-      const path = resolve(folder, filename);
-      if (isIgnored(root, path)) return;
-
-      if (path === elmJsonPath) {
-        sourceDirectories =
-          readSourceDirectories(elmJsonPath) ?? sourceDirectories;
-      }
-      if (!recursive || path === elmJsonPath) refresh();
-      // A shallow watcher also sees unrelated names, and parents of folders still missing.
-      const watched = pathsFor(root, sourceDirectories);
-      if (recursive || watched.some((input) => isWithin(path, input))) {
-        changed();
-      }
-    });
+  /** Gives `undefined` when the folder was deleted after `refresh` saw it, as `git checkout` can do. */
+  function open(
+    key: string,
+    folder: string,
+    recursive: boolean,
+  ): FSWatcher | undefined {
+    let watcher: FSWatcher;
+    try {
+      watcher = watch(folder, { recursive }, (_event, filename) =>
+        onEvent(folder, recursive, filename),
+      );
+    } catch (error) {
+      if (isErrno(error) && error.code === "ENOENT") return undefined;
+      throw error;
+    }
     // A watched folder that is deleted errors on some platforms; its parent's watcher takes over.
     watcher.on("error", () => {
       watcher.close();
@@ -124,6 +132,27 @@ export function watchSite(
       refresh();
     });
     return watcher;
+  }
+
+  function onEvent(
+    folder: string,
+    recursive: boolean,
+    filename: string | null,
+  ): void {
+    if (filename === null) return;
+    const path = resolve(folder, filename);
+    if (isIgnored(root, path)) return;
+
+    if (path === elmJsonPath) {
+      sourceDirectories =
+        readSourceDirectories(elmJsonPath) ?? sourceDirectories;
+    }
+    if (!recursive || path === elmJsonPath) refresh();
+    // A shallow watcher also sees unrelated names, and parents of folders still missing.
+    const watched = pathsFor(root, sourceDirectories);
+    if (recursive || watched.some((input) => isWithin(path, input))) {
+      changed();
+    }
   }
 
   refresh();
@@ -140,20 +169,30 @@ export function watchSite(
 
 /**
  * Runs `run` at once when idle. Requests made while it runs collapse into a
- * single run after it, so builds never overlap and none is lost. `run` must
- * not reject.
+ * single run after it, so builds never overlap and none is lost. A run that
+ * rejects goes to `onError`, and the queue carries on.
  */
-export function rebuildQueue(run: () => Promise<void>): { request(): void } {
+export function rebuildQueue(
+  run: () => Promise<void>,
+  onError: (error: unknown) => void,
+): { request(): void } {
   let running = false;
   let again = false;
 
   async function drain(): Promise<void> {
     running = true;
-    do {
-      again = false;
-      await run();
-    } while (again);
-    running = false;
+    try {
+      do {
+        again = false;
+        try {
+          await run();
+        } catch (error) {
+          onError(error);
+        }
+      } while (again);
+    } finally {
+      running = false;
+    }
   }
 
   return {

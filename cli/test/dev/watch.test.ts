@@ -125,12 +125,17 @@ describe("rebuildQueue", () => {
     const finishers: (() => void)[] = [];
     let running = 0;
     let overlapped = false;
-    const queue = rebuildQueue(async () => {
-      running++;
-      overlapped ||= running > 1;
-      await new Promise<void>((done) => finishers.push(done));
-      running--;
-    });
+    const queue = rebuildQueue(
+      async () => {
+        running++;
+        overlapped ||= running > 1;
+        await new Promise<void>((done) => finishers.push(done));
+        running--;
+      },
+      (error) => {
+        throw error;
+      },
+    );
 
     queue.request();
     expect(finishers).toHaveLength(1);
@@ -151,5 +156,24 @@ describe("rebuildQueue", () => {
     expect(finishers).toHaveLength(3);
     finishers[2]?.();
     expect(overlapped).toBe(false);
+  });
+
+  test("reports a run that rejects and keeps running later requests", async () => {
+    const errors: unknown[] = [];
+    let runs = 0;
+    const queue = rebuildQueue(
+      async () => {
+        runs++;
+        if (runs === 1) throw new Error("disk full");
+      },
+      (error) => errors.push(error),
+    );
+
+    queue.request();
+    await waitUntil(() => errors.length === 1);
+    queue.request();
+    await waitUntil(() => runs === 2);
+
+    expect(errors).toEqual([new Error("disk full")]);
   });
 });

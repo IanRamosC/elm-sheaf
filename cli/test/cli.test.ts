@@ -170,6 +170,7 @@ describe("sheaf", () => {
         const home = await (await fetch(url)).text();
         expect(home).toContain("Plans");
         expect(home).toContain('<script type="module">');
+        expect(dev.output()).not.toContain("Compiled in DEV mode");
 
         appendFileSync(
           join(posts, "2026-11-01-hello-sheaf.md"),

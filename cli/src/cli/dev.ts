@@ -6,11 +6,13 @@ import { isErrno } from "../content/files";
 import { startDevServer } from "../dev/server";
 import { rebuildQueue, watchSite } from "../dev/watch";
 import type { Diagnostic } from "../diagnostics/diagnostic";
+import { renderDiagnostic } from "../diagnostics/render";
 import { err, type Result } from "../result";
 import {
   count,
   printDiagnostics,
   printErrorCount,
+  type RenderedDiagnostic,
   renderDiagnostics,
   write,
 } from "./report";
@@ -71,18 +73,32 @@ export async function runDev(
     } else {
       // A crash while writing can leave part of a site behind.
       await rm(folder, { recursive: true, force: true });
-      const rendered = await renderDiagnostics(result.error, siteRoot);
-      server.showErrors(rendered.map(({ text }) => text));
-      printDiagnostics(rendered, colour);
-      printErrorCount(rendered, colour);
+      showFailure(await renderDiagnostics(result.error, siteRoot));
+      return;
     }
     server.reload();
+  }
+
+  function showFailure(rendered: RenderedDiagnostic[]): void {
+    server.showErrors(rendered.map(({ text }) => text));
+    printDiagnostics(rendered, colour);
+    printErrorCount(rendered, colour);
+    server.reload();
+  }
+
+  // Showing a build can fail too, say when the previous folder can't be deleted.
+  function showCrash(error: unknown): void {
+    if (stopping) return;
+    const diagnostic = crashed(error);
+    showFailure([
+      { severity: "error", text: renderDiagnostic(diagnostic, undefined) },
+    ]);
   }
 
   const queue = rebuildQueue(() => {
     building = rebuild();
     return building;
-  });
+  }, showCrash);
   const watcher = watchSite(siteRoot, queue.request);
   queue.request();
 
@@ -90,7 +106,8 @@ export async function runDev(
   stopping = true;
   watcher.close();
   server.stop();
-  await building;
+  // A rejection here was already reported by the queue.
+  await building.catch(() => undefined);
   await rm(output, { recursive: true, force: true });
   return 0;
 }
@@ -106,21 +123,26 @@ async function buildCatchingCrashes(
       now: new Date(),
       output,
       optimize: false,
-      log: write,
+      log: withoutDevModeNotice,
     });
   } catch (error) {
-    return err([
-      {
-        severity: "error",
-        title: "SHEAF CRASHED",
-        message:
-          error instanceof Error
-            ? (error.stack ?? error.message)
-            : String(error),
-        hint: "`sheaf dev` keeps running and builds again on the next change.",
-      },
-    ]);
+    return err([crashed(error)]);
   }
+}
+
+/** Elm prints this notice on every unoptimised run; it says nothing about the site. */
+function withoutDevModeNotice(line: string): void {
+  if (!line.startsWith("warn: Compiled in DEV mode")) write(line);
+}
+
+function crashed(error: unknown): Diagnostic {
+  return {
+    severity: "error",
+    title: "SHEAF CRASHED",
+    message:
+      error instanceof Error ? (error.stack ?? error.message) : String(error),
+    hint: "`sheaf dev` keeps running and builds again on the next change.",
+  };
 }
 
 /** Removes the output of `dev` runs whose process has ended without cleaning up. */
