@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { err, ok, type Result } from "../result";
+import { slotLimiter } from "./slots";
 
 // The macOS default backend resizes with Accelerate, which gives different
 // bytes than Linux; "bun" gives the same output on every machine.
@@ -100,22 +101,4 @@ function failureOf(error: unknown): CodecFailure | undefined {
 
 // Each pipeline runs on a worker thread, so more at once than there are cores
 // only holds more decoded images in memory.
-const SLOTS = navigator.hardwareConcurrency;
-let busy = 0;
-const waiting: (() => void)[] = [];
-
-async function withSlot<T>(work: () => Promise<T>): Promise<T> {
-  if (busy < SLOTS) {
-    busy++;
-  } else {
-    // A finishing task hands its slot straight to the next one waiting.
-    await new Promise<void>((resolve) => waiting.push(resolve));
-  }
-  try {
-    return await work();
-  } finally {
-    const next = waiting.shift();
-    if (next === undefined) busy--;
-    else next();
-  }
-}
+const withSlot = slotLimiter(navigator.hardwareConcurrency);

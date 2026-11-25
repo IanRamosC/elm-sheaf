@@ -30,6 +30,7 @@ import {
   type PlannedFile,
   planImage,
 } from "./plan";
+import { slotLimiter } from "./slots";
 import { isSvg, svgSize } from "./svg";
 
 /** A cached image file and the path, relative to `dist/`, it is published at. */
@@ -215,8 +216,21 @@ async function locateImage(
   return real.startsWith(realFolder + sep) ? ok(lookup.found) : err(outside);
 }
 
+// Each image holds its source bytes from the read until its variants are
+// written, so this bounds how many files are in memory at once. Without it
+// every image of the site is read before the first one is encoded.
+const withReadSlot = slotLimiter(navigator.hardwareConcurrency);
+
 /** Reads an image, plans its files, and writes those not yet in the cache. */
-async function publishImage(
+function publishImage(
+  siteRoot: string,
+  sitePath: string,
+  images: Config["images"],
+): Promise<Result<Published, Problem>> {
+  return withReadSlot(() => readAndPublish(siteRoot, sitePath, images));
+}
+
+async function readAndPublish(
   siteRoot: string,
   sitePath: string,
   images: Config["images"],
