@@ -82,6 +82,27 @@ describe("startDevServer", () => {
     expect(root.headers.get("location")).toBe("/blog/");
   });
 
+  test("keeps the request's encoding when redirecting a folder", async () => {
+    for (const name of ["日記", "a?b"]) {
+      mkdirSync(join(folder, name));
+      writeFileSync(join(folder, name, "index.html"), "<body>x</body>");
+    }
+    const server = start();
+    server.showSite(folder);
+    const origin = new URL(server.url).origin;
+
+    for (const [requested, location] of <[string, string][]>[
+      ["%E6%97%A5%E8%A8%98", "/blog/%E6%97%A5%E8%A8%98/"],
+      ["a%3Fb", "/blog/a%3Fb/"],
+    ]) {
+      const response = await fetch(`${origin}/blog/${requested}`, {
+        redirect: "manual",
+      });
+      expect(response.status).toBe(302);
+      expect(response.headers.get("location")).toBe(location);
+    }
+  });
+
   test("never serves a file outside the output folder", async () => {
     writeFileSync(join(folder, "..", "sheaf-secret.json"), "{}");
     const server = start();

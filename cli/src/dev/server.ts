@@ -65,7 +65,8 @@ export function startDevServer(options: Options): Result<DevServer, string> {
     request: Request,
     server: Bun.Server<undefined>,
   ): Promise<Response> {
-    const resolved = resolveRequest(basePath, new URL(request.url).pathname);
+    const { pathname } = new URL(request.url);
+    const resolved = resolveRequest(basePath, pathname);
     switch (resolved.kind) {
       case "events":
         return events(request, server);
@@ -74,11 +75,11 @@ export function startDevServer(options: Options): Result<DevServer, string> {
       case "not found":
         return notFound(state);
       case "file":
-        return serveFile(resolved.path);
+        return serveFile(resolved.path, pathname);
     }
   }
 
-  async function serveFile(path: string): Promise<Response> {
+  async function serveFile(path: string, pathname: string): Promise<Response> {
     const isPage = path.endsWith(".html");
     switch (state.kind) {
       case "building":
@@ -87,13 +88,18 @@ export function startDevServer(options: Options): Result<DevServer, string> {
         if (state.lastGood === undefined || isPage) {
           return html(errorPage(state.rendered, eventsPath), 500);
         }
-        return fromFolder(state.lastGood, path);
+        return fromFolder(state.lastGood, path, pathname);
       case "site":
-        return fromFolder(state.folder, path);
+        return fromFolder(state.folder, path, pathname);
     }
   }
 
-  async function fromFolder(folder: string, path: string): Promise<Response> {
+  // The redirect keeps the request's own encoding: a decoded path breaks on non-ASCII and on "?".
+  async function fromFolder(
+    folder: string,
+    path: string,
+    pathname: string,
+  ): Promise<Response> {
     const file = join(folder, path);
     if (await isFile(file)) {
       return path.endsWith(".html")
@@ -101,7 +107,7 @@ export function startDevServer(options: Options): Result<DevServer, string> {
         : new Response(Bun.file(file), { headers });
     }
     if (await isFile(join(file, "index.html"))) {
-      return redirect(`${basePath}${path}/`);
+      return redirect(`${pathname}/`);
     }
     return notFound(state);
   }
