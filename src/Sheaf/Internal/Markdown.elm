@@ -12,8 +12,10 @@ become a `Body`.
 import Dict exposing (Dict)
 import Sheaf.Html as Html exposing (Html)
 import Sheaf.Html.Attributes as Attributes
+import Sheaf.Internal.Component as Component exposing (Component, Kind(..))
 import Sheaf.Internal.Html as Internal
 import Sheaf.Internal.Protocol exposing (Alignment(..), Node(..), Span)
+import Sheaf.Internal.Results as Results
 import Sheaf.Ref as Ref exposing (Ref)
 
 
@@ -24,10 +26,12 @@ type Body
 
 
 {-| What rendering needs from the rest of the site. `resolve` gives the URL of
-a document, or `Nothing` when it has no page.
+a document, or `Nothing` when it has no page, and `components` are the site's
+components by name.
 -}
 type alias Context =
     { resolve : Ref -> Maybe String
+    , components : Dict String Component
     }
 
 
@@ -55,6 +59,7 @@ reference anywhere may point to any of them.
 -}
 type alias Scope =
     { resolve : Ref -> Maybe String
+    , components : Dict String Component
     , footnotes : Dict String Footnote
     }
 
@@ -91,7 +96,7 @@ render context (Body tree) =
     let
         scope : Scope
         scope =
-            { resolve = context.resolve, footnotes = footnotesOf tree }
+            { resolve = context.resolve, components = context.components, footnotes = footnotesOf tree }
     in
     merge (renderNode scope tree) (renderFootnotes scope)
 
@@ -210,26 +215,34 @@ renderNode scope node =
             Ok [ footnoteReference scope reference ]
 
         ContainerDirective directive ->
-            merge
-                (unknownComponent directive ("Component.container \"" ++ directive.name ++ "\" …"))
-                (renderNodes scope directive.children)
+            renderDirective scope Container directive (renderNodes scope directive.children)
 
         LeafDirective directive ->
-            unknownComponent directive ("Component.leaf \"" ++ directive.name ++ "\" …")
+            renderDirective scope Leaf directive (Ok [])
 
 
-{-| Sites have no components yet, so every directive names an unknown one.
+{-| The children of a directive are rendered even when it has problems, so
+that the problems inside them are reported too.
 -}
-unknownComponent : { a | position : Span, name : String } -> String -> Rendered
-unknownComponent directive example =
-    Err
-        [ Located
-            { span = directive.position
-            , title = "UNKNOWN COMPONENT"
-            , message = "This document uses a component named `" ++ directive.name ++ "`, but the site has no component with that name."
-            , hint = Just ("Add it to the site's `components`, such as `" ++ example ++ "`.")
-            }
-        ]
+renderDirective : Scope -> Kind -> { a | position : Span, name : String, attributes : List ( String, String ) } -> Rendered -> Rendered
+renderDirective scope kind directive children =
+    let
+        view : Result (List Problem) (List Html -> Html)
+        view =
+            Component.use scope.components { kind = kind, name = directive.name, attributes = directive.attributes }
+                |> Result.mapError
+                    (List.map
+                        (\problem ->
+                            Located { span = directive.position, title = problem.title, message = problem.message, hint = problem.hint }
+                        )
+                    )
+    in
+    case ( view, children ) of
+        ( Ok make, Ok inner ) ->
+            Ok [ make inner ]
+
+        _ ->
+            Err (Results.errors view ++ Results.errors children)
 
 
 headingElement : Int -> List Html.Attribute -> List Html -> Html

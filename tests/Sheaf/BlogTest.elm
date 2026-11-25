@@ -2,8 +2,9 @@ module Sheaf.BlogTest exposing (suite)
 
 import Expect
 import Json.Encode as Encode
-import RenderFixtures exposing (PostMeta, Source, bodyAt, headAt, metadata, page, paths, post, postMeta, requestWithSlugs)
+import RenderFixtures exposing (PostMeta, Source, bodyAt, headAt, leafDirective, metadata, page, paths, post, postMeta, requestWithSlugs, span)
 import Sheaf.Blog as Blog
+import Sheaf.Component as Component
 import Sheaf.Document exposing (Document)
 import Sheaf.Head as Head
 import Sheaf.Html as Html
@@ -66,6 +67,11 @@ suite =
                 render [ tagged "a" 1 [ "Elm" ] ]
                     |> bodyAt "posts/a/index.html"
                     |> Expect.equal (Just "<a href=\"/blog/tags/elm/\">Elm</a>")
+        , test "the site has the config's components" <|
+            \_ ->
+                render [ { about | body = [ leafDirective "divider" (span 3 1 11) ] } ]
+                    |> bodyAt "about/index.html"
+                    |> Expect.equal (Just "<hr>")
         ]
 
 
@@ -96,6 +102,7 @@ config =
         , archive = \_ -> page []
         , notFound = page []
         }
+    , components = [ Component.leaf "divider" (Component.succeed ()) (\() -> Html.hr [] []) ]
     }
 
 
@@ -109,7 +116,7 @@ postLayout document =
 
 titled : Document PostMeta -> Page
 titled document =
-    { title = document.meta.title, head = [], body = [] }
+    { title = document.meta.title, head = [], body = document.body }
 
 
 slugTable : List ( String, String, String )

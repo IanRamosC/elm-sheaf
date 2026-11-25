@@ -8,6 +8,7 @@
         "Sheaf",
         "Sheaf.Blog",
         "Sheaf.Collection",
+        "Sheaf.Component",
         "Sheaf.Date",
         "Sheaf.Document",
         "Sheaf.Feed",

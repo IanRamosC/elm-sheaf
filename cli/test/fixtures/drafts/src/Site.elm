@@ -33,4 +33,5 @@ site =
                 (\post -> { title = post.meta.title, head = [], body = post.body })
             ]
         , feeds = []
+        , components = []
         }

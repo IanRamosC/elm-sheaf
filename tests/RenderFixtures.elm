@@ -92,7 +92,7 @@ render routes =
 
 renderWithFeeds : List Route -> List Feed -> Value -> Response
 renderWithFeeds routes feeds =
-    Render.render (Sheaf.site { metadata = metadata, routes = routes, feeds = feeds })
+    Render.render (Sheaf.site { metadata = metadata, routes = routes, feeds = feeds, components = [] })
 
 
 metadata : Sheaf.Metadata

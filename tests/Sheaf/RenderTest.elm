@@ -706,7 +706,7 @@ siteTests =
             \_ ->
                 request [] []
                     |> Render.render
-                        (Sheaf.site { metadata = metadata, routes = [ Route.single "/" (page []) ], feeds = [] }
+                        (Sheaf.site { metadata = metadata, routes = [ Route.single "/" (page []) ], feeds = [], components = [] }
                             |> Sheaf.withRoutes [ Route.single "/about/" (page []) ]
                         )
                     |> paths

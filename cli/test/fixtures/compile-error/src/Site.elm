@@ -14,4 +14,5 @@ site =
             }
         , routes = []
         , feeds = []
+        , components = []
         }

@@ -60,6 +60,7 @@ site =
             , archive = archive
             , notFound = notFound
             }
+        , components = []
         }
 
 

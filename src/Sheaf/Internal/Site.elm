@@ -16,19 +16,22 @@ module Sheaf.Internal.Site exposing
 -}
 
 import Sheaf.Html exposing (Html)
+import Sheaf.Internal.Component exposing (Component)
 import Sheaf.Internal.Frontmatter exposing (Frontmatter, Problem)
 import Sheaf.Internal.Head as Head
 import Sheaf.Internal.Pattern as Pattern
 import Sheaf.Internal.Protocol as Protocol
 
 
-{-| What the site says about itself, and every route and feed of it.
+{-| What the site says about itself, and every route, feed and component of
+it.
 -}
 type Site
     = Site
         { metadata : Metadata
         , routes : List Route
         , feeds : List Feed
+        , components : List Component
         }
 
 

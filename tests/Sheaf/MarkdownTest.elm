@@ -1,9 +1,13 @@
 module Sheaf.MarkdownTest exposing (suite)
 
+import Dict
 import Expect
 import Json.Decode as Decode
 import ProtocolFixtures
+import Sheaf.Component as Component exposing (Component)
 import Sheaf.Html as Html
+import Sheaf.Html.Attributes as Attributes
+import Sheaf.Internal.Component as Internal
 import Sheaf.Internal.Markdown as Markdown exposing (Problem(..))
 import Sheaf.Internal.Protocol as Protocol exposing (Alignment(..), Node(..))
 import Sheaf.Ref as Ref exposing (Ref)
@@ -81,7 +85,7 @@ helloWorldAt url ref =
 renderWith : (Ref -> Maybe String) -> Node -> Result (List Problem) String
 renderWith resolve node =
     Markdown.fromNode node
-        |> Markdown.render { resolve = resolve }
+        |> Markdown.render { resolve = resolve, components = Dict.empty }
         |> Result.map (List.map Html.toString >> String.concat)
 
 
@@ -413,52 +417,40 @@ fixtureTests =
         trees =
             Decode.decodeString Protocol.requestDecoder ProtocolFixtures.allNodesRequest
                 |> Result.map (.documents >> List.map .tree)
+
+        renderTree : Node -> Result (List Problem) String
+        renderTree tree =
+            Markdown.fromNode tree
+                |> Markdown.render
+                    { resolve = helloWorldAt "/blog/posts/hello-world/"
+                    , components = Internal.byName [ calloutComponent, youtubeComponent ]
+                    }
+                |> Result.map (List.map Html.toString >> String.concat)
     in
     describe "a decoded request"
-        [ test "every node type but directives renders" <|
+        [ test "every node type renders" <|
             \_ ->
                 trees
-                    |> Result.map (List.map (withoutDirectives >> renderWith (helloWorldAt "/blog/posts/hello-world/")))
+                    |> Result.map (List.map renderTree)
                     |> Expect.equal (Ok [ Ok allNodesHtml ])
-        , test "directives are unknown components until the site has components" <|
-            \_ ->
-                trees
-                    |> Result.map (List.map (renderWith (helloWorldAt "/blog/posts/hello-world/") >> Result.mapError (List.map problemTitle)))
-                    |> Expect.equal (Ok [ Err [ "UNKNOWN COMPONENT", "UNKNOWN COMPONENT" ] ])
         ]
 
 
-withoutDirectives : Node -> Node
-withoutDirectives node =
-    case node of
-        Root container ->
-            Root { container | children = List.filter (not << isDirective) container.children }
-
-        other ->
-            other
-
-
-isDirective : Node -> Bool
-isDirective node =
-    case node of
-        ContainerDirective _ ->
-            True
-
-        LeafDirective _ ->
-            True
-
-        _ ->
-            False
+calloutComponent : Component
+calloutComponent =
+    Component.container "callout"
+        (Component.succeed (\kind classes -> String.join " " ("callout" :: kind :: List.filterMap identity [ classes ]))
+            |> Component.required "kind" Component.string
+            |> Component.optional "class" Component.string
+        )
+        (\classes -> Html.aside [ Attributes.class classes ])
 
 
-problemTitle : Problem -> String
-problemTitle problem =
-    case problem of
-        UnresolvedLink _ ->
-            "UNRESOLVED LINK"
-
-        Located located ->
-            located.title
+youtubeComponent : Component
+youtubeComponent =
+    Component.leaf "youtube"
+        (Component.succeed identity |> Component.required "id" Component.string)
+        (\id -> Html.div [ Attributes.id id ] [])
 
 
 allNodesHtml : String
@@ -481,6 +473,8 @@ allNodesHtml =
         , "<th style=\"text-align: right\">C</th><th>D</th></tr></thead>"
         , "<tbody><tr><td style=\"text-align: left\">1</td><td style=\"text-align: center\">2</td>"
         , "<td style=\"text-align: right\">3</td><td>4</td></tr></tbody></table>"
+        , "<aside class=\"callout note wide\"><p>Inside a callout.</p></aside>"
+        , "<div id=\"intro\"></div>"
         , "<section data-footnotes class=\"footnotes\"><ol><li id=\"user-content-fn-note\"><p>The note."
         , backLink "note" 1
         , "</p></li></ol></section>"

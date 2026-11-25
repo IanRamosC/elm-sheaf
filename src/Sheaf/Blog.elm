@@ -10,11 +10,12 @@ Git does not keep empty folders, so commit an empty `.gitkeep` file in it.
 
     import Sheaf
     import Sheaf.Blog as Blog
+    import Sheaf.Component as Component exposing (Component)
     import Sheaf.Document exposing (Document)
     import Sheaf.Frontmatter as Frontmatter exposing (Frontmatter)
     import Sheaf.Head as Head
-    import Sheaf.Html exposing (Html, a, article, h1, li, main_, nav, text, ul)
-    import Sheaf.Html.Attributes exposing (href, siteHref)
+    import Sheaf.Html exposing (Html, a, article, aside, h1, li, main_, nav, text, ul)
+    import Sheaf.Html.Attributes exposing (class, href, siteHref)
     import Sheaf.Route exposing (Group, Listing, Page)
 
     type alias PostMeta =
@@ -61,7 +62,14 @@ Git does not keep empty folders, so commit an empty `.gitkeep` file in it.
                 , archive = \items -> layout "Archive" (titles items)
                 , notFound = layout "Not found" (h1 [] [ text "Not found" ])
                 }
+            , components = [ callout ]
             }
+
+    callout : Component
+    callout =
+        Component.container "callout"
+            (Component.succeed identity |> Component.required "kind" Component.string)
+            (\kind -> aside [ class ("callout " ++ kind) ])
 
     post : Document PostMeta -> Page
     post document =
@@ -117,8 +125,9 @@ Git does not keep empty folders, so commit an empty `.gitkeep` file in it.
 Every layout's head also gets links to the RSS feed at `/feed.xml` and the
 Atom feed at `/atom.xml`, so feed readers find them from any page.
 
-Add routes and feeds of your own with
-[`Sheaf.withRoutes`](Sheaf#withRoutes) and [`Sheaf.withFeeds`](Sheaf#withFeeds).
+Add routes, feeds and components of your own with
+[`Sheaf.withRoutes`](Sheaf#withRoutes), [`Sheaf.withFeeds`](Sheaf#withFeeds)
+and [`Sheaf.withComponents`](Sheaf#withComponents).
 
 @docs Config, Layouts, site, tagLink
 
@@ -126,6 +135,7 @@ Add routes and feeds of your own with
 
 import Sheaf
 import Sheaf.Collection as Collection exposing (Collection)
+import Sheaf.Component exposing (Component)
 import Sheaf.Document exposing (Document)
 import Sheaf.Feed as Feed
 import Sheaf.Frontmatter exposing (Frontmatter)
@@ -143,6 +153,8 @@ import Sheaf.Route as Route exposing (Group, Listing, Page)
   - `tags` gives a post's tags, as written in its frontmatter.
   - `feedItem` gives the title and summary of a post in the feeds.
   - `layouts` turn documents into pages.
+  - `components` render the directives of posts and pages, as in
+    [`Sheaf.Component`](Sheaf-Component).
 
 -}
 type alias Config post page =
@@ -153,6 +165,7 @@ type alias Config post page =
     , tags : post -> List String
     , feedItem : post -> { title : String, summary : Maybe String }
     , layouts : Layouts post page
+    , components : List Component
     }
 
 
@@ -217,6 +230,7 @@ site config =
             , Route.notFound (withFeeds layouts.notFound)
             ]
         , feeds = [ Feed.fromCollection { rss = rssPath, atom = atomPath } posts config.feedItem ]
+        , components = config.components
         }
 
 

@@ -49,6 +49,7 @@ site =
                 notes
                 (\meta -> { title = meta.title, summary = Nothing })
             ]
+        , components = []
         }
 
 

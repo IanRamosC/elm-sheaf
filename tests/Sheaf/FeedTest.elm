@@ -127,7 +127,7 @@ itemTests =
             \_ ->
                 request [ "posts" ] [ dated "a" "2026-11-01" ]
                     |> Render.render
-                        (Sheaf.site { metadata = RenderFixtures.metadata, routes = [ postRoute ], feeds = [ feed ] }
+                        (Sheaf.site { metadata = RenderFixtures.metadata, routes = [ postRoute ], feeds = [ feed ], components = [] }
                             |> Sheaf.withFeeds [ feedAt { rss = "/posts.xml", atom = "/posts.atom" } ]
                         )
                     |> .feeds

@@ -433,7 +433,7 @@ describe("a Sheaf site", () => {
       expect(diagnostic?.sourcePath).toBe("src/Site.elm");
       expect(diagnostic?.span).toEqual({
         start: { line: 9, column: 9 },
-        end: { line: 17, column: 10 },
+        end: { line: 18, column: 10 },
       });
       expect(diagnostic?.message).toContain(
         "The 1st argument to `site` is not what I expect:",

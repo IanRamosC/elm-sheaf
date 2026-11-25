@@ -12,6 +12,7 @@ import Dict exposing (Dict)
 import Json.Decode as Decode
 import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Check as Check exposing (CheckedPage, LinkProblem(..), Location(..), UncheckedPage)
+import Sheaf.Internal.Component as Component exposing (Component)
 import Sheaf.Internal.Feed as Feed
 import Sheaf.Internal.Grouping as Grouping exposing (GroupPages, Grouped)
 import Sheaf.Internal.Hint as Hint
@@ -65,6 +66,7 @@ type alias Context =
     -- The pattern of the first item route of each collection.
     , itemPatterns : Dict String String
     , slugs : Dict String GroupSlug
+    , components : Dict String Component
     }
 
 
@@ -83,6 +85,7 @@ renderSite (Site site) request =
                     |> List.reverse
                     |> Dict.fromList
             , slugs = request.slugs
+            , components = Component.byName site.components
             }
 
         feedCollections : List String
@@ -159,6 +162,7 @@ renderSite (Site site) request =
         Results.unique
             (List.concat
                 [ List.filterMap RouteCheck.badRoute site.routes
+                , Component.siteProblems site.components
                 , List.concatMap Results.errors feeds
                 , unknownCollections used request.collections
                 , Listing.missingDates (Results.unique (List.filterMap Site.listedCollection site.routes ++ feedCollections)) published
@@ -270,7 +274,9 @@ urlTarget context groupPages url =
 -}
 renderBody : Context -> Document -> Result (List Diagnostic) (List Html)
 renderBody context document =
-    Markdown.render { resolve = linkTarget context >> Result.toMaybe } (Markdown.fromNode document.tree)
+    Markdown.render
+        { resolve = linkTarget context >> Result.toMaybe, components = context.components }
+        (Markdown.fromNode document.tree)
         |> Result.mapError (List.filterMap (bodyDiagnostic context document))
 
 
