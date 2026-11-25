@@ -83,7 +83,15 @@ describe("startDevServer", () => {
   });
 
   test("keeps the request's encoding when redirecting a folder", async () => {
-    for (const name of ["日記", "a?b"]) {
+    const cases: [name: string, requested: string, location: string][] = [
+      ["日記", "%E6%97%A5%E8%A8%98", "/blog/%E6%97%A5%E8%A8%98/"],
+      ["a?b", "a%3Fb", "/blog/a%3Fb/"],
+    ];
+    // Windows allows no "?" in a file name, so no page there has one.
+    const possible = cases.filter(
+      ([name]) => process.platform !== "win32" || !name.includes("?"),
+    );
+    for (const [name] of possible) {
       mkdirSync(join(folder, name));
       writeFileSync(join(folder, name, "index.html"), "<body>x</body>");
     }
@@ -91,10 +99,7 @@ describe("startDevServer", () => {
     server.showSite(folder);
     const origin = new URL(server.url).origin;
 
-    for (const [requested, location] of <[string, string][]>[
-      ["%E6%97%A5%E8%A8%98", "/blog/%E6%97%A5%E8%A8%98/"],
-      ["a%3Fb", "/blog/a%3Fb/"],
-    ]) {
+    for (const [, requested, location] of possible) {
       const response = await fetch(`${origin}/blog/${requested}`, {
         redirect: "manual",
       });
