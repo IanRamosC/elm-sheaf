@@ -18,7 +18,11 @@ This is every key, with the defaults of those you can leave out:
 {
   "siteUrl": "https://example.com/blog/",
   "timezone": "UTC",
-  "highlight": { "theme": { "light": "github-light", "dark": "github-dark" } },
+  "highlight": {
+    "theme": { "light": "github-light", "dark": "github-dark" },
+    "grammars": {},
+    "themes": {}
+  },
   "images": { "widths": [480, 960, 1600], "formats": ["webp"] }
 }
 ```
@@ -53,11 +57,11 @@ written with a time and an offset doesn't depend on it. See
 
 ## `highlight`
 
-`highlight.theme.light` and `highlight.theme.dark` name the two
-[Shiki themes](https://shiki.style/themes) code blocks are highlighted with.
-Either can be left out. A name Shiki doesn't have is `BAD CONFIG`, with the
-closest theme as a suggestion. Sheaf leaves out Shiki's `aurora-x` theme,
-because it is GPL-3.0.
+`highlight.theme.light` and `highlight.theme.dark` name the two themes code
+blocks are highlighted with: [Shiki's](https://shiki.style/themes), or
+[your own](#your-own-grammars-and-themes). Either can be left out. A name Sheaf
+doesn't have is `BAD CONFIG`, with the closest theme as a suggestion. Sheaf
+leaves out Shiki's `aurora-x` theme, because it is GPL-3.0.
 
 Pages use the light theme. To follow the reader's system setting, add Shiki's
 dark-mode CSS to your stylesheet, as the starter's `static/style.css` does:
@@ -74,6 +78,31 @@ dark-mode CSS to your stylesheet, as the starter's `static/style.css` does:
   }
 }
 ```
+
+### Your own grammars and themes
+
+`highlight.grammars` and `highlight.themes` add grammars and themes to Shiki's,
+from files in your site:
+
+```json
+"highlight": {
+  "theme": { "light": "github-light", "dark": "my-theme" },
+  "grammars": { "nginx": "highlight/nginx.tmLanguage.json" },
+  "themes": { "my-theme": "highlight/my-theme.json" }
+}
+```
+
+Each key is a name: a code block marked `nginx` uses the grammar named
+`nginx`, and `highlight.theme` uses a theme's name. Each value is the path of a JSON file,
+relative to the site's folder: a TextMate grammar, with `scopeName` and
+`patterns`, or a VS Code colour theme, with `tokenColors` or `colors`. These
+are the formats VS Code extensions ship and Shiki loads. A name can be any,
+including one of Shiki's, and your file is used instead of Shiki's. This is how
+a site gets back the GPL-3.0 grammars and theme that Sheaf leaves out.
+
+A file that is missing, isn't JSON or isn't a grammar or theme is `BAD CONFIG`,
+naming the key and the file. Code is highlighted again when one of the files
+changes, and `sheaf dev` rebuilds when you save one.
 
 ## `images`
 

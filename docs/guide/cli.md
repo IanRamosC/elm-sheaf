@@ -123,7 +123,7 @@ titles.
 | Title | What it means |
 |---|---|
 | `NO SHEAF.JSON` | There is no `sheaf.json` in the folder the command runs in. |
-| `BAD CONFIG` | `sheaf.json` or `--site-url` has a problem: invalid JSON, an unknown key, a missing or invalid `siteUrl`, an unknown timezone, an unknown or left-out Shiki theme, or bad image settings. |
+| `BAD CONFIG` | `sheaf.json` or `--site-url` has a problem: invalid JSON, an unknown key, a missing or invalid `siteUrl`, an unknown timezone, an unknown or left-out Shiki theme, a grammar or theme file that is missing or isn't one, or bad image settings. |
 | `FOLDER NOT EMPTY` | `sheaf init` was given a folder with something in it, or a file. |
 | `NOT A SHEAF REPOSITORY` | The `--local` path has no `src/Sheaf.elm` and `cli/package.json`. |
 | `ELM NOT FOUND` | There is no `elm` in the site's `node_modules/.bin` or on the `PATH`. |

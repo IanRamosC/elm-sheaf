@@ -9,18 +9,27 @@ const ignoredFolders = new Set([".sheaf", "elm-stuff", "node_modules", "dist"]);
 
 /**
  * The files and folders a build reads, resolved against the site root: the
- * content, the static files, both configuration files and the Elm source
- * directories. `.sheaf/gen` is a source directory too, but every build
- * rewrites it, so watching it would make each build start the next.
+ * content, the static files, both configuration files, the Elm source
+ * directories and the grammars and themes `sheaf.json` names. `.sheaf/gen`
+ * is a source directory too, but every build rewrites it, so watching it
+ * would make each build start the next.
  */
-export function watchedPaths(siteRoot: string, elmJson: string): string[] {
-  return pathsFor(siteRoot, parseSourceDirectories(elmJson) ?? []);
+export function watchedPaths(
+  siteRoot: string,
+  elmJson: string,
+  sheafJson: string,
+): string[] {
+  return pathsFor(siteRoot, [
+    ...(parseSourceDirectories(elmJson) ?? []),
+    ...(parseHighlightFiles(sheafJson) ?? []),
+  ]);
 }
 
-function pathsFor(siteRoot: string, sourceDirectories: string[]): string[] {
+/** `named` are the paths the configuration files give, which change with them. */
+function pathsFor(siteRoot: string, named: string[]): string[] {
   const generated = resolve(siteRoot, ".sheaf");
   const paths = ["content", "static", "sheaf.json", "elm.json"]
-    .concat(sourceDirectories)
+    .concat(named)
     .map((path) => resolve(siteRoot, path))
     .filter((path) => !isWithin(generated, path));
   return [...new Set(paths)];
@@ -38,9 +47,32 @@ function parseSourceDirectories(elmJson: string): string[] | undefined {
   }
 }
 
-function readSourceDirectories(elmJsonPath: string): string[] | undefined {
+/** The files of `highlight.grammars` and `highlight.themes`; the build reports what is wrong with them. */
+function parseHighlightFiles(sheafJson: string): string[] | undefined {
   try {
-    return parseSourceDirectories(readFileSync(elmJsonPath, "utf8"));
+    const highlight: unknown = JSON.parse(sheafJson).highlight;
+    if (!isObject(highlight)) return [];
+    return [highlight.grammars, highlight.themes].flatMap((paths) =>
+      isObject(paths)
+        ? Object.values(paths).filter((path) => typeof path === "string")
+        : [],
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** What `parse` makes of the file at `path`, or `undefined` when it can't be read. */
+function readWith<T>(
+  path: string,
+  parse: (text: string) => T | undefined,
+): T | undefined {
+  try {
+    return parse(readFileSync(path, "utf8"));
   } catch {
     return undefined;
   }
@@ -60,9 +92,13 @@ export function watchSite(
 ): { close(): void } {
   const root = resolve(siteRoot);
   const elmJsonPath = join(root, "elm.json");
-  const configFiles = [join(root, "sheaf.json"), elmJsonPath];
-  // When elm.json can't be read, the build reports why; until then the last good list stands.
-  let sourceDirectories = readSourceDirectories(elmJsonPath) ?? [];
+  const sheafJsonPath = join(root, "sheaf.json");
+  const configFiles = [sheafJsonPath, elmJsonPath];
+  // When a configuration file can't be read, the build reports why; until
+  // then the last good list stands.
+  let sourceDirectories = readWith(elmJsonPath, parseSourceDirectories) ?? [];
+  let highlightFiles = readWith(sheafJsonPath, parseHighlightFiles) ?? [];
+  const named = () => [...sourceDirectories, ...highlightFiles];
   const watchers = new Map<string, FSWatcher>();
   let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -77,7 +113,7 @@ export function watchSite(
       wanted.set(`${recursive}:${folder}`, { folder, recursive });
 
     want(root, false);
-    const folders = pathsFor(root, sourceDirectories).filter(
+    const folders = pathsFor(root, named()).filter(
       (path) => !configFiles.includes(path),
     );
     for (const path of folders) {
@@ -145,11 +181,15 @@ export function watchSite(
 
     if (path === elmJsonPath) {
       sourceDirectories =
-        readSourceDirectories(elmJsonPath) ?? sourceDirectories;
+        readWith(elmJsonPath, parseSourceDirectories) ?? sourceDirectories;
     }
-    if (!recursive || path === elmJsonPath) refresh();
+    if (path === sheafJsonPath) {
+      highlightFiles =
+        readWith(sheafJsonPath, parseHighlightFiles) ?? highlightFiles;
+    }
+    if (!recursive || configFiles.includes(path)) refresh();
     // A shallow watcher also sees unrelated names, and parents of folders still missing.
-    const watched = pathsFor(root, sourceDirectories);
+    const watched = pathsFor(root, named());
     if (recursive || watched.some((input) => isWithin(path, input))) {
       changed();
     }

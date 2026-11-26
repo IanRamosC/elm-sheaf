@@ -1,0 +1,5 @@
+{
+  "name": "toy",
+  "scopeName": "source.toy",
+  "patterns": [{ "match": "\\bserver\\b", "name": "keyword.control.toy" }]
+}

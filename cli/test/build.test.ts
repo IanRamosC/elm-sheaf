@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
   chmodSync,
+  cpSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -370,6 +371,65 @@ describe("build", () => {
     },
     SLOW,
   );
+
+  test(
+    "highlights with the site's own grammar, again after it changes",
+    async () => {
+      const root = copyFixture("minimal");
+      cpSync(fixturePath("highlight"), join(root, "highlight"), {
+        recursive: true,
+      });
+      writeFileSync(
+        join(root, "sheaf.json"),
+        JSON.stringify({
+          siteUrl: "https://example.com/",
+          highlight: {
+            theme: { dark: "two-colour" },
+            grammars: { nginx: "highlight/toy.tmLanguage.json" },
+            themes: { "two-colour": "highlight/two-colour.json" },
+          },
+        }),
+      );
+      const post = join(root, "content/posts/2026-11-23-hello-world.md");
+      writeFileSync(
+        post,
+        `${readFileSync(post, "utf8")}\n\`\`\`nginx\nserver listen\n\`\`\`\n`,
+      );
+      const page = join(root, "dist/posts/hello-world/index.html");
+      const orangeWord = /--shiki-dark:#ff8000[^>]*>(\w+)</i;
+
+      const first = await build(root, options(root));
+      expect(first.ok).toBe(true);
+      expect(orangeWord.exec(readFileSync(page, "utf8"))?.[1]).toBe("server");
+
+      writeFileSync(
+        join(root, "highlight/toy.tmLanguage.json"),
+        JSON.stringify({
+          scopeName: "source.toy",
+          patterns: [{ match: "\\blisten\\b", name: "keyword.control.toy" }],
+        }),
+      );
+      const second = await build(root, options(root));
+      expect(second.ok).toBe(true);
+      expect(orangeWord.exec(readFileSync(page, "utf8"))?.[1]).toBe("listen");
+    },
+    SLOW,
+  );
+
+  test("reports a missing grammar file as a config problem", async () => {
+    const root = copyFixture("minimal");
+    writeFileSync(
+      join(root, "sheaf.json"),
+      JSON.stringify({
+        siteUrl: "https://example.com/",
+        highlight: { grammars: { nginx: "nginx.json" } },
+      }),
+    );
+
+    const result = await build(root, options(root, { output: undefined }));
+
+    expect(titlesOf(result)).toEqual(["BAD CONFIG"]);
+  });
 
   test("explains a site without sheaf.json", async () => {
     const root = copyFixture("minimal");

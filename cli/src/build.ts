@@ -38,6 +38,7 @@ import {
   highlightCode,
   languagesIn,
 } from "./highlight/highlight";
+import { loadSiteHighlight, type SiteHighlight } from "./highlight/site";
 import { imageOutputs } from "./images/emit";
 import {
   type ImageFile,
@@ -79,6 +80,12 @@ export async function build(
 ): Promise<Result<BuildSuccess, Diagnostic[]>> {
   const config = await readConfig(siteRoot, options.siteUrl);
   if (!config.ok) return config;
+  // The files sheaf.json names are part of the config, so they are read first.
+  const siteHighlight = await loadSiteHighlight(
+    siteRoot,
+    config.value.highlight,
+  );
+  if (!siteHighlight.ok) return siteHighlight;
 
   const elmPackage = await readElmPackage(siteRoot);
   if (!elmPackage.ok) return elmPackage;
@@ -113,6 +120,7 @@ export async function build(
   const highlighted = await highlightDocuments(
     siteRoot,
     config.value,
+    siteHighlight.value,
     parsed.value,
   );
   if (!highlighted.ok) return highlighted;
@@ -269,15 +277,17 @@ function parseDocuments(
 async function highlightDocuments(
   siteRoot: string,
   config: Config,
+  site: SiteHighlight,
   documents: ParsedDocument[],
 ): Promise<
   Result<{ documents: ParsedDocument[]; warnings: Diagnostic[] }, Diagnostic[]>
 > {
   const cache = await loadHighlightCache(siteRoot);
   using highlighter = await createCodeHighlighter(
-    config.highlight,
+    config.highlight.theme,
     languagesIn(documents.map(({ tree }) => tree)),
     cache,
+    site,
   );
   const highlighted = collect(
     documents.map(({ source, tree }) => {

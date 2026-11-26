@@ -32,6 +32,8 @@ numbers are those of the npm package `elm-sheaf`.
   a dark theme. Shiki's GPL-3.0 grammars (`ada`, `gnuplot`, `nginx`, `org`,
   `racket`) and theme (`aurora-x`) are left out, because Sheaf's
   BSD-3-Clause binaries can't carry them.
+- A site can add grammars and themes of its own, or replace Shiki's, with
+  `highlight.grammars` and `highlight.themes` in `sheaf.json`.
 - Local images in Markdown are resized to several widths, encoded as WebP as
   well, and written as `<picture>` elements with their dimensions. Missing
   images and paths whose case doesn't match fail the build.

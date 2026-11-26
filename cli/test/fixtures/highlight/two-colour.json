@@ -1,0 +1,11 @@
+{
+  "name": "Two colour",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#101010",
+    "editor.foreground": "#e0e0e0"
+  },
+  "tokenColors": [
+    { "scope": "keyword", "settings": { "foreground": "#ff8000" } }
+  ]
+}

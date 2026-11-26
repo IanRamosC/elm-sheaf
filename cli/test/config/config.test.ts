@@ -144,8 +144,9 @@ describe("parseConfig", () => {
     ]) {
       const result = parse(json);
       expect(result.ok && result.value.highlight).toEqual({
-        light: "github-light",
-        dark: "github-dark",
+        theme: { light: "github-light", dark: "github-dark" },
+        grammars: new Map(),
+        themes: new Map(),
       });
     }
   });
@@ -154,10 +155,58 @@ describe("parseConfig", () => {
     const result = parse(
       '{"siteUrl":"https://example.com/","highlight":{"theme":{"dark":"nord"}}}',
     );
-    expect(result.ok && result.value.highlight).toEqual({
+    expect(result.ok && result.value.highlight.theme).toEqual({
       light: "github-light",
       dark: "nord",
     });
+  });
+
+  test("keeps the site's own grammars and themes", () => {
+    const result = parse(
+      JSON.stringify({
+        siteUrl: "https://example.com/",
+        highlight: {
+          theme: { dark: "my-theme" },
+          grammars: { nginx: "highlight/nginx.tmLanguage.json" },
+          themes: { "my-theme": "highlight/my-theme.json" },
+        },
+      }),
+    );
+    expect(result.ok && result.value.highlight).toEqual({
+      theme: { light: "github-light", dark: "my-theme" },
+      grammars: new Map([["nginx", "highlight/nginx.tmLanguage.json"]]),
+      themes: new Map([["my-theme", "highlight/my-theme.json"]]),
+    });
+  });
+
+  test("lets a site theme take the name of a theme Sheaf leaves out", () => {
+    const result = parse(
+      '{"siteUrl":"https://example.com/","highlight":{"theme":{"dark":"aurora-x"},"themes":{"aurora-x":"aurora-x.json"}}}',
+    );
+    expect(result.ok && result.value.highlight.theme.dark).toBe("aurora-x");
+  });
+
+  test("suggests the site's own theme", () => {
+    const errors = errorsOf(
+      '{"siteUrl":"https://example.com/","highlight":{"theme":{"dark":"my-thme"},"themes":{"my-theme":"t.json"}}}',
+    );
+    expect(errors[0]?.hint).toBe('Did you mean "my-theme"?');
+  });
+
+  test("rejects grammars and themes that are not objects of paths", () => {
+    const errors = errorsOf(
+      '{"siteUrl":"https://example.com/","highlight":{"grammars":["nginx"],"themes":{"mine":1}}}',
+    );
+    expect(
+      errors.map(({ title, message, sourcePath }) => [
+        title,
+        message,
+        sourcePath,
+      ]),
+    ).toEqual([
+      ["BAD CONFIG", '"highlight.grammars" must be an object.', "sheaf.json"],
+      ["BAD CONFIG", '"highlight.themes.mine" must be a string.', "sheaf.json"],
+    ]);
   });
 
   test("suggests the Shiki theme closest to an unknown one", () => {
@@ -194,7 +243,7 @@ describe("parseConfig", () => {
 
   test("rejects unknown keys and wrong types under highlight", () => {
     const errors = errorsOf(
-      '{"siteUrl":"https://example.com/","highlight":{"themes":{},"theme":{"light":1,"darkk":"nord"}}}',
+      '{"siteUrl":"https://example.com/","highlight":{"theem":{},"theme":{"light":1,"darkk":"nord"}}}',
     );
     expect(errors.map(({ hint }) => hint)).toEqual([
       'Did you mean "theme"?',

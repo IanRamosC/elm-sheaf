@@ -10,7 +10,11 @@ const config: Config = {
   siteUrl: new URL("https://example.com/"),
   basePath: "/",
   timezone: "UTC",
-  highlight: { light: "github-light", dark: "github-dark" },
+  highlight: {
+    theme: { light: "github-light", dark: "github-dark" },
+    grammars: new Map(),
+    themes: new Map(),
+  },
   images: { widths: [480, 960, 1600], formats: ["webp"] },
 };
 const buildStart = new Date("2026-11-23T12:00:00Z");

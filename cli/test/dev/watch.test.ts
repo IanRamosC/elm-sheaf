@@ -27,6 +27,16 @@ function elmJson(sourceDirectories: string[]): string {
   return JSON.stringify({ "source-directories": sourceDirectories });
 }
 
+function sheafJson(
+  grammars: Record<string, string>,
+  themes: Record<string, string> = {},
+): string {
+  return JSON.stringify({
+    siteUrl: "https://example.com/",
+    highlight: { grammars, themes },
+  });
+}
+
 /**
  * macOS reports changes made a few milliseconds before a watcher starts, so
  * the setup is given time to fall out of that window first.
@@ -53,6 +63,7 @@ describe("watchedPaths", () => {
     const paths = watchedPaths(
       "/site",
       elmJson(["src", ".sheaf/gen", "../shared/src", "src"]),
+      "{}",
     );
 
     expect(paths).toEqual([
@@ -66,7 +77,20 @@ describe("watchedPaths", () => {
   });
 
   test("keeps the site root as a source directory", () => {
-    expect(watchedPaths("/site", elmJson(["."]))).toContain(resolve("/site"));
+    expect(watchedPaths("/site", elmJson(["."]), "{}")).toContain(
+      resolve("/site"),
+    );
+  });
+
+  test("lists the grammars and themes sheaf.json names", () => {
+    const paths = watchedPaths(
+      "/site",
+      elmJson(["src"]),
+      sheafJson({ nginx: "highlight/nginx.json" }, { mine: "mine.json" }),
+    );
+
+    expect(paths).toContain(resolve("/site/highlight/nginx.json"));
+    expect(paths).toContain(resolve("/site/mine.json"));
   });
 });
 
@@ -116,6 +140,24 @@ describe("watchSite", () => {
     writeFileSync(join(root, "elm.json"), elmJson(["src", "lib"]));
     await waitUntil(() => watcher.calls() === 1);
     writeFileSync(join(root, "lib/Extra.elm"), "module Extra");
+    await waitUntil(() => watcher.calls() === 2);
+  });
+});
+
+describe("watchSite and the site's highlighting", () => {
+  test("follows the grammar files that sheaf.json names", async () => {
+    writeFileSync(join(root, "elm.json"), elmJson(["src"]));
+    mkdirSync(join(root, "highlight"));
+    writeFileSync(join(root, "highlight/toy.json"), "{}");
+    writeFileSync(join(root, "sheaf.json"), sheafJson({}));
+    const watcher = await watchCounting();
+
+    writeFileSync(
+      join(root, "sheaf.json"),
+      sheafJson({ toy: "highlight/toy.json" }),
+    );
+    await waitUntil(() => watcher.calls() === 1);
+    writeFileSync(join(root, "highlight/toy.json"), '{"scopeName":"x"}');
     await waitUntil(() => watcher.calls() === 2);
   });
 });

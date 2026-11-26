@@ -11,8 +11,13 @@ export type Config = {
   basePath: string;
   /** IANA timezone name that decides when a date-only post counts as published. */
   timezone: string;
-  /** The Shiki themes code is highlighted with. */
-  highlight: { light: string; dark: string };
+  highlight: {
+    /** The themes code is highlighted with: Shiki's, or the site's own. */
+    theme: { light: string; dark: string };
+    /** The site's own grammars and themes, by name, as paths relative to the site root. */
+    grammars: ReadonlyMap<string, string>;
+    themes: ReadonlyMap<string, string>;
+  };
   /** The widths local images are resized to, and the formats written besides the original's. */
   images: { widths: number[]; formats: ImageFormat[] };
 };
@@ -24,7 +29,10 @@ const knownKeys = ["siteUrl", "timezone", "highlight", "images"];
 
 const defaultTimezone = "UTC";
 
-const defaultThemes = { light: "github-light", dark: "github-dark" };
+const defaultThemes: Config["highlight"]["theme"] = {
+  light: "github-light",
+  dark: "github-dark",
+};
 
 const defaultImages: Config["images"] = {
   widths: [480, 960, 1600],
@@ -181,25 +189,84 @@ function parseFormats(value: unknown): Result<ImageFormat[], Problem[]> {
   return problems.length > 0 ? err(problems) : ok(formats);
 }
 
-/** `{ "theme": { "light": …, "dark": … } }`, where every part is optional. */
+/**
+ * `{ "theme": { "light": …, "dark": … }, "grammars": {…}, "themes": {…} }`,
+ * where every part is optional. The files are read later, by the build.
+ */
 function parseHighlight(
   value: unknown,
 ): Result<Config["highlight"], Problem[]> {
-  if (value === undefined) return ok(defaultThemes);
+  if (value === undefined) {
+    return ok({ theme: defaultThemes, grammars: new Map(), themes: new Map() });
+  }
   if (!isObject(value)) {
     return err([{ message: '"highlight" must be an object.' }]);
   }
-  const problems = unknownKeys(value, ["theme"], "highlight.");
-  const theme = value.theme ?? {};
-  if (!isObject(theme)) {
+  const problems = unknownKeys(
+    value,
+    ["theme", "grammars", "themes"],
+    "highlight.",
+  );
+  const grammars = parsePaths(value.grammars, "grammars");
+  const themes = parsePaths(value.themes, "themes");
+  if (!grammars.ok) problems.push(...grammars.error);
+  if (!themes.ok) problems.push(...themes.error);
+  const theme = parseThemes(value.theme, themes.ok ? themes.value : new Map());
+  if (!theme.ok) problems.push(...theme.error);
+  if (!grammars.ok || !themes.ok || !theme.ok || problems.length > 0) {
+    return err(problems);
+  }
+  return ok({
+    theme: theme.value,
+    grammars: grammars.value,
+    themes: themes.value,
+  });
+}
+
+/** `"grammars"` or `"themes"`: names mapped to the paths of their files. */
+function parsePaths(
+  value: unknown,
+  key: "grammars" | "themes",
+): Result<Map<string, string>, Problem[]> {
+  if (value === undefined) return ok(new Map());
+  if (!isObject(value)) {
+    const example =
+      key === "grammars"
+        ? '"grammars": { "nginx": "highlight/nginx.tmLanguage.json" }'
+        : '"themes": { "my-theme": "highlight/my-theme.json" }';
     return err([
-      ...problems,
-      { message: '"highlight.theme" must be an object.' },
+      {
+        message: `"highlight.${key}" must be an object.`,
+        hint: `Map each name to a file in your site, such as ${example}.`,
+      },
     ]);
   }
-  problems.push(...unknownKeys(theme, ["light", "dark"], "highlight.theme."));
-  const light = parseTheme(theme.light, "light");
-  const dark = parseTheme(theme.dark, "dark");
+  const paths = new Map<string, string>();
+  const problems: Problem[] = [];
+  for (const [name, path] of Object.entries(value)) {
+    if (typeof path === "string") {
+      paths.set(name, path);
+    } else {
+      problems.push({
+        message: `"highlight.${key}.${name}" must be a string.`,
+        hint: "Give the path of a JSON file, relative to the site's folder.",
+      });
+    }
+  }
+  return problems.length > 0 ? err(problems) : ok(paths);
+}
+
+function parseThemes(
+  value: unknown,
+  siteThemes: ReadonlyMap<string, string>,
+): Result<Config["highlight"]["theme"], Problem[]> {
+  const theme = value ?? {};
+  if (!isObject(theme)) {
+    return err([{ message: '"highlight.theme" must be an object.' }]);
+  }
+  const problems = unknownKeys(theme, ["light", "dark"], "highlight.theme.");
+  const light = parseTheme(theme.light, "light", siteThemes);
+  const dark = parseTheme(theme.dark, "dark", siteThemes);
   if (!light.ok) problems.push(light.error);
   if (!dark.ok) problems.push(dark.error);
   if (!light.ok || !dark.ok || problems.length > 0) return err(problems);
@@ -208,13 +275,14 @@ function parseHighlight(
 
 function parseTheme(
   value: unknown,
-  variant: keyof Config["highlight"],
+  variant: keyof Config["highlight"]["theme"],
+  siteThemes: ReadonlyMap<string, string>,
 ): Result<string, Problem> {
   if (value === undefined) return ok(defaultThemes[variant]);
   if (typeof value !== "string") {
     return err({ message: `"highlight.theme.${variant}" must be a string.` });
   }
-  if (isIncludedTheme(value)) return ok(value);
+  if (siteThemes.has(value) || isIncludedTheme(value)) return ok(value);
   if (isExcludedTheme(value)) {
     return err({
       message: `The ${variant} theme "${value}" is not a theme Sheaf can use.`,
@@ -223,7 +291,10 @@ function parseTheme(
   }
   const [closest] = suggestions(
     value,
-    Object.keys(bundledThemes).filter(isIncludedTheme),
+    [
+      ...siteThemes.keys(),
+      ...Object.keys(bundledThemes).filter(isIncludedTheme),
+    ],
     1,
   );
   return err({

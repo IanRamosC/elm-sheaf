@@ -192,7 +192,9 @@ A block without a language is plain text. A language Sheaf can't highlight is
 Use `text` for a block you don't want highlighted. Sheaf leaves out Shiki's
 `ada`, `gnuplot`, `nginx`, `org` and `racket` grammars, because they are
 GPL-3.0 and Sheaf is BSD-3-Clause, but a site can
-[add them back](configuration.md#highlight). The themes are set there too.
+[add them back](configuration.md#your-own-grammars-and-themes), as it can any
+other grammar. The themes are set in
+[Configuration](configuration.md#highlight).
 
 ### Components
 

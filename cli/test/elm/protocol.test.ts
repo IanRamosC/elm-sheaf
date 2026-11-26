@@ -132,7 +132,11 @@ describe("the all-nodes fixture tree", () => {
           siteUrl: new URL("https://example.com/"),
           basePath: "/",
           timezone: "UTC",
-          highlight: { light: "github-light", dark: "github-dark" },
+          highlight: {
+            theme: { light: "github-light", dark: "github-dark" },
+            grammars: new Map(),
+            themes: new Map(),
+          },
           images: { widths: [480, 960, 1600], formats: ["webp"] },
         },
         new ContentFiles([document.sourcePath, imagePath]),
