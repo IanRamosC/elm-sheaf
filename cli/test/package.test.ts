@@ -47,6 +47,9 @@ describe("the npm tarball", () => {
   test("is listed by `bun pm pack --dry-run`", () => {
     expect(dryRun.stderr).not.toContain("error");
     expect(dryRun.exitCode).toBe(0);
+    // An empty list would mean the output format changed, and would make the
+    // exclusion test below pass for nothing.
+    expect(files).not.toEqual([]);
   });
 
   test("carries the manifest, the licence, the README and the sources", () => {
@@ -62,6 +65,7 @@ describe("the npm tarball", () => {
   });
 
   test("leaves out tests, scripts, templates and build output", () => {
+    expect(files).not.toEqual([]);
     const excluded = files.filter((path) =>
       /^(test|scripts|templates|out|\.sheaf)\//.test(path),
     );
