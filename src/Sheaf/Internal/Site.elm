@@ -89,10 +89,10 @@ together, in `templateFor`.
 
 An item route decodes the frontmatter of a document and of its neighbours,
 and gives the template waiting for the document's rendered body, which may
-never come. A listing route gets
-its documents with their bodies, already in its collection's order, and
-decodes them all. A grouped route also keeps how to find a document's group
-values, because the renderer groups the documents before any template runs.
+never come. A listing route gets its documents with their bodies, already in
+its collection's order, and decodes them all. A grouped route also keeps how
+to find a document's group values, because the renderer groups the documents
+before any template runs.
 
 -}
 type Route

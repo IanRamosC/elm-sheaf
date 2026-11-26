@@ -164,9 +164,10 @@ and `next` the newer one. A collection ordered with `Collection.orderedBy` is
 read from the lowest number to the highest (see
 [Ordering by a number](#ordering-by-a-number)). The first document has no
 `previous` and the last has no `next`. If a collection read by date has a
-published document without a date, such as most pages, no document of it has
-neighbours. Drafts are neighbours only in a build that includes them. A
-document has the same neighbours on its own page and in every listing.
+published document without a date, no document of it has neighbours (a
+collection of pages usually has no dates). Drafts are neighbours only in a
+build that includes them. A document has the same neighbours on its own page
+and in every listing.
 
 ### Paths and links
 

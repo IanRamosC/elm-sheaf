@@ -511,6 +511,27 @@ neighbourTests =
                     |> render [ Route.allItems "/archive/" posts (\items -> page [ Html.text (listedNeighbours items) ]) ]
                     |> bodyAt "archive/index.html"
                     |> Expect.equal (Just "c (b | -), b (a | c), a (- | b)")
+        , test "grouped documents have the neighbours they have in the whole collection" <|
+            \_ ->
+                let
+                    tagged : Source -> Source
+                    tagged source =
+                        { source | frontmatter = source.frontmatter ++ [ ( "tags", Encode.list Encode.string [ "elm" ] ) ] }
+
+                    -- `b` is not tagged, so the group holds `a` and `c` only.
+                    sources : List Source
+                    sources =
+                        [ dated "b" "2024-02-01", tagged (dated "c" "2024-03-01"), tagged (dated "a" "2024-01-01") ]
+                in
+                requestWithSlugs [ ( "elm", "elm", "elm" ) ] [ "posts" ] sources
+                    |> render
+                        [ Route.groupedBy "/tags/:group/" { by = .tags, perPage = Nothing } posts (\_ listing -> page [ Html.text (listedNeighbours listing.items) ])
+                        , Route.allGroups "/tags/" .tags posts (\groups -> page (List.map (.items >> listedNeighbours >> Html.text) groups))
+                        ]
+                    |> Expect.all
+                        [ bodyAt "tags/elm/index.html" >> Expect.equal (Just "c (b | -), a (- | b)")
+                        , bodyAt "tags/index.html" >> Expect.equal (Just "c (b | -), a (- | b)")
+                        ]
         , test "neighbours cross page boundaries" <|
             \_ ->
                 request [ "posts" ] threePosts
