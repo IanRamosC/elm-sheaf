@@ -176,6 +176,10 @@ describe("loadContent aliases", () => {
     "/caf%C3%A9/",
     "/a//b/",
     "/a b/",
+    "/_sheaf/old/",
+    "/_Sheaf",
+    "/robots.txt",
+    "/Sitemap.XML/",
   ])("rejects the alias %p", (alias) => {
     const found = problems([
       file("content/posts/a.md", `title: Hi\naliases: [/ok/, '${alias}']`),
@@ -216,13 +220,54 @@ describe("loadContent aliases", () => {
     },
   );
 
-  test("shows how to write aliases only when the value is not a path", () => {
+  test("shows how to write aliases when the value is not a path", () => {
     const [notPaths] = problems([file("content/posts/a.md", "aliases: 12")]);
     const [badPath] = problems([file("content/posts/a.md", "aliases: old/")]);
 
     expect(notPaths?.hint).toContain("Write it as a list of paths");
-    expect(badPath?.message).toContain("An alias starts with `/`");
-    expect(badPath).not.toHaveProperty("hint");
+    expect(badPath?.message).toBe("`old/` is not a path on this site.");
+    expect(badPath?.hint).toContain("An alias starts with `/`");
+  });
+
+  test.each([
+    ["[1]", "such as `/2019/old-name/`"],
+    ["[/a//b/]", "single slashes"],
+    ["[/a/../b/]", "Write the path it leads to"],
+  ])("gives `aliases: %s` a hint", (value, hint) => {
+    const [problem] = problems([
+      file("content/posts/a.md", `aliases: ${value}`),
+    ]);
+
+    expect(problem?.hint).toContain(hint);
+  });
+
+  test("keeps aliases out of the folder Sheaf writes its own files to", () => {
+    const [problem] = problems([
+      file("content/posts/a.md", "aliases: [/_SHEAF/images/a.png]"),
+    ]);
+
+    expect(problem).toMatchObject({
+      title: "BAD ALIAS",
+      message:
+        "The alias `/_SHEAF/images/a.png` is in `/_sheaf/`, which is reserved for files Sheaf writes.",
+      hint: "Choose an alias that does not start with `/_sheaf/`.",
+    });
+  });
+
+  test("keeps aliases off robots.txt and sitemap.xml", () => {
+    const [robots, sitemap] = problems([
+      file("content/posts/a.md", "aliases: [/Robots.txt, /sitemap.xml/]"),
+    ]);
+
+    expect(robots?.message).toContain("is `/robots.txt`, which is reserved");
+    expect(sitemap?.message).toContain("is `/sitemap.xml`, which is reserved");
+  });
+
+  test("allows a path that only starts like a reserved one", () => {
+    expect(aliasesOf("aliases: [/_sheafs/, /robots.txt.html]")).toEqual([
+      "/_sheafs/",
+      "/robots.txt.html",
+    ]);
   });
 
   test("reports a bad alias with the document's other problems", () => {

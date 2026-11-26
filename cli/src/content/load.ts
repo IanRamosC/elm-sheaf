@@ -394,9 +394,8 @@ function parseAliases(
 ): Result<string[], Diagnostic[]> {
   if (value === undefined || value === null) return ok([]);
   const badAlias = (
-    message: string,
+    { message, hint }: AliasProblem,
     span: Span | undefined,
-    hint: string | undefined,
   ): Diagnostic => ({
     severity: "error",
     title: "BAD ALIAS",
@@ -413,11 +412,14 @@ function parseAliases(
     const problem = aliasProblem(value);
     return problem === undefined
       ? ok([value])
-      : err([badAlias(problem, keySpan, percentHint(value))]);
+      : err([badAlias(problem, keySpan)]);
   }
   if (!Array.isArray(value)) {
     return err([
-      badAlias("The `aliases` field is not valid.", keySpan, ALIAS_FORMS),
+      badAlias(
+        { message: "The `aliases` field is not valid.", hint: ALIAS_FORMS },
+        keySpan,
+      ),
     ]);
   }
 
@@ -426,39 +428,80 @@ function parseAliases(
   value.forEach((alias: unknown, index) => {
     const span = positionOf(`aliases.${index}`)?.value;
     if (typeof alias !== "string") {
-      const message = "Each alias must be a path, such as `/2019/old-name/`.";
-      problems.push(badAlias(message, span, undefined));
+      const problem = {
+        message: "Each alias must be a path.",
+        hint: "Write a path on this site, such as `/2019/old-name/`.",
+      };
+      problems.push(badAlias(problem, span));
       return;
     }
     const problem = aliasProblem(alias);
     if (problem === undefined) {
       aliases.push(alias);
     } else {
-      problems.push(badAlias(problem, span, percentHint(alias)));
+      problems.push(badAlias(problem, span));
     }
   });
   return problems.length > 0 ? err(problems) : ok(aliases);
 }
 
+/** Files Sheaf writes at the root of every site. */
+const RESERVED_FILES = ["/robots.txt", "/sitemap.xml"];
+
+interface AliasProblem {
+  message: string;
+  hint?: string;
+}
+
 /**
  * Why `alias` cannot be a path on this site, if it cannot. Every segment
  * between its slashes follows the rule for slugs, and only the last may be
- * empty, as it is in `/old-name/`.
+ * empty, as it is in `/old-name/`. Case is ignored when comparing with the
+ * paths Sheaf keeps for itself, as it is for output paths.
  */
-function aliasProblem(alias: string): string | undefined {
+function aliasProblem(alias: string): AliasProblem | undefined {
   if (!alias.startsWith("/")) {
-    return `\`${alias}\` is not a path on this site. An alias starts with \`/\`, such as \`/2019/old-name/\`.`;
+    return {
+      message: `\`${alias}\` is not a path on this site.`,
+      hint: "An alias starts with `/`, such as `/2019/old-name/`.",
+    };
   }
   const segments = alias.slice(1).split("/");
   if (segments.slice(0, -1).includes("")) {
-    return `The alias \`${alias}\` has an empty segment between two slashes.`;
+    return {
+      message: `The alias \`${alias}\` has an empty segment between two slashes.`,
+      hint: "Separate its segments with single slashes, such as `/2019/old-name/`.",
+    };
   }
   const bad = segments.find((segment) => segment !== "" && !isSlug(segment));
   if (bad === "." || bad === "..") {
-    return `The alias \`${alias}\` has a \`${bad}\` segment. Write the path it leads to instead.`;
+    return {
+      message: `The alias \`${alias}\` has a \`${bad}\` segment.`,
+      hint: "Write the path it leads to instead.",
+    };
   }
   if (bad !== undefined) {
-    return `The alias \`${alias}\` has the segment \`${bad}\`, which cannot be part of a URL path. ${SLUG_RULE}`;
+    const hint = percentHint(alias);
+    return {
+      message: `The alias \`${alias}\` has the segment \`${bad}\`, which cannot be part of a URL path. ${SLUG_RULE}`,
+      ...(hint && { hint }),
+    };
+  }
+  const lower = alias.toLowerCase();
+  if (segments[0]?.toLowerCase() === "_sheaf") {
+    return {
+      message: `The alias \`${alias}\` is in \`/_sheaf/\`, which is reserved for files Sheaf writes.`,
+      hint: "Choose an alias that does not start with `/_sheaf/`.",
+    };
+  }
+  const file = RESERVED_FILES.find(
+    (reserved) => lower === reserved || lower === `${reserved}/`,
+  );
+  if (file !== undefined) {
+    return {
+      message: `The alias \`${alias}\` is \`${file}\`, which is reserved for a file Sheaf writes.`,
+      hint: "Choose another path for the alias.",
+    };
   }
   return undefined;
 }
