@@ -87,7 +87,8 @@ outputs (Feed feed) =
 
 {-| A document's item, or nothing if it has no date, which is reported on its
 own. A feed may describe a collection with other frontmatter than its item
-route does, so it reports its own frontmatter problems.
+route does, so it reports its own frontmatter problems. Its body has no
+heading links, which feed readers would show as stray `#`s.
 -}
 itemOf : Context a -> (Url -> Maybe String) -> String -> (Protocol.Document -> Result (List Problem) Description) -> ListedDocument -> Result (List Diagnostic) (Maybe Protocol.FeedItem)
 itemOf context resolve pattern describe { document, body } =
@@ -110,7 +111,7 @@ itemOf context resolve pattern describe { document, body } =
                         , url = context.origin ++ path
                         , title = description.title
                         , summary = description.summary
-                        , html = String.concat (List.map (Html.resolveUrls resolve >> Html.rewriteUrls absolute >> Html.toString) body)
+                        , html = String.concat (List.map (Html.withoutHeadingLinks >> Html.resolveUrls resolve >> Html.rewriteUrls absolute >> Html.toString) body)
                         , date = date.posix
                         , updated = (Maybe.withDefault date document.updated).posix
                         }

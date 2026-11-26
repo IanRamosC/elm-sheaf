@@ -1,15 +1,16 @@
-module Sheaf.Internal.Markdown exposing (Body, Context, Problem(..), fromNode, render)
+module Sheaf.Internal.Markdown exposing (Body, Context, Problem(..), fromNode, render, headings)
 
 {-| A document's Markdown body, and its renderer.
 
 It is not exposed by the package so that only the host's decoded documents can
 become a `Body`.
 
-@docs Body, Context, Problem, fromNode, render
+@docs Body, Context, Problem, fromNode, render, headings
 
 -}
 
 import Dict exposing (Dict)
+import Sheaf.Document as Document
 import Sheaf.Html as Html exposing (Html)
 import Sheaf.Html.Attributes as Attributes
 import Sheaf.Internal.Component as Component exposing (Component, Kind(..))
@@ -88,7 +89,7 @@ type alias Rendered =
 {-| Turn a body into HTML, or every problem in it, not just the first.
 
 Code blocks become Shiki's markup, `pre.shiki > code.language-<lang>` with
-a `span.line` per line, headings get their `id`,
+a `span.line` per line, headings get their `id` and a link to themselves,
 task-list items get a disabled checkbox and footnotes are laid out as GitHub
 does.
 
@@ -157,7 +158,8 @@ renderNode scope node =
             element (Html.p []) (renderNodes scope container.children)
 
         Heading heading ->
-            element (headingElement heading.depth [ Attributes.id heading.id ]) (renderNodes scope heading.children)
+            element (headingElement heading.depth [ Attributes.id heading.id ])
+                (Result.map (\children -> children ++ selfLink heading.id) (renderNodes scope heading.children))
 
         Text text ->
             Ok [ Html.text text.value ]
@@ -267,6 +269,26 @@ headingElement depth =
 
         _ ->
             Html.h6
+
+
+{-| The link a heading ends with, to itself. The `#` is decorative: the link
+is named by the heading's text. A heading without an id has nothing to link
+to.
+-}
+selfLink : String -> List Html
+selfLink id =
+    if String.isEmpty id then
+        []
+
+    else
+        [ Html.text " "
+        , Html.a
+            [ Attributes.class "heading-link"
+            , Attributes.href ("#" ++ id)
+            , Attributes.attribute "aria-labelledby" id
+            ]
+            [ Html.text "#" ]
+        ]
 
 
 withTitle : Maybe String -> List Html.Attribute -> List Html.Attribute
@@ -795,3 +817,40 @@ backLinkTo footnote index =
         ]
         mark
     ]
+
+
+
+-- HEADINGS
+
+
+{-| Every heading of a tree, in the order they are written, at any depth and
+inside any block.
+-}
+headings : Node -> List Document.Heading
+headings tree =
+    List.filterMap
+        (\node ->
+            case node of
+                Heading heading ->
+                    Just { depth = heading.depth, id = heading.id, text = plainText node }
+
+                _ ->
+                    Nothing
+        )
+        (descendants tree)
+
+
+{-| The text a heading's id is made from, as the host makes it: text and
+inline code, without images or footnote references.
+-}
+plainText : Node -> String
+plainText node =
+    case node of
+        Text text ->
+            text.value
+
+        InlineCode code ->
+            code.value
+
+        _ ->
+            String.concat (List.map plainText (childrenOf node))

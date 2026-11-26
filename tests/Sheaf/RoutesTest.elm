@@ -3,10 +3,10 @@ module Sheaf.RoutesTest exposing (suite)
 import Expect
 import Json.Decode as Decode
 import Json.Encode as Encode
-import RenderFixtures exposing (PostMeta, Source, bodyAt, draft, error, headAt, page, paths, post, postMeta, postPage, posts, render, renderWithFeeds, request, requestUnder, requestWithSlugs, span, titles)
+import RenderFixtures exposing (PostMeta, Source, bodyAt, draft, error, headAt, heading, page, paths, post, postMeta, postPage, postRoute, posts, render, renderWithFeeds, request, requestUnder, requestWithSlugs, span, textNode, titles)
 import Sheaf
 import Sheaf.Collection as Collection exposing (Collection)
-import Sheaf.Document exposing (Document, Neighbour)
+import Sheaf.Document exposing (Document, Heading, Neighbour)
 import Sheaf.Feed as Feed
 import Sheaf.Frontmatter as Frontmatter
 import Sheaf.Head as Head
@@ -28,6 +28,7 @@ suite =
         , orderedTests
         , readingOrderTests
         , neighbourTests
+        , headingTests
         , notFoundTests
         , badRouteTests
         , repeatedLinkTests
@@ -546,6 +547,49 @@ neighbourTests =
 listedNeighbours : List (Document meta) -> String
 listedNeighbours items =
     String.join ", " (List.map (\item -> item.slug ++ " (" ++ neighbours item ++ ")") items)
+
+
+
+-- HEADINGS
+
+
+headingTests : Test
+headingTests =
+    let
+        withHeadings : Source -> Source
+        withHeadings source =
+            { source
+                | body =
+                    [ heading 2 "setup" [ textNode "Setup" ]
+                    , heading 3 "install" [ textNode "Install" ]
+                    ]
+            }
+
+        describeHeadings : List Heading -> String
+        describeHeadings headings =
+            String.join ", " (List.map (\{ depth, id, text } -> String.fromInt depth ++ " " ++ id ++ " " ++ text) headings)
+    in
+    describe "headings"
+        [ test "a document's headings reach its template" <|
+            \_ ->
+                request [ "posts" ] [ withHeadings (post "a") ]
+                    |> render [ Route.eachItem "/posts/:slug/" posts (\document -> page [ Html.text (describeHeadings document.headings) ]) ]
+                    |> bodyAt "posts/a/index.html"
+                    |> Expect.equal (Just "2 setup Setup, 3 install Install")
+        , test "listed documents have their headings" <|
+            \_ ->
+                request [ "posts" ] [ withHeadings (dated "a" "2024-01-01") ]
+                    |> render [ Route.allItems "/archive/" posts (\items -> page (List.map (.headings >> describeHeadings >> Html.text) items)) ]
+                    |> bodyAt "archive/index.html"
+                    |> Expect.equal (Just "2 setup Setup, 3 install Install")
+        , test "the self-link ignores the base path" <|
+            \_ ->
+                requestUnder "/repo/" [ "posts" ] [ withHeadings (post "a") ]
+                    |> render [ postRoute ]
+                    |> bodyAt "posts/a/index.html"
+                    |> Maybe.map (String.contains "<h2 id=\"setup\">Setup <a class=\"heading-link\" href=\"#setup\" aria-labelledby=\"setup\">#</a></h2>")
+                    |> Expect.equal (Just True)
+        ]
 
 
 

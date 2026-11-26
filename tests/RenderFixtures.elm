@@ -8,6 +8,7 @@ module RenderFixtures exposing
     , footnoteDefinition
     , footnoteReference
     , headAt
+    , heading
     , image
     , imageWith
     , leafDirective
@@ -304,6 +305,13 @@ markdownNode type_ fields =
 paragraph : List Value -> Value
 paragraph children =
     markdownNode "paragraph" [ ( "children", Encode.list identity children ) ]
+
+
+{-| A heading of `depth` with the id the host gave it.
+-}
+heading : Int -> String -> List Value -> Value
+heading depth id children =
+    markdownNode "heading" [ ( "depth", Encode.int depth ), ( "id", Encode.string id ), ( "children", Encode.list identity children ) ]
 
 
 textNode : String -> Value

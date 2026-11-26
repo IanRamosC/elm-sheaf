@@ -19,6 +19,7 @@ suite : Test
 suite =
     describe "Sheaf.Internal.Markdown"
         [ blockTests
+        , headingTests
         , inlineTests
         , listTests
         , tableTests
@@ -106,7 +107,7 @@ blockTests =
         , test "a heading gets its id and level" <|
             \_ ->
                 Heading { position = at 1, depth = 3, id = "setup", children = [ text "Setup" ] }
-                    |> rendersTo "<h3 id=\"setup\">Setup</h3>"
+                    |> rendersTo "<h3 id=\"setup\">Setup <a class=\"heading-link\" href=\"#setup\" aria-labelledby=\"setup\">#</a></h3>"
         , test "a highlighted code block keeps its text exactly, escaped" <|
             \_ ->
                 Code
@@ -153,6 +154,88 @@ blockTests =
 blockStyle : String
 blockStyle =
     "background-color:#fff;--shiki-dark-bg:#24292e;color:#24292e;--shiki-dark:#e1e4e8"
+
+
+headingTests : Test
+headingTests =
+    let
+        heading : Int -> String -> List Node -> Node
+        heading depth id children =
+            Heading { position = at 1, depth = depth, id = id, children = children }
+    in
+    describe "headings"
+        [ test "headings lists every heading in order" <|
+            \_ ->
+                -- # A\n## B\n### C\n## D
+                root [ heading 1 "a" [ text "A" ], heading 2 "b" [ text "B" ], heading 3 "c" [ text "C" ], heading 2 "d" [ text "D" ] ]
+                    |> Markdown.headings
+                    |> Expect.equal
+                        [ { depth = 1, id = "a", text = "A" }
+                        , { depth = 2, id = "b", text = "B" }
+                        , { depth = 3, id = "c", text = "C" }
+                        , { depth = 2, id = "d", text = "D" }
+                        ]
+        , test "heading text drops markup" <|
+            \_ ->
+                -- ## Use `elm make` with [docs](https://x.y) and *care*[^1]
+                root
+                    [ heading 2
+                        "use-elm-make-with-docs-and-care"
+                        [ text "Use "
+                        , InlineCode { position = at 1, value = "elm make" }
+                        , text " with "
+                        , Link { position = at 1, url = "https://x.y", title = Nothing, children = [ text "docs" ] }
+                        , text " and "
+                        , Emphasis { position = at 1, children = [ text "care" ] }
+                        , FootnoteReference { position = at 1, identifier = "1" }
+                        ]
+                    ]
+                    |> Markdown.headings
+                    |> List.map .text
+                    |> Expect.equal [ "Use elm make with docs and care" ]
+        , test "heading text leaves images out" <|
+            \_ ->
+                root [ heading 2 "a-cat" [ text "A cat ", Image { position = at 1, url = "cat.png", alt = "Cat", title = Nothing, local = Nothing } ] ]
+                    |> Markdown.headings
+                    |> List.map .text
+                    |> Expect.equal [ "A cat " ]
+        , test "headings inside containers count" <|
+            \_ ->
+                root
+                    [ ContainerDirective { position = at 1, name = "callout", attributes = [], children = [ heading 2 "in-a-callout" [ text "In a callout" ] ] }
+                    , Blockquote { position = at 1, children = [ heading 2 "in-a-quote" [ text "In a quote" ] ] }
+                    , ListBlock
+                        { position = at 1
+                        , ordered = False
+                        , start = Nothing
+                        , spread = False
+                        , children = [ ListItem { position = at 1, checked = Nothing, children = [ heading 3 "in-a-list" [ text "In a list" ] ] } ]
+                        }
+                    ]
+                    |> Markdown.headings
+                    |> List.map .id
+                    |> Expect.equal [ "in-a-callout", "in-a-quote", "in-a-list" ]
+        , test "a heading without an id has no self-link" <|
+            \_ ->
+                heading 2 "" [ text "!!!" ]
+                    |> renderWith noLinks
+                    |> Result.map (String.contains "heading-link")
+                    |> Expect.equal (Ok False)
+        , test "a heading links to itself" <|
+            \_ ->
+                heading 2 "setup" [ text "Setup" ]
+                    |> rendersTo "<h2 id=\"setup\">Setup <a class=\"heading-link\" href=\"#setup\" aria-labelledby=\"setup\">#</a></h2>"
+        , test "the self-link sits outside a link in the heading" <|
+            \_ ->
+                heading 2 "docs" [ Link { position = at 1, url = "https://x.y", title = Nothing, children = [ text "Docs" ] } ]
+                    |> rendersTo "<h2 id=\"docs\"><a href=\"https://x.y\">Docs</a> <a class=\"heading-link\" href=\"#docs\" aria-labelledby=\"docs\">#</a></h2>"
+        , test "a heading's self-link can be taken out, leaving its own link" <|
+            \_ ->
+                Markdown.fromNode (root [ heading 2 "docs" [ Link { position = at 1, url = "https://x.y", title = Nothing, children = [ text "Docs" ] } ] ])
+                    |> Markdown.render { resolve = noLinks, components = Dict.empty }
+                    |> Result.map (List.map (InternalHtml.withoutHeadingLinks >> Html.toString) >> String.concat)
+                    |> Expect.equal (Ok "<h2 id=\"docs\"><a href=\"https://x.y\">Docs</a></h2>")
+        ]
 
 
 inlineTests : Test
@@ -495,7 +578,7 @@ youtubeComponent =
 allNodesHtml : String
 allNodesHtml =
     String.concat
-        [ "<h2 id=\"intro\">Intro</h2>"
+        [ "<h2 id=\"intro\">Intro <a class=\"heading-link\" href=\"#intro\" aria-labelledby=\"intro\">#</a></h2>"
         , "<p>Plain <em>em</em> <strong>strong</strong> <del>del</del> <code>x &lt; y</code><br>"
         , "<a href=\"https://example.com\" title=\"Example\">ext</a> "
         , "<a href=\"/blog/posts/hello-world/#setup\">setup</a> "

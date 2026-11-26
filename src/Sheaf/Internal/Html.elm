@@ -3,6 +3,7 @@ module Sheaf.Internal.Html exposing
     , text, node, attribute, booleanAttribute, sitePathAttribute, siteSrcset, link, groupLink
     , attributeName
     , urls, resolveUrls, rewriteUrls
+    , withoutHeadingLinks
     , toString, document, problems
     )
 
@@ -15,6 +16,7 @@ directly.
 @docs text, node, attribute, booleanAttribute, sitePathAttribute, siteSrcset, link, groupLink
 @docs attributeName
 @docs urls, resolveUrls, rewriteUrls
+@docs withoutHeadingLinks
 @docs toString, document, problems
 
 -}
@@ -310,6 +312,52 @@ dropWhile drop list =
 isSpace : Char -> Bool
 isSpace c =
     c == ' ' || c == '\t' || c == '\n' || c == '\u{000C}' || c == '\u{000D}'
+
+
+
+-- HEADING LINKS
+
+
+{-| Take out the link each heading ends with, to itself, and the space before
+it, as a feed does: feed readers show the link as a stray `#`.
+-}
+withoutHeadingLinks : Html -> Html
+withoutHeadingLinks html =
+    case html of
+        Text _ ->
+            html
+
+        Element tag attributes children ->
+            if isHeading tag then
+                Element tag attributes (dropHeadingLink children)
+
+            else
+                Element tag attributes (List.map withoutHeadingLinks children)
+
+        Link url children ->
+            Link url (List.map withoutHeadingLinks children)
+
+
+isHeading : String -> Bool
+isHeading tag =
+    List.member tag [ "h1", "h2", "h3", "h4", "h5", "h6" ]
+
+
+dropHeadingLink : List Html -> List Html
+dropHeadingLink children =
+    case children of
+        [] ->
+            []
+
+        [ Text " ", Element "a" attributes _ ] ->
+            if List.member (Valued "class" "heading-link") attributes then
+                []
+
+            else
+                children
+
+        child :: rest ->
+            child :: dropHeadingLink rest
 
 
 

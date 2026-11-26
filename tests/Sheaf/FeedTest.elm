@@ -2,7 +2,7 @@ module Sheaf.FeedTest exposing (suite)
 
 import Expect
 import Json.Encode exposing (Value)
-import RenderFixtures exposing (PostMeta, Source, bodyAt, containerDirective, draft, footnoteDefinition, footnoteReference, image, imageWith, link, markdownLink, page, paragraph, paths, photo, post, postRoute, posts, renderWithFeeds, request, requestUnder, span, textNode, titles)
+import RenderFixtures exposing (PostMeta, Source, bodyAt, containerDirective, draft, footnoteDefinition, footnoteReference, heading, image, imageWith, link, markdownLink, page, paragraph, paths, photo, post, postRoute, posts, renderWithFeeds, request, requestUnder, span, textNode, titles)
 import Sheaf
 import Sheaf.Collection as Collection
 import Sheaf.Component as Component exposing (Component)
@@ -258,6 +258,15 @@ absoluteUrlTests =
                     |> itemHtml
                     |> List.map (String.contains "href=\"https://example.com/blog/posts/a/#user-content-fn-1\"")
                     |> Expect.equal [ True ]
+        , test "feeds leave the self-link out" <|
+            \_ ->
+                linkingTo [ heading 2 "setup" [ textNode "Setup" ], paragraph [ link "#setup" ] ]
+                    |> Expect.all
+                        [ itemHtml >> Expect.equal [ "<h2 id=\"setup\">Setup</h2><p><a href=\"https://example.com/blog/posts/a/#setup\">link</a></p>" ]
+                        , bodyAt "posts/a/index.html"
+                            >> Maybe.map (String.contains "<h2 id=\"setup\">Setup <a class=\"heading-link\" href=\"#setup\" aria-labelledby=\"setup\">#</a></h2>")
+                            >> Expect.equal (Just True)
+                        ]
         , test "the page keeps the URLs as written" <|
             \_ ->
                 linkingTo [ paragraph [ link "../b/" ] ]

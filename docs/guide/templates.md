@@ -120,10 +120,14 @@ type alias Document meta =
     , updated : Maybe Date
     , meta : meta
     , image : Maybe Image
+    , headings : List Heading
     , previous : Maybe (Neighbour meta)
     , next : Maybe (Neighbour meta)
     , body : List Html
     }
+
+type alias Heading =
+    { depth : Int, id : String, text : String }
 
 type alias Neighbour meta =
     { ref : Ref
@@ -136,6 +140,24 @@ type alias Neighbour meta =
 `meta` is what your frontmatter decoder produced, `body` is the rendered
 Markdown, and `image` is the cover from the `image` key (see
 [Static files and images](static-files-and-images.md)).
+
+`headings` lists every heading of the body in order, for a table of contents.
+`depth` is 1 for `#` to 6 for `######`, `id` is the heading's `id` on the page,
+and `text` is its plain text, with inline code kept and images and footnote
+references left out. Headings inside components, blockquotes and lists are
+listed too, so pick the depths you want:
+
+```elm
+tableOfContents : Document PostMeta -> Html
+tableOfContents document =
+    document.headings
+        |> List.filter (\heading -> heading.depth == 2 || heading.depth == 3)
+        |> List.map (\heading -> li [] [ a [ href ("#" ++ heading.id) ] [ text heading.text ] ])
+        |> ul []
+```
+
+A component that drops or repeats its children can leave a table-of-contents
+link with no target, or with two.
 
 `previous` and `next` are the documents on either side of this one, for links
 to the older and newer post:

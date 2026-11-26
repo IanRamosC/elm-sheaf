@@ -173,6 +173,19 @@ footnotes, strikethrough and autolinks work. Headings get ids the way GitHub
 makes them, lowercase with spaces as hyphens, so `## What to edit first` can be
 linked as `#what-to-edit-first`.
 
+Each heading also ends with a link to itself, so readers can copy a link to
+that section:
+
+```html
+<h2 id="setup">Setup <a class="heading-link" href="#setup" aria-labelledby="setup">#</a></h2>
+```
+
+Style it with the `heading-link` class. The `#` is only decoration: screen
+readers name the link by the heading's text. A heading with no letters or
+digits, such as `## !!!`, gets no link. Feeds leave these links out, because
+feed readers would show a stray `#`. Templates get a document's headings too,
+for a table of contents; see [Templates](templates.md#pages).
+
 Raw HTML in Markdown is `RAW HTML`. Sheaf's output contains only what your
 templates produce, so use a component instead.
 

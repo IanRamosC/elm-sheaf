@@ -75,6 +75,7 @@ import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Date as InternalDate
 import Sheaf.Internal.Frontmatter as Frontmatter exposing (Frontmatter, Problem)
 import Sheaf.Internal.Image as Image
+import Sheaf.Internal.Markdown as Markdown
 import Sheaf.Internal.Protocol as Protocol
 import Sheaf.Internal.Results as Results
 import Sheaf.Internal.Site as Site exposing (FrontmatterProblems, ListedDocument, Neighbours)
@@ -337,6 +338,7 @@ decode (Site.Collection collection) { document, previous, next } =
                 , updated = updated
                 , meta = meta
                 , image = Maybe.map Image.fromProtocol document.image
+                , headings = Markdown.headings document.tree
                 , previous = Maybe.andThen neighbour previous
                 , next = Maybe.andThen neighbour next
                 , body = body
