@@ -14,6 +14,7 @@ type Step = {
 
 type Job = {
   needs?: string | string[];
+  if?: string;
   permissions?: Record<string, string>;
   environment?: string | { name?: string };
   steps?: Step[];
@@ -60,6 +61,7 @@ describe("the docs workflow", () => {
   test("never runs on pull requests", () => {
     expect(Object.keys(workflow.on ?? {})).not.toContain("pull_request");
     expect(Object.keys(workflow.on ?? {})).not.toContain("pull_request_target");
+    expect(jobs.deploy?.if).toBe("github.ref == 'refs/heads/main'");
   });
 
   test("never cancels a deploy under way", () => {

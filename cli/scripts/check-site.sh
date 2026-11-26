@@ -131,6 +131,7 @@ POST
 
   step "Auditing the starter's accessibility"
   "${audit[@]}" "$root_out"
+  "${audit[@]}" --width 375 "$root_out"
 }
 
 # Built in docs/ itself, whose elm.json reaches the package through ../src.
