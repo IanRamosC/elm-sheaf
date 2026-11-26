@@ -64,8 +64,8 @@ on npm, so 1.0.0 goes to npm by hand, and the workflow does the rest.
 2. Set `"version"` in `cli/package.json` to `1.0.0`.
 3. Remove the notes that say Sheaf isn't released and send people to
    `--local`: the Status section of `README.md` and of `cli/README.md`,
-   "Before the first release" in `docs/guide/getting-started.md` and the
-   links to it, and the sentence about it at the top of `docs/guide/cli.md`
+   "Before the first release" in `docs/content/guide/getting-started.md` and the
+   links to it, and the sentence about it at the top of `docs/content/guide/cli.md`
    and under `--local` there. The Install section of `README.md` and "Install
    Sheaf" in the guide already describe the published packages and binaries.
 4. Add the version badges to the badge row of `README.md`, with their
