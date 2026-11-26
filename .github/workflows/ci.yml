@@ -69,3 +69,42 @@ jobs:
       # Fails when an exposed value has no docs, as `elm publish` would.
       - name: Build the Elm package docs
         run: elm make --docs="$RUNNER_TEMP/docs.json"
+
+  # A standalone binary runs only on its own system, so each one is built and
+  # tried on a runner of its kind.
+  binary:
+    name: binary (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-latest
+          - macos-15-intel
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: cli/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+
+      - name: Install Elm
+        run: npm install --global elm@0.19.3-0
+
+      - name: Install dependencies
+        working-directory: cli
+        run: bun install --frozen-lockfile
+
+      - name: Build the binary and try it
+        working-directory: cli
+        run: bun run smoke-binary

@@ -322,7 +322,7 @@ describe("sheaf", () => {
       const built = await sheaf(["build"], site);
 
       expect(created.exitCode).toBe(0);
-      expect(created.stdout).toContain('cd "');
+      expect(created.stdout).toContain(`cd '${site}'`);
       expect(built.stdout).toContain("Built");
       expect(built.exitCode).toBe(0);
       expect(existsSync(join(site, "dist/index.html"))).toBe(true);

@@ -19,7 +19,9 @@
     "embed-starter": "bun scripts/embed-starter.ts",
     "embed-fixtures": "bun scripts/embed-protocol-fixtures.ts",
     "screenshots": "bun scripts/screenshots.ts",
-    "check": "bunx --bun biome check . && bunx --bun tsc --noEmit"
+    "check": "bunx --bun biome check . && bunx --bun tsc --noEmit",
+    "build-binaries": "bun scripts/build-binaries.ts",
+    "smoke-binary": "bun scripts/smoke-binary.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.8",

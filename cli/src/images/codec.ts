@@ -13,8 +13,8 @@ const QUALITY = 80;
  * The Bun version is in it because a Bun upgrade may change the encoders'
  * bytes: without it a warm cache would keep the old bytes while a fresh
  * machine wrote new ones under the same name. The highlight cache keys on
- * Shiki's version for the same reason. Once Sheaf ships as a compiled binary
- * (Plan 5), its own version belongs here too.
+ * Shiki's version for the same reason. A standalone binary carries the Bun
+ * it was compiled with, and `Bun.version` there is that Bun's version.
  */
 const ENCODER_SETTINGS = `bun ${Bun.version}, webp quality ${QUALITY}, jpeg quality ${QUALITY}, png default`;
 

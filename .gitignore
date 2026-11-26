@@ -3,3 +3,4 @@ elm-stuff/
 .sheaf/
 dist/
 .DS_Store
+cli/out/

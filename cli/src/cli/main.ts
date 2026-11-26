@@ -1,9 +1,10 @@
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { parseArgs } from "node:util";
 import packageJson from "../../package.json";
 import { build } from "../build";
 import { initSite } from "../init/init";
 import { runDev } from "./dev";
+import { nextSteps, runtimeOf } from "./next-steps";
 import {
   count,
   printDiagnostics,
@@ -169,15 +170,10 @@ async function runInit(
 
   write(paint("green", `Created a site in ${folder}`, colour));
   write("\nNext steps:");
-  if (resolve(folder) !== process.cwd()) write(`  cd ${shellQuoted(folder)}`);
-  write("  bun install");
-  write("  bunx sheaf dev");
+  for (const step of nextSteps(folder, process.cwd(), runtimeOf(Bun.main))) {
+    write(`  ${step}`);
+  }
   return 0;
-}
-
-/** Quotes a folder name for the shell only when it needs it. */
-function shellQuoted(path: string): string {
-  return /^[\w@%+=:,./-]+$/.test(path) ? path : JSON.stringify(path);
 }
 
 type CommandOptions = { drafts: boolean; siteUrl: string | undefined };

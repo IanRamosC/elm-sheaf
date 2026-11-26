@@ -69,6 +69,13 @@ which downloads Elm 0.19.3. It copies a
 `file:` dependency rather than linking it, so after you pull or edit the clone's
 `cli/`, run `bun install` in the site again.
 
+These are the steps `init` prints when it runs under Bun, with the folder in
+single quotes if its name has spaces or characters the shell would read. The
+standalone `sheaf` binary prints `cd my-blog` and `sheaf dev` instead, after a
+line asking you to install Elm 0.19.3 if it isn't on your `PATH`: nothing is
+installed into a site the binary uses, so Elm and `sheaf` both come from your
+`PATH`.
+
 `sheaf dev` prints the address it serves the site at, such as
 `http://127.0.0.1:4000/`. Open it, then edit `content/posts/welcome.md`: the
 site rebuilds and the page reloads when you save.
