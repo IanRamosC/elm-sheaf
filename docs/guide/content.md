@@ -119,10 +119,11 @@ A single path can be written without the list, as `aliases: /old/`.
 Each alias is a path on this site, starting with `/` and without the base
 path, which Sheaf adds. Its segments follow the rules for slugs, so it can't
 have a query, a fragment, a `.` or `..` segment, or two slashes in a row. Write
-characters such as `é` as they are rather than percent-encoded. An alias that
-breaks these rules is `BAD ALIAS`.
+characters such as `é` as they are rather than percent-encoded. It can't be in
+`/_sheaf/`, or be `/robots.txt` or `/sitemap.xml`, which Sheaf writes itself.
+An alias that breaks these rules is `BAD ALIAS`.
 
-An alias ending in `.html` is written as that file. Any other is a folder with
+An alias ending in `.html`, in any case, is written as that file. Any other is a folder with
 an `index.html`, so `/old` and `/old/` are the same page. A server would send a
 file without an extension as something other than HTML, and the redirect
 wouldn't work.
