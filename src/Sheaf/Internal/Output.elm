@@ -11,15 +11,17 @@ import Dict exposing (Dict)
 import Sheaf.Internal.Check as Check exposing (Location, UncheckedPage)
 import Sheaf.Internal.Path as Path
 import Sheaf.Internal.Protocol exposing (Diagnostic, Severity(..))
+import Sheaf.Internal.Redirect as Redirect exposing (Redirect)
 
 
 {-| A file of the site: a page, a feed's file in a format such as `RSS` at
-its path as written, or the sitemap.
+its path as written, the sitemap, or a redirect from a document's alias.
 -}
 type Output
     = PageFile UncheckedPage
     | FeedFile String String
     | Sitemap
+    | RedirectFile Redirect
 
 
 {-| Where a page is written in `dist/`. A pattern ending in `/` is a folder,
@@ -54,38 +56,57 @@ fileOf output =
         Sitemap ->
             "sitemap.xml"
 
+        RedirectFile redirect ->
+            Redirect.fileOf redirect.from
 
-{-| The pages of the first output at each file, and a diagnostic for every
-later one that would overwrite it or need its name as a folder.
+
+{-| The pages and redirects of the first output at each file, and a diagnostic
+for every later one that would overwrite it or need its name as a folder. So
+that a page always wins over an alias, redirects come after the other outputs.
 
 Paths are compared lowercased, because macOS's default disk ignores case: two
 files that differ only in case are one file there, but not on Linux.
 
 -}
-withoutClashes : List Output -> ( List UncheckedPage, List Diagnostic )
+withoutClashes : List Output -> { pages : List UncheckedPage, redirects : List Redirect, diagnostics : List Diagnostic }
 withoutClashes outputs =
     let
-        step : Output -> ( Taken, List UncheckedPage, List Diagnostic ) -> ( Taken, List UncheckedPage, List Diagnostic )
+        step : Output -> ( Taken, List Output, List Diagnostic ) -> ( Taken, List Output, List Diagnostic )
         step output ( taken, kept, found ) =
             case clash taken output of
                 Just diagnostic ->
                     ( taken, kept, diagnostic :: found )
 
                 Nothing ->
-                    ( take output taken
-                    , case output of
-                        PageFile page ->
-                            page :: kept
-
-                        _ ->
-                            kept
-                    , found
-                    )
+                    ( take output taken, output :: kept, found )
 
         ( _, written, clashes ) =
             List.foldl step ( { files = Dict.empty, folders = Dict.empty }, [], [] ) outputs
     in
-    ( List.reverse written, List.reverse clashes )
+    { pages =
+        List.filterMap
+            (\output ->
+                case output of
+                    PageFile page ->
+                        Just page
+
+                    _ ->
+                        Nothing
+            )
+            (List.reverse written)
+    , redirects =
+        List.filterMap
+            (\output ->
+                case output of
+                    RedirectFile redirect ->
+                        Just redirect
+
+                    _ ->
+                        Nothing
+            )
+            (List.reverse written)
+    , diagnostics = List.reverse clashes
+    }
 
 
 {-| The outputs written so far, by their lowercased file and by every
@@ -219,6 +240,9 @@ nameOf output =
 
         Sitemap ->
             "sitemap `/sitemap.xml`"
+
+        RedirectFile redirect ->
+            "alias `" ++ redirect.from ++ "` of `" ++ redirect.sourcePath ++ "`"
 
 
 duplicatePage : String -> Maybe String -> Diagnostic

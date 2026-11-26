@@ -629,6 +629,7 @@ describe("the blog fixture", () => {
         "index.html",
         "tags/elm/index.html",
         "posts/pictures/index.html",
+        "old-post/index.html",
       ]) {
         expect(readFileSync(join(root, "dist", file), "utf8")).toMatchSnapshot(
           file,

@@ -200,7 +200,8 @@ titles.
 | Title | What it means |
 |---|---|
 | `BAD ROUTE` | A route or feed pattern can't be written: no leading `/`, a missing or misplaced `:slug` or `:group`, a path under `/_sheaf/`, or a `perPage` or `limit` below 1. |
-| `DUPLICATE PAGE` | Two routes write the same file, compared without regard to case. |
+| `DUPLICATE PAGE` | Two routes or aliases write the same file, compared without regard to case. |
+| `ALIAS WITHOUT PAGE` | A document has `aliases`, but its collection has no `Route.eachItem` route for them to redirect to. |
 | `NO PAGE FOR FEED` | A feed's collection has no `Route.eachItem` route for its items to link to. |
 | `UNKNOWN FEED` | `Head.rssFeed` or `Head.atomFeed` names a feed the site doesn't declare. |
 | `MISSING SLUG` | A group value, such as a tag, has no slug, because no document's frontmatter writes it that way. |

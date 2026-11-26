@@ -2,10 +2,11 @@ module Sheaf.RenderTest exposing (suite)
 
 import Expect
 import Json.Encode as Encode
-import RenderFixtures exposing (Source, bodyAt, draft, error, headAt, leafDirective, markdownLink, metadata, page, paragraph, paths, post, postMeta, postPage, postRoute, posts, render, request, span, titles)
+import RenderFixtures exposing (Source, bodyAt, draft, error, headAt, leafDirective, markdownLink, metadata, page, paragraph, paths, post, postMeta, postPage, postRoute, posts, render, renderWithFeeds, request, requestUnder, span, titles)
 import Sheaf
 import Sheaf.Collection as Collection
 import Sheaf.Date as Date
+import Sheaf.Feed as Feed
 import Sheaf.Head as Head
 import Sheaf.Html as Html
 import Sheaf.Html.Attributes as Attributes
@@ -29,6 +30,7 @@ suite =
         , componentProblemTests
         , invalidHtmlTests
         , duplicateTests
+        , redirectTests
         , badRouteTests
         , badRequestTests
         , siteTests
@@ -583,6 +585,137 @@ duplicateTests =
                     |> .diagnostics
                     |> Expect.equal
                         [ error "DUPLICATE PAGE" "The routes `/:slug/` and `/:slug/` both make the page `about/index.html`." ]
+        ]
+
+
+
+-- REDIRECTS
+
+
+redirectTests : Test
+redirectTests =
+    let
+        aliased : String -> List String -> Source
+        aliased slug aliases =
+            let
+                source : Source
+                source =
+                    post slug
+            in
+            { source | aliases = aliases }
+
+        redirectTo : String -> String
+        redirectTo target =
+            "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                ++ ("<title>Redirecting…</title><meta http-equiv=\"refresh\" content=\"0; url=" ++ target ++ "\">")
+                ++ ("<link rel=\"canonical\" href=\"https://example.com" ++ target ++ "\"><meta name=\"robots\" content=\"noindex\">")
+                ++ ("</head><body><p>This page has moved to <a href=\"" ++ target ++ "\">" ++ target ++ "</a>.</p></body></html>")
+    in
+    describe "redirects"
+        [ test "an alias writes a redirect page" <|
+            \_ ->
+                request [ "posts" ] [ aliased "new" [ "/old/" ] ]
+                    |> render [ postRoute ]
+                    |> .pages
+                    |> List.filter (\written -> written.path == "old/index.html")
+                    |> Expect.equal
+                        [ { path = "old/index.html"
+                          , html = redirectTo "/blog/posts/new/"
+                          , aliasOf = Just "content/posts/new.md"
+                          }
+                        ]
+        , test "an alias without a slash becomes a folder" <|
+            \_ ->
+                request [ "posts" ] [ aliased "new" [ "/old", "/old.html" ] ]
+                    |> render [ postRoute ]
+                    |> paths
+                    |> Expect.equal [ "posts/new/index.html", "old/index.html", "old.html" ]
+        , test "redirects carry the base path" <|
+            \_ ->
+                requestUnder "/repo/" [ "posts" ] [ aliased "new" [ "/old/" ] ]
+                    |> render [ postRoute ]
+                    |> .pages
+                    |> List.filter (\written -> written.path == "old/index.html")
+                    |> List.map .html
+                    |> Expect.equal [ redirectTo "/repo/posts/new/" ]
+        , test "redirects are not in the sitemap or feeds" <|
+            \_ ->
+                let
+                    dated : Source
+                    dated =
+                        aliased "new" [ "/old/" ]
+                in
+                request [ "posts" ] [ { dated | date = Just "2026-11-23" } ]
+                    |> renderWithFeeds [ postRoute ]
+                        [ Feed.fromCollection { rss = "/feed.xml", atom = "/atom.xml", limit = Nothing }
+                            posts
+                            (\meta -> { title = meta.title, summary = Nothing })
+                        ]
+                    |> Expect.all
+                        [ .sitemap >> List.map .url >> Expect.equal [ "https://example.com/blog/posts/new/" ]
+                        , .feeds >> List.concatMap .items >> List.map .url >> Expect.equal [ "https://example.com/blog/posts/new/" ]
+                        , .diagnostics >> Expect.equal []
+                        ]
+        , test "an alias clashing with a page is reported" <|
+            \_ ->
+                request [ "posts" ] [ aliased "new" [ "/posts/other/" ], post "other" ]
+                    |> render [ postRoute ]
+                    |> Expect.all
+                        [ .diagnostics
+                            >> Expect.equal
+                                [ error "DUPLICATE PAGE" "The route `/posts/:slug/` and the alias `/posts/other/` of `content/posts/new.md` both make the file `posts/other/index.html`." ]
+                        , bodyAt "posts/other/index.html" >> Expect.equal (Just "<article><h1>other</h1><p>Hi</p></article>")
+                        ]
+        , test "two documents with the same alias are reported" <|
+            \_ ->
+                request [ "posts" ] [ aliased "a" [ "/old/" ], aliased "b" [ "/old/" ] ]
+                    |> render [ postRoute ]
+                    |> .diagnostics
+                    |> Expect.equal
+                        [ error "DUPLICATE PAGE" "The alias `/old/` of `content/posts/a.md` and the alias `/old/` of `content/posts/b.md` both make the file `old/index.html`." ]
+        , test "one document's duplicate aliases are one redirect" <|
+            \_ ->
+                request [ "posts" ] [ aliased "new" [ "/old", "/old/" ] ]
+                    |> render [ postRoute ]
+                    |> Expect.all
+                        [ paths >> Expect.equal [ "posts/new/index.html", "old/index.html" ]
+                        , .diagnostics >> Expect.equal []
+                        ]
+        , test "an alias on a document with no item route" <|
+            \_ ->
+                let
+                    source : Source
+                    source =
+                        aliased "new" [ "/old/" ]
+                in
+                request [ "posts" ] [ { source | positions = [ ( "aliases", span 3 10 16 ) ], date = Just "2026-11-23" } ]
+                    |> render [ Route.allItems "/posts/" posts (\_ -> page []) ]
+                    |> Expect.all
+                        [ .diagnostics
+                            >> Expect.equal
+                                [ { severity = Error
+                                  , title = "ALIAS WITHOUT PAGE"
+                                  , message = "This document has aliases, but the collection `posts` has no `eachItem` route, so there is no page for them to redirect to."
+                                  , sourcePath = Just "content/posts/new.md"
+                                  , span = Just (span 3 10 16)
+                                  , hint = Just "Add a `Route.eachItem` route for `posts`, or remove `aliases`."
+                                  }
+                                ]
+                        , paths >> Expect.equal [ "posts/index.html" ]
+                        ]
+        , test "an excluded draft writes no redirect" <|
+            \_ ->
+                let
+                    hidden : Source
+                    hidden =
+                        draft "secret-plans"
+                in
+                request [ "posts" ] [ post "hello-world", { hidden | aliases = [ "/old/" ] } ]
+                    |> render [ postRoute ]
+                    |> Expect.all
+                        [ paths >> Expect.equal [ "posts/hello-world/index.html" ]
+                        , .diagnostics >> Expect.equal []
+                        ]
         ]
 
 

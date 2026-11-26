@@ -179,10 +179,11 @@ export async function build(
 function outputFiles(response: Response, config: Config): OutputFile[] {
   // `siteUrl.href` may lack the trailing slash that relative feed paths need.
   const site = config.siteUrl.origin + config.basePath;
-  const files: OutputFile[] = response.pages.map(({ path, html }) => ({
+  const files: OutputFile[] = response.pages.map(({ path, html, aliasOf }) => ({
     kind: "text",
     path,
     content: html,
+    ...(aliasOf !== undefined && { aliasOf }),
   }));
   for (const feed of response.feeds) {
     const render = (path: string) => ({

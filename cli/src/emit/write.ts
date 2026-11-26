@@ -3,10 +3,11 @@ import { dirname, join, posix } from "node:path";
 
 /**
  * A file to write to the output folder, with a path relative to it: either text, or
- * a copy of a file elsewhere on disk, such as a cached image.
+ * a copy of a file elsewhere on disk, such as a cached image. A redirect page
+ * has `aliasOf`, the source path of the document it redirects to.
  */
 export type OutputFile =
-  | { kind: "text"; path: string; content: string }
+  | { kind: "text"; path: string; content: string; aliasOf?: string }
   | { kind: "copy"; path: string; source: string };
 
 /**

@@ -73,6 +73,30 @@ describe("staticClashes", () => {
     );
   });
 
+  test("names a redirect by the document it redirects to", () => {
+    const diagnostics = staticClashes(
+      [
+        {
+          kind: "text",
+          path: "old/index.html",
+          content: "",
+          aliasOf: "content/posts/new.md",
+        },
+      ],
+      [{ kind: "copy", path: "old/index.html", source: "/elsewhere" }],
+    );
+
+    expect(diagnostics).toEqual([
+      {
+        severity: "error",
+        title: "STATIC FILE CLASH",
+        message:
+          "static/old/index.html would replace the redirect old/index.html (alias of content/posts/new.md) that Sheaf generates.",
+        hint: "Rename or delete the static file, or change the alias in content/posts/new.md.",
+      },
+    ]);
+  });
+
   test("accepts files that do not collide", () => {
     expect(clashesOf("style.css", "posts/a.png", "fonts/x.woff2")).toEqual([]);
   });

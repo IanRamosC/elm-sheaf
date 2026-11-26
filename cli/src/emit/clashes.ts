@@ -23,7 +23,14 @@ export function staticClashes(
       folders.set(parts.slice(0, end).join("/"), claimed);
     }
   };
-  for (const { path } of outputs) claim({ path, static: false });
+  for (const output of outputs) {
+    const aliasOf = output.kind === "text" ? output.aliasOf : undefined;
+    claim({
+      path: output.path,
+      static: false,
+      ...(aliasOf !== undefined && { aliasOf }),
+    });
+  }
 
   const diagnostics: Diagnostic[] = [];
   for (const { path } of staticFiles) {
@@ -35,7 +42,8 @@ export function staticClashes(
   return diagnostics;
 }
 
-type Claimed = { path: string; static: boolean };
+/** A path taken by a static file or an output; a redirect page has `aliasOf`. */
+type Claimed = { path: string; static: boolean; aliasOf?: string };
 
 function reservedClash({ path }: Claimed): Diagnostic | undefined {
   if (!path.toLowerCase().startsWith(RESERVED_FOLDER)) return undefined;
@@ -88,9 +96,13 @@ function samePath(mine: Claimed, other: Claimed): Diagnostic {
   );
 }
 
-/** Names an output by its kind, which the path alone tells apart: feeds and the sitemap are the only `.xml`. */
-function describe({ path, static: isStatic }: Claimed): string {
+/**
+ * Names an output by its kind. Apart from redirects, the path alone tells them
+ * apart: feeds and the sitemap are the only `.xml`.
+ */
+function describe({ path, static: isStatic, aliasOf }: Claimed): string {
   if (isStatic) return `static/${path}`;
+  if (aliasOf !== undefined) return `redirect ${path} (alias of ${aliasOf})`;
   if (path.toLowerCase().startsWith(IMAGE_FOLDER)) {
     return `image variant ${path}`;
   }
@@ -99,9 +111,11 @@ function describe({ path, static: isStatic }: Claimed): string {
 }
 
 function moveHint(other: Claimed): string {
-  return other.static
-    ? "Rename or delete one of them."
-    : "Rename or delete the static file, or change the route that generates the other.";
+  if (other.static) return "Rename or delete one of them.";
+  if (other.aliasOf !== undefined) {
+    return `Rename or delete the static file, or change the alias in ${other.aliasOf}.`;
+  }
+  return "Rename or delete the static file, or change the route that generates the other.";
 }
 
 function clash(message: string, hint: string): Diagnostic {

@@ -24,6 +24,7 @@ import Sheaf.Internal.Output as Output exposing (Output(..))
 import Sheaf.Internal.Path as Path
 import Sheaf.Internal.Pattern as Pattern
 import Sheaf.Internal.Protocol as Protocol exposing (Diagnostic, Document, GroupSlug, Request, Response, Severity(..), SitemapEntry)
+import Sheaf.Internal.Redirect as Redirect exposing (Redirect)
 import Sheaf.Internal.Results as Results
 import Sheaf.Internal.RouteCheck as RouteCheck
 import Sheaf.Internal.Site as Site exposing (Feed(..), FrontmatterProblems, Page, Route(..), Site(..))
@@ -131,11 +132,13 @@ renderSite (Site site) request =
         feeds =
             List.map (Feed.render context (urlTarget context groupPages) bodies) site.feeds
 
-        ( written, clashes ) =
+        written : { pages : List UncheckedPage, redirects : List Redirect, diagnostics : List Diagnostic }
+        written =
             Output.withoutClashes
                 (List.map PageFile (List.filterMap Result.toMaybe made)
                     ++ List.concatMap Feed.outputs site.feeds
                     ++ [ Sitemap ]
+                    ++ List.map RedirectFile (List.concatMap (redirectsOf context) published)
                 )
 
         checked : List CheckedPage
@@ -149,14 +152,16 @@ renderSite (Site site) request =
                     , feedPaths = feedPaths site.feeds
                     }
                 )
-                written
+                written.pages
 
         good : List CheckedPage
         good =
             List.filter (\page -> List.isEmpty page.brokenLinks && List.isEmpty page.problems) checked
     in
     { site = site.metadata
-    , pages = List.map (write (urlTarget context groupPages) site.metadata.language) good
+    , pages =
+        List.map (write (urlTarget context groupPages) site.metadata.language) good
+            ++ List.map (writeRedirect context site.metadata.language) written.redirects
     , feeds = List.filterMap Result.toMaybe feeds
     , sitemap = List.filterMap (sitemapEntry context) good
     , diagnostics =
@@ -175,7 +180,8 @@ renderSite (Site site) request =
                 , List.concatMap Results.errors made
                 , Check.brokenLinkDiagnostics checked
                 , List.concatMap .problems checked
-                , clashes
+                , List.filterMap (aliasWithoutPage context) published
+                , written.diagnostics
                 ]
             )
     }
@@ -332,6 +338,72 @@ bodyDiagnostic context document problem =
                 , span = Just located.span
                 , hint = located.hint
                 }
+
+
+
+-- REDIRECTS
+
+
+{-| A redirect for each of a document's aliases, to its item page. Two aliases
+written as the same file, such as `/old` and `/old/`, are one redirect.
+-}
+redirectsOf : Context -> Document -> List Redirect
+redirectsOf context document =
+    case Dict.get document.collection context.itemPatterns of
+        Just pattern ->
+            firstAtEachFile document.aliases
+                |> List.map
+                    (\alias ->
+                        { from = alias
+                        , to = Pattern.fill Pattern.Slug document.slug pattern
+                        , sourcePath = document.sourcePath
+                        }
+                    )
+
+        Nothing ->
+            []
+
+
+firstAtEachFile : List String -> List String
+firstAtEachFile aliases =
+    List.foldl
+        (\alias ( files, kept ) ->
+            if List.member (Redirect.fileOf alias) files then
+                ( files, kept )
+
+            else
+                ( Redirect.fileOf alias :: files, alias :: kept )
+        )
+        ( [], [] )
+        aliases
+        |> Tuple.second
+        |> List.reverse
+
+
+aliasWithoutPage : Context -> Document -> Maybe Diagnostic
+aliasWithoutPage context document =
+    if List.isEmpty document.aliases || Dict.member document.collection context.itemPatterns then
+        Nothing
+
+    else
+        Just
+            { severity = Error
+            , title = "ALIAS WITHOUT PAGE"
+            , message = "This document has aliases, but the collection `" ++ document.collection ++ "` has no `eachItem` route, so there is no page for them to redirect to."
+            , sourcePath = Just document.sourcePath
+            , span =
+                Dict.get "aliases" document.frontmatterPositions
+                    |> Maybe.map (\position -> Maybe.withDefault position.value position.key)
+            , hint = Just ("Add a `Route.eachItem` route for `" ++ document.collection ++ "`, or remove `aliases`.")
+            }
+
+
+writeRedirect : Context -> String -> Redirect -> Protocol.Page
+writeRedirect context language redirect =
+    { path = Redirect.fileOf redirect.from
+    , html = Redirect.page { language = language, origin = context.origin, basePath = context.basePath, to = redirect.to }
+    , aliasOf = Just redirect.sourcePath
+    }
 
 
 

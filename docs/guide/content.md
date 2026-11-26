@@ -47,7 +47,7 @@ image: { src: cover.png, alt: Cover }
 ---
 ```
 
-Five keys are reserved: Sheaf reads them itself, before any Elm runs.
+Six keys are reserved: Sheaf reads them itself, before any Elm runs.
 
 | Key | What it is | When it's missing |
 |---|---|---|
@@ -56,10 +56,12 @@ Five keys are reserved: Sheaf reads them itself, before any Elm runs.
 | `updated` | When it last changed significantly | None; feeds use `date` |
 | `draft` | `true` keeps it out of production builds | `false` |
 | `image` | A cover image, for the layout and link previews | None |
+| `aliases` | Old paths that redirect to the document | None |
 
 A reserved key with a value of the wrong kind, such as `draft: yes`, is
 `BAD FRONTMATTER`. The `image` key is covered in
-[Static files and images](static-files-and-images.md).
+[Static files and images](static-files-and-images.md), and `aliases` in
+[Old URLs](#old-urls). Templates don't see `aliases`.
 
 Every other key belongs to your collection's decoder, written with
 `Sheaf.Frontmatter`. This one is from the starter's `src/Site.elm`:
@@ -100,6 +102,45 @@ slug becomes the value's name: `hello-world` becomes
 `Content.Posts.helloWorld`, and `2026-recap` becomes `n2026Recap`. Two slugs
 that become the same name are `NAME CLASH`, and a slug with no ASCII letter or
 digit, which can't become one, is `UNUSABLE SLUG`. Setting `slug` fixes both.
+
+## Old URLs
+
+When a document moves, list the paths it used to have under `aliases`, and
+Sheaf writes a page at each one that sends readers on to the new one:
+
+```yaml
+aliases:
+  - /2019/03/old-post-name/
+  - /old.html
+```
+
+A single path can be written without the list, as `aliases: /old/`.
+
+Each alias is a path on this site, starting with `/` and without the base
+path, which Sheaf adds. Its segments follow the rules for slugs, so it can't
+have a query, a fragment, a `.` or `..` segment, or two slashes in a row. Write
+characters such as `é` as they are rather than percent-encoded. An alias that
+breaks these rules is `BAD ALIAS`.
+
+An alias ending in `.html` is written as that file. Any other is a folder with
+an `index.html`, so `/old` and `/old/` are the same page. A server would send a
+file without an extension as something other than HTML, and the redirect
+wouldn't work.
+
+The redirect page uses a meta refresh, which works on any static host. It
+names the new page as canonical, asks search engines not to index the old one,
+and links to the new page for browsers that don't follow the refresh. A meta
+refresh can't carry a fragment over, so `/old/#setup` lands at the top of the
+new page.
+
+Redirect pages aren't in the sitemap or the feeds. The rules for them:
+
+- the document's collection needs a `Route.eachItem` route, or there is no
+  page to redirect to; without one, the alias is `ALIAS WITHOUT PAGE`;
+- an alias that would be written where another page, alias or feed is, is
+  `DUPLICATE PAGE`, and one where a file of `static/` is, is
+  `STATIC FILE CLASH`;
+- a draft left out of the build has its aliases left out too.
 
 ## Dates and drafts
 
