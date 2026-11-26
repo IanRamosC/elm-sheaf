@@ -12,9 +12,10 @@ link to a document that doesn't exist, or an image that isn't there.
 ## Status
 
 Sheaf is not released yet. Neither the npm package `elm-sheaf` nor the Elm
-package `ianramosc/elm-sheaf` is published, so for now you run the CLI from a
-clone of the repository and create sites with `--local`. Expect the API to
-change before the first release. The
+package `ianramosc/elm-sheaf` is published, and there are no binaries to
+download, so the steps below don't work yet. For now, run the CLI from a clone
+of the repository and create sites with `--local`, which points them at that
+clone. Expect the API to change before the first release. The
 [repository README](https://github.com/IanRamosC/elm-sheaf#status) explains
 how to try it today.
 
@@ -39,6 +40,14 @@ that `bunx elm-sheaf` works without installing anything first. Inside a site,
 `sheaf dev` serves it and reloads the browser on every save, `sheaf build`
 renders it into `dist/`, and `sheaf check` reports problems without writing
 anything.
+
+## Without Bun
+
+Each [release](https://github.com/IanRamosC/elm-sheaf/releases) has a
+standalone binary for macOS, Linux and Windows, which needs no Bun, only Elm
+0.19.3 on your `PATH`.
+[Getting started](https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/getting-started.md#install-sheaf)
+says which file to download and how to install it on each system.
 
 ## Documentation
 

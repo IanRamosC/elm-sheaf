@@ -12,6 +12,10 @@ bunx sheaf build     # write the published site to dist/
 bunx sheaf check     # check everything without writing the site
 ```
 
+With the standalone `sheaf` binary, skip `bun install` and leave out `bunx`:
+`sheaf dev`, `sheaf build` and `sheaf check`. The binary uses the Elm 0.19.3
+on your `PATH`.
+
 ## Where things are
 
 - `content/posts/` holds the posts and `content/pages/` the other pages, such

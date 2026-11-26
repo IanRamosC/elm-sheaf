@@ -18,10 +18,12 @@ Options:
   -v, --version     Show the version
 ```
 
-Inside a site made by `sheaf init`, run the commands with `bunx sheaf`. Until
-the packages are published, create a site with the CLI in your clone of this
-repository, `bun <clone>/cli/src/index.ts init my-blog --local <clone>`, as
-[Getting started](getting-started.md) shows.
+Inside a site made by `sheaf init`, run the commands with `bunx sheaf`, or with
+`sheaf` if you installed the standalone binary. Outside a site, `bunx elm-sheaf`
+runs the latest published version. Before the first release, create a site
+with the CLI in your clone of this repository,
+`bun <clone>/cli/src/index.ts init my-blog --local <clone>`, as
+[Getting started](getting-started.md#before-the-first-release) shows.
 
 `build`, `check` and `dev` run in the site's folder, the one with `sheaf.json`.
 An option belongs only to the commands whose usage line shows it: `--drafts`
@@ -76,11 +78,14 @@ workflow. It creates the folder if it's missing, and refuses one with anything
 in it, hidden files included, before writing anything. Then it prints the next
 steps.
 
+- Without `--local`, the site depends on the published packages: `elm.json`
+  on `ianramosc/elm-sheaf`, which Elm downloads from the package website, and
+  `package.json` on `elm-sheaf` from npm.
 - `--local <path>` makes the site use a clone of this repository instead of the
   published packages: `elm.json` adds the clone's `src` to its
   `source-directories`, and `package.json` depends on the clone's `cli` folder.
-  Until the packages are published, this is the only way to make a site that
-  builds.
+  It's for working on Sheaf itself, and for trying it before the first release,
+  when it's the only way to make a site that builds.
 
 ## Exit codes
 

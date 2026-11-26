@@ -11,6 +11,13 @@ numbers are those of the npm package `elm-sheaf`.
 - `sheaf init` creates a site from a starter blog: a home page, a welcome post,
   an about page, a stylesheet with light and dark colour schemes, and a
   workflow that deploys to GitHub Pages.
+- The npm package `elm-sheaf` provides the command `sheaf`, also available as
+  `elm-sheaf`, so `bunx elm-sheaf init my-blog` works without installing Sheaf
+  first.
+- Standalone binaries for macOS (Apple Silicon and Intel), Linux (x64 and
+  ARM64) and Windows (x64), which need no Bun, only Elm 0.19.3 on the `PATH`.
+  Each release carries them with their `SHA256SUMS` and the licences of the
+  code compiled into them.
 - `sheaf build` renders the site into `dist/` as plain HTML and CSS, with no
   JavaScript.
 - `sheaf dev` serves the site with drafts, rebuilds it on every change and
@@ -39,5 +46,9 @@ numbers are those of the npm package `elm-sheaf`.
   images and paths whose case doesn't match fail the build.
 - Files in `static/` are copied into the site as they are.
 - Drafts, dates with a configurable time zone, and cover images.
+- Every command checks that the site's `elm.json` gets the Elm package
+  `ianramosc/elm-sheaf` exactly once, at a 1.x version this CLI supports.
+- `Head.icon` links the site's icon, and the starter uses it for
+  `static/favicon.svg`.
 - Diagnostics name the file and line, suggest the closest match, and list
   every problem of a kind at once.

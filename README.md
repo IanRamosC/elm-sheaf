@@ -98,22 +98,10 @@ Other tools may suit you better:
 ## Status
 
 Sheaf is not released yet. Neither the npm package `elm-sheaf` nor the Elm
-package `ianramosc/elm-sheaf` is published, so for now you run the CLI from a
-clone of this repository and create sites with `--local`, which points them at
-that clone. Such a site can't be built on a host yet, so delete the starter's
-`.github/workflows/deploy.yml` until the packages are published.
-[Getting started][getting-started] walks through it. Expect the API to change
-before the first release.
-
-## Requirements
-
-- [Bun](https://bun.sh) 1.4.5 or newer.
-- [Elm 0.19.3](https://guide.elm-lang.org/install/elm.html). Sheaf looks for
-  `elm` in your site's `node_modules/.bin`, then on your `PATH`. A site made by
-  `sheaf init` has Elm in its `package.json`, so `bun install` usually provides
-  it.
-
-## Quick start
+package `ianramosc/elm-sheaf` is published, and there are no binaries to
+download, so the Install steps below don't work yet. For now, run the CLI from
+a clone of this repository and create sites with `--local`, which points them
+at that clone:
 
 ```sh
 git clone https://github.com/IanRamosC/elm-sheaf.git
@@ -125,6 +113,51 @@ cd my-blog
 bun install
 bunx sheaf dev
 ```
+
+Such a site can't be built on a host yet, so delete the starter's
+`.github/workflows/deploy.yml` until the packages are published.
+[Getting started][getting-started] walks through it. Expect the API to change
+before the first release.
+
+## Install
+
+Sheaf runs under [Bun](https://bun.sh) 1.4.5 or newer, or as a standalone
+binary that needs no Bun. Either way, it builds sites with
+[Elm 0.19.3](https://guide.elm-lang.org/install/elm.html).
+
+With Bun, there is nothing to install first. The site's `package.json` gets
+Sheaf and Elm, and `bun install` provides both:
+
+```sh
+bunx elm-sheaf init my-blog
+cd my-blog
+bun install
+bunx sheaf dev
+```
+
+The binaries are attached to each [release][releases]. Download the one for
+your system:
+
+| System | File |
+|---|---|
+| macOS on Apple Silicon | `sheaf-darwin-arm64` |
+| macOS on Intel | `sheaf-darwin-x64` |
+| Linux on x64 | `sheaf-linux-x64` |
+| Linux on ARM64 | `sheaf-linux-arm64` |
+| Windows on x64 | `sheaf-windows-x64.exe` |
+
+On a Mac with Apple Silicon, take `sheaf-darwin-arm64`, never the x64 file,
+which doesn't run under Rosetta on older versions of macOS. The x64 files need
+a processor with SSE4.2, which nearly every x64 processor from the last fifteen
+years has.
+
+On macOS and Linux, make it executable with `chmod +x`, rename it `sheaf` and
+move it into a folder on your `PATH`. On macOS, also clear the download's
+quarantine flag with `xattr`. On Windows, rename it `sheaf.exe` and put it in a
+folder on your `PATH`; SmartScreen may warn you the first time it runs. The
+binary doesn't contain Elm, so put Elm 0.19.3 on your `PATH` too, then run
+`sheaf init my-blog`, `cd my-blog` and `sheaf dev`.
+[Getting started][install] gives the commands for each system.
 
 `sheaf dev` prints the address it serves the site at, such as
 `http://127.0.0.1:4000/`. Edit `content/posts/welcome.md` and the page reloads.
@@ -181,6 +214,8 @@ your site, in `cli/templates/`, is also offered under the
 [astro]: https://docs.astro.build/
 [astro-schema]: https://docs.astro.build/en/guides/content-collections/
 [getting-started]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/getting-started.md
+[install]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/getting-started.md#install-sheaf
+[releases]: https://github.com/IanRamosC/elm-sheaf/releases
 [content]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/content.md
 [templates]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/templates.md
 [configuration]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/configuration.md
