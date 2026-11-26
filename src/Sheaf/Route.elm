@@ -70,14 +70,14 @@ unless the collection is given
 
 import Sheaf.Collection exposing (Collection)
 import Sheaf.Date exposing (Date)
-import Sheaf.Document exposing (Document)
+import Sheaf.Document exposing (Document, Neighbour)
 import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Date as InternalDate
 import Sheaf.Internal.Frontmatter as Frontmatter exposing (Frontmatter, Problem)
 import Sheaf.Internal.Image as Image
 import Sheaf.Internal.Protocol as Protocol
 import Sheaf.Internal.Results as Results
-import Sheaf.Internal.Site as Site exposing (FrontmatterProblems, ListedDocument)
+import Sheaf.Internal.Site as Site exposing (FrontmatterProblems, ListedDocument, Neighbours)
 import Sheaf.Ref as Ref
 
 
@@ -293,10 +293,26 @@ decodeMeta frontmatter document =
     Frontmatter.decode frontmatter { values = document.frontmatter, positions = document.frontmatterPositions }
 
 
-{-| Decode a document's frontmatter, then wait for its rendered body.
+{-| Decode a document's frontmatter and its neighbours', then wait for its
+rendered body. A neighbour that does not decode is left out: its problems are
+reported where its own page or listing decodes it.
 -}
-decode : Collection meta -> Protocol.Document -> Result (List Problem) (List Html -> Document meta)
-decode (Site.Collection collection) document =
+decode : Collection meta -> Neighbours -> Result (List Problem) (List Html -> Document meta)
+decode (Site.Collection collection) { document, previous, next } =
+    let
+        neighbour : Protocol.Document -> Maybe (Neighbour meta)
+        neighbour around =
+            decodeMeta collection.frontmatter around
+                |> Result.toMaybe
+                |> Maybe.map
+                    (\meta ->
+                        { ref = Ref.fromId around.id
+                        , slug = around.slug
+                        , date = Maybe.map InternalDate.fromProtocol around.date
+                        , meta = meta
+                        }
+                    )
+    in
     decodeMeta collection.frontmatter document
         |> Result.map
             (\meta body ->
@@ -321,6 +337,8 @@ decode (Site.Collection collection) document =
                 , updated = updated
                 , meta = meta
                 , image = Maybe.map Image.fromProtocol document.image
+                , previous = Maybe.andThen neighbour previous
+                , next = Maybe.andThen neighbour next
                 , body = body
                 }
             )
@@ -333,7 +351,7 @@ decodeAll collection items =
     items
         |> List.map
             (\item ->
-                decode collection item.document
+                decode collection { document = item.document, previous = item.previous, next = item.next }
                     |> Result.map (\toDocument -> toDocument item.body)
                     |> Result.mapError (\problems -> [ FrontmatterProblems item.document problems ])
             )

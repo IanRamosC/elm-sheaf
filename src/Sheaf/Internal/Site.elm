@@ -1,12 +1,12 @@
 module Sheaf.Internal.Site exposing
-    ( Site(..), Metadata, Feed(..), Description, Route(..), Grouping, NamedGroup, ListedDocument, FrontmatterProblems, Pagination, Collection(..), SortOrder(..), Page
+    ( Site(..), Metadata, Feed(..), Description, Route(..), Grouping, NamedGroup, ListedDocument, Neighbours, FrontmatterProblems, Pagination, Collection(..), SortOrder(..), Page
     , nameOf, patternOf, collectionOf, itemPattern, datedCollection, perPageOf, groupingOf, groupedPattern
     )
 
 {-| The site a user declares, behind `Sheaf`, `Sheaf.Route` and
 `Sheaf.Collection`, which only expose ways to build it.
 
-@docs Site, Metadata, Feed, Description, Route, Grouping, NamedGroup, ListedDocument, FrontmatterProblems, Pagination, Collection, SortOrder, Page
+@docs Site, Metadata, Feed, Description, Route, Grouping, NamedGroup, ListedDocument, Neighbours, FrontmatterProblems, Pagination, Collection, SortOrder, Page
 
 
 # What a route uses
@@ -87,8 +87,9 @@ type SortOrder
 route over a collection keeps its collection's decoder and its template
 together, in `templateFor`.
 
-An item route decodes a document's frontmatter and gives the template waiting
-for the document's rendered body, which may never come. A listing route gets
+An item route decodes the frontmatter of a document and of its neighbours,
+and gives the template waiting for the document's rendered body, which may
+never come. A listing route gets
 its documents with their bodies, already in its collection's order, and
 decodes them all. A grouped route also keeps how to find a document's group
 values, because the renderer groups the documents before any template runs.
@@ -101,7 +102,7 @@ type Route
         { pattern : String
         , collection : String
         , order : SortOrder
-        , templateFor : Protocol.Document -> Result (List Problem) (List Html -> Page)
+        , templateFor : Neighbours -> Result (List Problem) (List Html -> Page)
         }
     | Paginated
         { pattern : String
@@ -147,11 +148,25 @@ type alias NamedGroup item =
     }
 
 
-{-| A published document and its rendered body, as a listing route gets it.
+{-| A published document, the documents before and after it in its
+collection's reading order, and its rendered body, as a listing route gets
+it.
 -}
 type alias ListedDocument =
     { document : Protocol.Document
+    , previous : Maybe Protocol.Document
+    , next : Maybe Protocol.Document
     , body : List Html
+    }
+
+
+{-| A published document and the documents before and after it in its
+collection's reading order, as an item route gets it.
+-}
+type alias Neighbours =
+    { document : Protocol.Document
+    , previous : Maybe Protocol.Document
+    , next : Maybe Protocol.Document
     }
 
 

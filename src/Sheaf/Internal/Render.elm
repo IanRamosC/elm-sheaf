@@ -366,11 +366,16 @@ pagesOf context bodies groupings index route =
             [ Ok { route = index, routeName = Site.nameOf route, location = InPlaceOfMissingPages, page = page, lastModified = Nothing } ]
 
         EachItem item ->
+            let
+                neighboursOf : Document -> Site.Neighbours
+                neighboursOf =
+                    Listing.neighbours item.order item.collection bodies
+            in
             bodies
                 |> List.filter (\( document, _ ) -> document.collection == item.collection)
                 |> List.filterMap
                     (\( document, body ) ->
-                        case ( item.templateFor document, body ) of
+                        case ( item.templateFor (neighboursOf document), body ) of
                             ( Ok template, Ok html ) ->
                                 let
                                     made : UncheckedPage

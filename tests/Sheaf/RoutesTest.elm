@@ -6,7 +6,7 @@ import Json.Encode as Encode
 import RenderFixtures exposing (PostMeta, Source, bodyAt, draft, error, headAt, page, paths, post, postMeta, postPage, posts, render, renderWithFeeds, request, requestUnder, requestWithSlugs, span, titles)
 import Sheaf
 import Sheaf.Collection as Collection exposing (Collection)
-import Sheaf.Document exposing (Document)
+import Sheaf.Document exposing (Document, Neighbour)
 import Sheaf.Feed as Feed
 import Sheaf.Frontmatter as Frontmatter
 import Sheaf.Head as Head
@@ -27,6 +27,7 @@ suite =
         , missingDateTests
         , orderedTests
         , readingOrderTests
+        , neighbourTests
         , notFoundTests
         , badRouteTests
         , repeatedLinkTests
@@ -415,6 +416,115 @@ readingOrderTests =
                     [ doc "a" 3, doc "c" 1, doc "b" 1 ]
                     |> Expect.equal (Ok (Just [ "b", "c", "a" ]))
         ]
+
+
+
+-- NEIGHBOURS
+
+
+{-| The slugs of a document's previous and next documents, `-` for none.
+-}
+neighbours : { a | previous : Maybe (Neighbour meta), next : Maybe (Neighbour meta) } -> String
+neighbours document =
+    let
+        slugOf : Maybe (Neighbour meta) -> String
+        slugOf =
+            Maybe.map .slug >> Maybe.withDefault "-"
+    in
+    slugOf document.previous ++ " | " ++ slugOf document.next
+
+
+neighbourPage : Document meta -> Page
+neighbourPage document =
+    page [ Html.text (neighbours document) ]
+
+
+{-| Posts `a`, `b` and `c`, a month apart, oldest first.
+-}
+threePosts : List Source
+threePosts =
+    [ dated "b" "2024-02-01", dated "c" "2024-03-01", dated "a" "2024-01-01" ]
+
+
+neighbourTests : Test
+neighbourTests =
+    describe "neighbours"
+        [ test "neighbours follow the date, oldest to newest" <|
+            \_ ->
+                request [ "posts" ] threePosts
+                    |> render [ Route.eachItem "/posts/:slug/" posts neighbourPage ]
+                    |> Expect.all
+                        [ bodyAt "posts/a/index.html" >> Expect.equal (Just "- | b")
+                        , bodyAt "posts/b/index.html" >> Expect.equal (Just "a | c")
+                        , bodyAt "posts/c/index.html" >> Expect.equal (Just "b | -")
+                        ]
+        , test "neighbours follow orderedBy" <|
+            \_ ->
+                request [ "docs" ] [ doc "deploy" 3, doc "intro" 1, doc "setup" 2 ]
+                    |> render [ Route.eachItem "/docs/:slug/" docs neighbourPage ]
+                    |> bodyAt "docs/setup/index.html"
+                    |> Expect.equal (Just "intro | deploy")
+        , test "an undated document clears every neighbour" <|
+            \_ ->
+                let
+                    inPages : Source -> Source
+                    inPages source =
+                        { source | collection = "pages" }
+                in
+                request [ "pages" ] (List.map inPages [ dated "a" "2024-01-01", post "b", dated "c" "2024-03-01" ])
+                    |> render [ Route.eachItem "/:slug/" (Collection.named "pages" postMeta) neighbourPage ]
+                    |> Expect.all
+                        [ .diagnostics >> Expect.equal []
+                        , bodyAt "a/index.html" >> Expect.equal (Just "- | -")
+                        , bodyAt "b/index.html" >> Expect.equal (Just "- | -")
+                        , bodyAt "c/index.html" >> Expect.equal (Just "- | -")
+                        ]
+        , test "neighbours carry decoded meta" <|
+            \_ ->
+                let
+                    third : Source
+                    third =
+                        dated "c" "2024-03-01"
+                in
+                request [ "posts" ] [ dated "b" "2024-02-01", { third | frontmatter = [ ( "title", Encode.string "Third" ) ] } ]
+                    |> render
+                        [ Route.eachItem "/posts/:slug/"
+                            posts
+                            (\document -> page [ Html.text (Maybe.withDefault "-" (Maybe.map (.meta >> .title) document.next)) ])
+                        ]
+                    |> bodyAt "posts/b/index.html"
+                    |> Expect.equal (Just "Third")
+        , test "drafts are neighbours only when built" <|
+            \_ ->
+                let
+                    unbuilt : Source
+                    unbuilt =
+                        dated "b" "2024-02-01"
+                in
+                request [ "posts" ] [ dated "a" "2024-01-01", { unbuilt | excluded = True }, dated "c" "2024-03-01" ]
+                    |> render [ Route.eachItem "/posts/:slug/" posts neighbourPage ]
+                    |> bodyAt "posts/a/index.html"
+                    |> Expect.equal (Just "- | c")
+        , test "listed documents have neighbours" <|
+            \_ ->
+                request [ "posts" ] threePosts
+                    |> render [ Route.allItems "/archive/" posts (\items -> page [ Html.text (listedNeighbours items) ]) ]
+                    |> bodyAt "archive/index.html"
+                    |> Expect.equal (Just "c (b | -), b (a | c), a (- | b)")
+        , test "neighbours cross page boundaries" <|
+            \_ ->
+                request [ "posts" ] threePosts
+                    |> render [ Route.paginated "/" { perPage = 1 } posts (\listing -> page [ Html.text (listedNeighbours listing.items) ]) ]
+                    |> bodyAt "index.html"
+                    |> Expect.equal (Just "c (b | -)")
+        ]
+
+
+{-| Each document's slug, then its neighbours.
+-}
+listedNeighbours : List (Document meta) -> String
+listedNeighbours items =
+    String.join ", " (List.map (\item -> item.slug ++ " (" ++ neighbours item ++ ")") items)
 
 
 

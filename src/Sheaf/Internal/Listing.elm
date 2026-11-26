@@ -1,17 +1,17 @@
 module Sheaf.Internal.Listing exposing
-    ( Body, listOf, readingOrder, paginate, whole
+    ( Body, listOf, readingOrder, neighbours, paginate, whole
     , missingDates, frontmatterDiagnostic
     )
 
 {-| What listing routes share: their documents in order, cut into pages, and
 the problems that keep a listing from being written.
 
-@docs Body, listOf, readingOrder, paginate, whole
+@docs Body, listOf, readingOrder, neighbours, paginate, whole
 @docs missingDates, frontmatterDiagnostic
 
 -}
 
-import Dict
+import Dict exposing (Dict)
 import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Compare as Compare
 import Sheaf.Internal.Date as Date
@@ -20,7 +20,7 @@ import Sheaf.Internal.Path as Path
 import Sheaf.Internal.Pattern as Pattern
 import Sheaf.Internal.Protocol exposing (Diagnostic, Document, Severity(..))
 import Sheaf.Internal.Results as Results
-import Sheaf.Internal.Site exposing (FrontmatterProblems, ListedDocument, Pagination, SortOrder(..))
+import Sheaf.Internal.Site exposing (FrontmatterProblems, ListedDocument, Neighbours, Pagination, SortOrder(..))
 
 
 {-| A published document and its rendered body, or the problems of its body.
@@ -34,10 +34,18 @@ of them can be listed: one whose body has problems, or without a date in a
 listing by date, would leave a hole in the listing. Their problems are
 reported on their own, and the frontmatter of each is still checked, so a body
 with problems is given as empty.
+
+Each document comes with its neighbours in the whole collection, so they are
+the same on every page and in every group that lists it.
+
 -}
 listOf : SortOrder -> String -> List Body -> ( List ListedDocument, Bool )
 listOf order collection bodies =
     let
+        neighboursOf : Document -> Neighbours
+        neighboursOf =
+            neighbours order collection bodies
+
         listed : List Body
         listed =
             sorted order (inCollection collection bodies)
@@ -51,7 +59,16 @@ listOf order collection bodies =
                 ByKey _ ->
                     True
     in
-    ( List.map (\( document, body ) -> { document = document, body = Result.withDefault [] body }) listed
+    ( List.map
+        (\( document, body ) ->
+            let
+                around : Neighbours
+                around =
+                    neighboursOf document
+            in
+            { document = document, previous = around.previous, next = around.next, body = Result.withDefault [] body }
+        )
+        listed
     , List.all (\( document, body ) -> canBeListed document && isOk body) listed
     )
 
@@ -78,6 +95,43 @@ readingOrder order collection bodies =
 
         ByKey _ ->
             Just (sorted order documents)
+
+
+{-| The documents before and after each published document of a collection
+in reading order. With no reading order, a document has neither.
+
+Apply it to the collection once, and the result to each document: the
+reading order is found only once.
+
+-}
+neighbours : SortOrder -> String -> List Body -> Document -> Neighbours
+neighbours order collection bodies =
+    let
+        byId : Dict String ( Maybe Document, Maybe Document )
+        byId =
+            case readingOrder order collection bodies of
+                Just ordered ->
+                    let
+                        documents : List Document
+                        documents =
+                            List.map Tuple.first ordered
+                    in
+                    List.map3 (\previous document next -> ( document.id, ( previous, next ) ))
+                        (Nothing :: List.map Just documents)
+                        documents
+                        (List.map Just (List.drop 1 documents) ++ [ Nothing ])
+                        |> Dict.fromList
+
+                Nothing ->
+                    Dict.empty
+    in
+    \document ->
+        let
+            ( previous, next ) =
+                Dict.get document.id byId
+                    |> Maybe.withDefault ( Nothing, Nothing )
+        in
+        { document = document, previous = previous, next = next }
 
 
 inCollection : String -> List Body -> List Body

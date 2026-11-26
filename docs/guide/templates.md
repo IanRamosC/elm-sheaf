@@ -120,13 +120,53 @@ type alias Document meta =
     , updated : Maybe Date
     , meta : meta
     , image : Maybe Image
+    , previous : Maybe (Neighbour meta)
+    , next : Maybe (Neighbour meta)
     , body : List Html
+    }
+
+type alias Neighbour meta =
+    { ref : Ref
+    , slug : String
+    , date : Maybe Date
+    , meta : meta
     }
 ```
 
 `meta` is what your frontmatter decoder produced, `body` is the rendered
 Markdown, and `image` is the cover from the `image` key (see
 [Static files and images](static-files-and-images.md)).
+
+`previous` and `next` are the documents on either side of this one, for links
+to the older and newer post:
+
+```elm
+neighbourLinks : Document PostMeta -> Html
+neighbourLinks document =
+    nav [ class "neighbours" ]
+        [ case document.previous of
+            Just older ->
+                Sheaf.link older.ref [ text ("← " ++ older.meta.title) ]
+
+            Nothing ->
+                text ""
+        , case document.next of
+            Just newer ->
+                Sheaf.link newer.ref [ text (newer.meta.title ++ " →") ]
+
+            Nothing ->
+                text ""
+        ]
+```
+
+A collection is read by date, oldest first, so `previous` is the older post
+and `next` the newer one. A collection ordered with `Collection.orderedBy` is
+read from the lowest number to the highest (see
+[Ordering by a number](#ordering-by-a-number)). The first document has no
+`previous` and the last has no `next`. If a collection read by date has a
+published document without a date, such as most pages, no document of it has
+neighbours. Drafts are neighbours only in a build that includes them. A
+document has the same neighbours on its own page and in every listing.
 
 ### Paths and links
 
