@@ -145,7 +145,11 @@ function usageOptions(help: string): Map<string, Set<string>> {
 }
 
 describe("the documentation", () => {
-  const userDocs = [join(REPO, "README.md"), ...guidePages()];
+  const userDocs = [
+    join(REPO, "README.md"),
+    join(REPO, "docs/content/pages/index.md"),
+    ...guidePages(),
+  ];
   let help = "";
 
   beforeAll(async () => {
@@ -303,6 +307,7 @@ describe("the documentation", () => {
     const linked = [
       join(REPO, "README.md"),
       join(REPO, "CONTRIBUTING.md"),
+      join(REPO, "docs/content/pages/index.md"),
       ...guidePages(),
     ];
     const broken = linked.flatMap((path) => {

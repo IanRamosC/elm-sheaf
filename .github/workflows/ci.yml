@@ -47,7 +47,7 @@ jobs:
 
       # Before the tests, which build the fixtures in place and write .sheaf/gen/.
       - name: Check Elm formatting
-        run: elm-format --validate src tests review/src cli/templates/default/src cli/test/fixtures
+        run: elm-format --validate src tests review/src cli/templates/default/src cli/test/fixtures docs/src
 
       - name: Lint
         working-directory: cli

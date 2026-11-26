@@ -8,7 +8,7 @@
 
 ## Checklist
 
-- [ ] `elm-format --validate src tests review/src cli/templates/default/src cli/test/fixtures`
+- [ ] `elm-format --validate src tests review/src cli/templates/default/src cli/test/fixtures docs/src`
 - [ ] `bun test`, `bunx --bun biome check .` and `bunx --bun tsc --noEmit` in `cli/`
 - [ ] `elm-test-rs`, `elm-review` and `elm make --docs=/tmp/sheaf-docs.json` at the root
 - [ ] The user guide in `docs/content/guide/` describes the change, if users can see it

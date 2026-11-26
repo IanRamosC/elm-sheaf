@@ -36,7 +36,7 @@ Every pull request must pass these, and CI runs the same ones. At the root of
 the repository:
 
 ```sh
-elm-format --validate src tests review/src cli/templates/default/src cli/test/fixtures
+elm-format --validate src tests review/src cli/templates/default/src cli/test/fixtures docs/src
 ```
 
 Run it before the tests: they build the fixture sites in place, which writes
