@@ -3,12 +3,30 @@
   "version": "1.0.0-dev",
   "description": "Static site generator whose templates are written in Elm.",
   "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IanRamosC/elm-sheaf.git",
+    "directory": "cli"
+  },
+  "homepage": "https://github.com/IanRamosC/elm-sheaf#readme",
+  "bugs": {
+    "url": "https://github.com/IanRamosC/elm-sheaf/issues"
+  },
+  "keywords": [
+    "elm",
+    "static-site-generator",
+    "blog",
+    "bun"
+  ],
   "type": "module",
   "files": [
-    "src"
+    "src",
+    "README.md",
+    "LICENSE"
   ],
   "bin": {
-    "sheaf": "src/index.ts"
+    "sheaf": "src/index.ts",
+    "elm-sheaf": "src/index.ts"
   },
   "engines": {
     "bun": ">=1.4.5"
