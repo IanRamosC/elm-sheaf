@@ -140,8 +140,9 @@ eachItem pattern collection template =
 
 
 {-| Like [`eachItem`](#eachItem), but the template also gets every published
-document of the collection, newest first or in the collection's order, such
-as for a sidebar.
+document of the collection, the page's own included, in the order a listing
+shows them: newest first, or the collection's order. Use it for a sidebar or a
+list of the posts in a series.
 
     Route.eachItemIn "/guide/:slug/" guide Theme.Guide.view
 
@@ -149,6 +150,9 @@ Each document comes as a [`Neighbour`](Sheaf-Document#Neighbour), without its
 body. Like a listing route, it orders them by date, so each needs a date,
 unless the collection is given
 [`Collection.orderedBy`](Sheaf-Collection#orderedBy).
+
+Drafts are listed only in builds that include them, and documents whose
+frontmatter doesn't decode are left out, and reported once.
 
 -}
 eachItemIn : String -> Collection meta -> (List (Neighbour meta) -> Document meta -> Page) -> Route

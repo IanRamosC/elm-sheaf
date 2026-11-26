@@ -71,11 +71,11 @@ type alias Heading =
     }
 
 
-{-| The document before or after another, for links such as "older" and
-"newer".
+{-| A document without its body: the one before or after another, or one of a
+whole collection given to [`Route.eachItemIn`](Sheaf-Route#eachItemIn).
 
-A collection is read oldest to newest, by date, so `previous` is the older
-document and `next` the newer one. A collection given
+For `previous` and `next`, a collection is read oldest to newest, by date, so
+`previous` is the older document and `next` the newer one. A collection given
 [`Collection.orderedBy`](Sheaf-Collection#orderedBy) is read from the lowest
 number to the highest. The first document has no `previous`, and the last no
 `next`.

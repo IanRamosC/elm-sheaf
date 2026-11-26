@@ -27,7 +27,7 @@ view documents =
         [] ->
             Layout.view
                 { title = "Sheaf"
-                , description = ""
+                , description = "A static site generator whose templates are written in Elm."
                 , head = []
                 , body = [ h1 [] [ text "Sheaf" ] ]
                 }

@@ -454,6 +454,8 @@ pagesOf context bodies groupings index route =
                 templateFor : Site.Neighbours -> Result (List Frontmatter.Problem) (List Html -> Page)
                 templateFor =
                     if item.listsCollection then
+                        -- A collection that can't be listed is already reported, by
+                        -- datedCollection or by the body that failed.
                         item.templateFor (List.map .document (Tuple.first (Listing.listOf item.order item.collection bodies)))
 
                     else
