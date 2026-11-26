@@ -409,7 +409,7 @@ linkProblemTests =
                         }
         , test "a link to a collection without an item route has no page" <|
             \_ ->
-                request [ "notes" ] [ { collection = "notes", slug = "hello", date = Nothing, updated = Nothing, excluded = False, frontmatter = [], positions = [], aliases = [], image = Nothing, body = [] } ]
+                request [ "notes" ] [ { collection = "notes", slug = "hello", date = Nothing, updated = Nothing, excluded = False, frontmatter = [], positions = [], keyPositions = [], aliases = [], image = Nothing, body = [] } ]
                     |> render [ homeLinkingTo "notes/hello" ]
                     |> .diagnostics
                     |> List.filter (\diagnostic -> diagnostic.title == "NO PAGE FOR LINK")
@@ -610,6 +610,10 @@ redirectTests =
                 ++ ("<title>Redirecting…</title><meta http-equiv=\"refresh\" content=\"0; url=" ++ target ++ "\">")
                 ++ ("<link rel=\"canonical\" href=\"https://example.com" ++ target ++ "\"><meta name=\"robots\" content=\"noindex\">")
                 ++ ("</head><body><p>This page has moved to <a href=\"" ++ target ++ "\">" ++ target ++ "</a>.</p></body></html>")
+
+        fromAlias : String -> Diagnostic -> Diagnostic
+        fromAlias sourcePath diagnostic =
+            { diagnostic | sourcePath = Just sourcePath }
     in
     describe "redirects"
         [ test "an alias writes a redirect page" <|
@@ -663,7 +667,7 @@ redirectTests =
                     |> Expect.all
                         [ .diagnostics
                             >> Expect.equal
-                                [ error "DUPLICATE PAGE" "The route `/posts/:slug/` and the alias `/posts/other/` of `content/posts/new.md` both make the file `posts/other/index.html`." ]
+                                [ fromAlias "content/posts/new.md" (error "DUPLICATE PAGE" "The route `/posts/:slug/` and the alias `/posts/other/` of `content/posts/new.md` both make the file `posts/other/index.html`.") ]
                         , bodyAt "posts/other/index.html" >> Expect.equal (Just "<article><h1>other</h1><p>Hi</p></article>")
                         ]
         , test "two documents with the same alias are reported" <|
@@ -672,13 +676,21 @@ redirectTests =
                     |> render [ postRoute ]
                     |> .diagnostics
                     |> Expect.equal
-                        [ error "DUPLICATE PAGE" "The alias `/old/` of `content/posts/a.md` and the alias `/old/` of `content/posts/b.md` both make the file `old/index.html`." ]
+                        [ fromAlias "content/posts/b.md" (error "DUPLICATE PAGE" "The alias `/old/` of `content/posts/a.md` and the alias `/old/` of `content/posts/b.md` both make the file `old/index.html`.") ]
         , test "one document's duplicate aliases are one redirect" <|
             \_ ->
                 request [ "posts" ] [ aliased "new" [ "/old", "/old/" ] ]
                     |> render [ postRoute ]
                     |> Expect.all
                         [ paths >> Expect.equal [ "posts/new/index.html", "old/index.html" ]
+                        , .diagnostics >> Expect.equal []
+                        ]
+        , test "one document's aliases that differ only in case are one redirect" <|
+            \_ ->
+                request [ "posts" ] [ aliased "new" [ "/Old/", "/old/" ] ]
+                    |> render [ postRoute ]
+                    |> Expect.all
+                        [ paths >> Expect.equal [ "posts/new/index.html", "Old/index.html" ]
                         , .diagnostics >> Expect.equal []
                         ]
         , test "an alias on a document with no item route" <|
@@ -703,6 +715,18 @@ redirectTests =
                                 ]
                         , paths >> Expect.equal [ "posts/index.html" ]
                         ]
+        , test "an alias without a page points at the aliases key when it has one" <|
+            \_ ->
+                let
+                    source : Source
+                    source =
+                        aliased "new" [ "/old/" ]
+                in
+                request [ "posts" ] [ { source | positions = [ ( "aliases", span 3 10 16 ) ], keyPositions = [ ( "aliases", span 3 1 8 ) ], date = Just "2026-11-23" } ]
+                    |> render [ Route.allItems "/posts/" posts (\_ -> page []) ]
+                    |> .diagnostics
+                    |> List.map .span
+                    |> Expect.equal [ Just (span 3 1 8) ]
         , test "an excluded draft writes no redirect" <|
             \_ ->
                 let

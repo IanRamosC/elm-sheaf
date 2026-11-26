@@ -82,31 +82,35 @@ withoutClashes outputs =
 
         ( _, written, clashes ) =
             List.foldl step ( { files = Dict.empty, folders = Dict.empty }, [], [] ) outputs
+
+        inOrder : List Output
+        inOrder =
+            List.reverse written
     in
-    { pages =
-        List.filterMap
-            (\output ->
-                case output of
-                    PageFile page ->
-                        Just page
-
-                    _ ->
-                        Nothing
-            )
-            (List.reverse written)
-    , redirects =
-        List.filterMap
-            (\output ->
-                case output of
-                    RedirectFile redirect ->
-                        Just redirect
-
-                    _ ->
-                        Nothing
-            )
-            (List.reverse written)
+    { pages = List.filterMap pageOf inOrder
+    , redirects = List.filterMap redirectOf inOrder
     , diagnostics = List.reverse clashes
     }
+
+
+pageOf : Output -> Maybe UncheckedPage
+pageOf output =
+    case output of
+        PageFile page ->
+            Just page
+
+        _ ->
+            Nothing
+
+
+redirectOf : Output -> Maybe Redirect
+redirectOf output =
+    case output of
+        RedirectFile redirect ->
+            Just redirect
+
+        _ ->
+            Nothing
 
 
 {-| The outputs written so far, by their lowercased file and by every
@@ -167,13 +171,13 @@ clash taken output =
     in
     case ( Dict.get file taken.files, Dict.get file taken.folders, inFile ) of
         ( Just first, _, _ ) ->
-            Just (sameFile first output)
+            Just (sameFile first output |> pointingAt [ output, first ])
 
         ( Nothing, Just inside, _ ) ->
-            Just (fileAndFolder output inside)
+            Just (fileAndFolder output inside |> pointingAt [ output, inside ])
 
         ( Nothing, Nothing, Just first ) ->
-            Just (fileAndFolder first output)
+            Just (fileAndFolder first output |> pointingAt [ output, first ])
 
         ( Nothing, Nothing, Nothing ) ->
             Nothing
@@ -181,6 +185,15 @@ clash taken output =
 
 
 -- MESSAGES
+
+
+{-| A clash involving an alias points at the document the alias is written in,
+the later output's when both are aliases. Routes, feeds and the sitemap have no
+file to point at.
+-}
+pointingAt : List Output -> Diagnostic -> Diagnostic
+pointingAt outputs diagnostic =
+    { diagnostic | sourcePath = List.head (List.filterMap (redirectOf >> Maybe.map .sourcePath) outputs) }
 
 
 sameFile : Output -> Output -> Diagnostic

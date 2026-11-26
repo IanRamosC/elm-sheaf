@@ -169,9 +169,10 @@ export async function build(
     ...imageOutputs(imaged.value.published),
   ];
   // A default: the site's own file, or a route's, takes its place unreported.
-  if (
-    !providesRobots([...outputs, ...staticFiles.value].map(({ path }) => path))
-  ) {
+  const writtenPaths = [...outputs, ...staticFiles.value].map(
+    ({ path }) => path,
+  );
+  if (!providesRobots(writtenPaths)) {
     outputs.push(robotsFile(config.value));
   }
   const clashes = staticClashes(outputs, staticFiles.value);

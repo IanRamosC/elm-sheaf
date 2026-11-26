@@ -345,7 +345,8 @@ bodyDiagnostic context document problem =
 
 
 {-| A redirect for each of a document's aliases, to its item page. Two aliases
-written as the same file, such as `/old` and `/old/`, are one redirect.
+written as the same file, such as `/old` and `/old/`, are one redirect, and
+so are two that differ only in case, as output paths are compared everywhere.
 -}
 redirectsOf : Context -> Document -> List Redirect
 redirectsOf context document =
@@ -368,11 +369,16 @@ firstAtEachFile : List String -> List String
 firstAtEachFile aliases =
     List.foldl
         (\alias ( files, kept ) ->
-            if List.member (Redirect.fileOf alias) files then
+            let
+                file : String
+                file =
+                    String.toLower (Redirect.fileOf alias)
+            in
+            if List.member file files then
                 ( files, kept )
 
             else
-                ( Redirect.fileOf alias :: files, alias :: kept )
+                ( file :: files, alias :: kept )
         )
         ( [], [] )
         aliases

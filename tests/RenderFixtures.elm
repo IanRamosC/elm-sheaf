@@ -120,6 +120,7 @@ type alias Source =
     , excluded : Bool
     , frontmatter : List ( String, Value )
     , positions : List ( String, Span )
+    , keyPositions : List ( String, Span )
     , aliases : List String
     , image : Maybe Value
     , body : List Value
@@ -135,6 +136,7 @@ post slug =
     , excluded = False
     , frontmatter = [ ( "title", Encode.string slug ) ]
     , positions = []
+    , keyPositions = []
     , aliases = []
     , image = Nothing
     , body = [ paragraph [ textNode "Hi" ] ]
@@ -200,6 +202,21 @@ requestWith { basePath, slugs } collections sources =
         ]
 
 
+{-| A field's position: the span of its value, and of its key when
+`keyPositions` has one for its path.
+-}
+encodePosition : List ( String, Span ) -> ( String, Span ) -> Value
+encodePosition keyPositions ( path, at ) =
+    let
+        key : List ( String, Value )
+        key =
+            keyPositions
+                |> List.filter (\( keyPath, _ ) -> keyPath == path)
+                |> List.map (\( _, keyAt ) -> ( "key", encodeSpan keyAt ))
+    in
+    Encode.object (( "path", Encode.string path ) :: key ++ [ ( "value", encodeSpan at ) ])
+
+
 encodeSource : Source -> Value
 encodeSource source =
     Encode.object
@@ -212,7 +229,7 @@ encodeSource source =
          , ( "draft", Encode.bool source.excluded )
          , ( "excluded", Encode.bool source.excluded )
          , ( "frontmatter", Encode.object source.frontmatter )
-         , ( "frontmatterPositions", Encode.list (\( path, at ) -> Encode.object [ ( "path", Encode.string path ), ( "value", encodeSpan at ) ]) source.positions )
+         , ( "frontmatterPositions", Encode.list (encodePosition source.keyPositions) source.positions )
          , ( "aliases", Encode.list Encode.string source.aliases )
          , ( "tree", markdownNode "root" [ ( "children", Encode.list identity source.body ) ] )
          ]

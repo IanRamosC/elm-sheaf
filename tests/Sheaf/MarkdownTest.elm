@@ -198,7 +198,14 @@ headingTests =
                 root [ heading 2 "a-cat" [ text "A cat ", Image { position = at 1, url = "cat.png", alt = "Cat", title = Nothing, local = Nothing } ] ]
                     |> Markdown.headings
                     |> List.map .text
-                    |> Expect.equal [ "A cat " ]
+                    |> Expect.equal [ "A cat" ]
+        , test "heading text is trimmed, with its line breaks and runs of spaces made one space" <|
+            \_ ->
+                -- A setext heading:  Two\n  lines  \n---
+                root [ heading 2 "two-lines" [ text "  Two\n  lines  " ] ]
+                    |> Markdown.headings
+                    |> List.map .text
+                    |> Expect.equal [ "Two lines" ]
         , test "headings inside containers count" <|
             \_ ->
                 root
@@ -221,6 +228,10 @@ headingTests =
                     |> renderWith noLinks
                     |> Result.map (String.contains "heading-link")
                     |> Expect.equal (Ok False)
+        , test "a heading without an id has no id attribute" <|
+            \_ ->
+                heading 2 "" [ text "!!!" ]
+                    |> rendersTo "<h2>!!!</h2>"
         , test "a heading links to itself" <|
             \_ ->
                 heading 2 "setup" [ text "Setup" ]

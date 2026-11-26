@@ -158,7 +158,7 @@ renderNode scope node =
             element (Html.p []) (renderNodes scope container.children)
 
         Heading heading ->
-            element (headingElement heading.depth [ Attributes.id heading.id ])
+            element (headingElement heading.depth (idAttribute heading.id))
                 (Result.map (\children -> children ++ selfLink heading.id) (renderNodes scope heading.children))
 
         Text text ->
@@ -269,6 +269,18 @@ headingElement depth =
 
         _ ->
             Html.h6
+
+
+{-| A heading's `id`, left out when it is empty, since an empty `id` is not
+valid HTML.
+-}
+idAttribute : String -> List Html.Attribute
+idAttribute id =
+    if String.isEmpty id then
+        []
+
+    else
+        [ Attributes.id id ]
 
 
 {-| The link a heading ends with, to itself. The `#` is decorative: the link
@@ -832,12 +844,20 @@ headings tree =
         (\node ->
             case node of
                 Heading heading ->
-                    Just { depth = heading.depth, id = heading.id, text = plainText node }
+                    Just { depth = heading.depth, id = heading.id, text = collapseWhitespace (plainText node) }
 
                 _ ->
                     Nothing
         )
         (descendants tree)
+
+
+{-| A heading's text as a reader sees it: trimmed, with each run of spaces and
+line breaks, such as a setext heading's, made one space.
+-}
+collapseWhitespace : String -> String
+collapseWhitespace text =
+    String.join " " (String.words text)
 
 
 {-| The text a heading's id is made from, as the host makes it: text and
