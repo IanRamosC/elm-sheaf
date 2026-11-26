@@ -86,11 +86,13 @@ Some test inputs are generated, and a test fails when they are out of date:
 ### Checks that need more than Bun
 
 CI runs two more checks that you can run yourself when you change what they
-cover. `cli/scripts/check-starter.sh` builds the starter site twice, at the
-root and under `/blog/`, and checks its HTML with the Nu Html Checker, its
-links with lychee and its accessibility with axe. It needs Docker running,
-Google Chrome (set `CHROME` to its executable when it isn't in its usual
-place), Elm 0.19.3 on your `PATH`, and `bun install` run in `cli/` and
+cover. `cli/scripts/check-site.sh` builds the starter site twice, at the
+root and under `/blog/`, and the documentation website in `docs/` under
+`/elm-sheaf/`. It checks their HTML with the Nu Html Checker, their links with
+lychee and their accessibility with axe, the website's at a desktop width and
+at 375 pixels. Give it `starter` or `docs` to check only one. It needs Docker
+running, Google Chrome (set `CHROME` to its executable when it isn't in its
+usual place), Elm 0.19.3 on your `PATH`, and `bun install` run in `cli/` and
 `tools/a11y/`. `bun run smoke-binary` in `cli/` builds the standalone binary
 for your machine and uses it to make and build a site in a folder outside the
 repository; it needs Elm 0.19.3 on your `PATH`.
@@ -114,11 +116,12 @@ cli/                     the npm package elm-sheaf: the CLI and the host that ru
   src/diagnostics/       the Diagnostic type and how it is printed
   src/init/              sheaf init, and starter.generated.ts, the starter it writes
   templates/default/     the starter's source, embedded by bun run embed-starter
-  scripts/               build-binaries, smoke-binary, check-starter.sh, embed-starter, screenshots
+  scripts/               build-binaries, smoke-binary, check-site.sh, embed-starter, screenshots
   test/                  bun tests, and fixture sites in test/fixtures/
-tools/a11y/              the axe audit that check-starter.sh runs over the built starter
-docs/content/guide/     the user guide
-.github/workflows/       ci.yml for every push and pull request, release.yml for version tags
+tools/a11y/              the axe audit that check-site.sh runs over the built sites
+docs/                    the documentation website, a Sheaf site, with the guide in content/guide/
+.github/workflows/       ci.yml for every push and pull request, release.yml for version tags,
+                         docs.yml to publish the website from main
 RELEASING.md             how both packages are released
 ```
 

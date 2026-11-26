@@ -110,10 +110,10 @@ jobs:
         working-directory: cli
         run: bun run smoke-binary
 
-  # Builds the starter at the root and under /blog/, then runs the Nu Html
-  # Checker, lychee and axe over both. Docker and Google Chrome come with the
-  # runner.
-  starter:
+  # Builds the starter at the root and under /blog/, and the documentation
+  # website under /elm-sheaf/, then runs the Nu Html Checker, lychee and axe
+  # over each. Docker and Google Chrome come with the runner.
+  sites:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -139,5 +139,5 @@ jobs:
           (cd cli && bunx --bun biome check ../tools/a11y)
           (cd tools/a11y && bunx --bun tsc --noEmit)
 
-      - name: Check the starter
-        run: cli/scripts/check-starter.sh
+      - name: Check the starter and the documentation website
+        run: cli/scripts/check-site.sh

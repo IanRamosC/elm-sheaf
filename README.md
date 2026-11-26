@@ -177,6 +177,8 @@ The [CLI reference][cli] lists every option, exit code and diagnostic.
 
 ## The guide
 
+The guide is on [the Sheaf website][website]. Its pages are also on GitHub:
+
 - [Getting started][getting-started]: from nothing to a site on your screen.
 - [Content][content]: collections, frontmatter, drafts, dates and links.
 - [Templates][templates]: `Site.elm`, the `Sheaf` modules and the blog preset.
@@ -213,6 +215,7 @@ your site, in `cli/templates/`, is also offered under the
 [eleventy]: https://www.11ty.dev/docs/languages/
 [astro]: https://docs.astro.build/
 [astro-schema]: https://docs.astro.build/en/guides/content-collections/
+[website]: https://ianramosc.github.io/elm-sheaf/
 [getting-started]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/content/guide/getting-started.md
 [install]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/content/guide/getting-started.md#install-sheaf
 [releases]: https://github.com/IanRamosC/elm-sheaf/releases

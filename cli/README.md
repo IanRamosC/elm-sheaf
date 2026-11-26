@@ -52,9 +52,10 @@ says which file to download and how to install it on each system.
 
 ## Documentation
 
-The [repository README](https://github.com/IanRamosC/elm-sheaf#readme) and its
-[guide](https://github.com/IanRamosC/elm-sheaf/blob/main/docs/content/guide/getting-started.md)
-cover the content format, templates, configuration and deployment.
+[The Sheaf website](https://ianramosc.github.io/elm-sheaf/) has the guide to
+the content format, templates, configuration and deployment. The
+[guide is also on GitHub](https://github.com/IanRamosC/elm-sheaf/blob/main/docs/content/guide/getting-started.md),
+next to the [repository README](https://github.com/IanRamosC/elm-sheaf#readme).
 
 ## Licence
 

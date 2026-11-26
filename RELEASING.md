@@ -82,7 +82,12 @@ on npm, so 1.0.0 goes to npm by hand, and the workflow does the rest.
 5. Merge into `main` and wait for CI to pass.
 6. Publish the Elm package `1.0.0`, as [the Elm package](#the-elm-package)
    describes. Sites made by `init` depend on it, so it goes first.
-7. Tag the CLI, without pushing the tag yet, and publish it to npm from a
+7. Point the website's "API" link at the published documentation: in
+   `docs/src/Docs/Layout.elm`, set its `href` to
+   `https://package.elm-lang.org/packages/ianramosc/elm-sheaf/latest/` and
+   remove its `title`, change the test in `cli/test/docs-site.test.ts` to
+   match, and merge into `main`. `docs.yml` publishes the website.
+8. Tag the CLI, without pushing the tag yet, and publish it to npm from a
    clean checkout of the tag:
 
    ```sh
@@ -98,15 +103,15 @@ on npm, so 1.0.0 goes to npm by hand, and the workflow does the rest.
 
    A publish from your machine carries no provenance. Later versions, which
    the workflow publishes, do.
-8. On npmjs.com, open `elm-sheaf`'s settings and add a trusted publisher:
+9. On npmjs.com, open `elm-sheaf`'s settings and add a trusted publisher:
    GitHub Actions, organisation or user `IanRamosC`, repository `elm-sheaf`,
    workflow file name `release.yml`, no environment. Then, under publishing
    access, require two-factor authentication and disallow tokens; trusted
    publishing still works.
-9. Push the tag: `git push origin v1.0.0`. The workflow finds 1.0.0 on npm,
-   skips it, and attaches the binaries to the release. Remove the worktree
-   with `git worktree remove ../elm-sheaf-v1.0.0`.
-10. Start the next version, as in step 6 of
+10. Push the tag: `git push origin v1.0.0`. The workflow finds 1.0.0 on npm,
+    skips it, and attaches the binaries to the release. Remove the worktree
+    with `git worktree remove ../elm-sheaf-v1.0.0`.
+11. Start the next version, as in step 6 of
     [Every later release](#every-later-release).
 
 From then on `bunx elm-sheaf init my-blog` makes a site that depends on the

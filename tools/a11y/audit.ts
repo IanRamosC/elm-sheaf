@@ -2,23 +2,31 @@
  * Runs axe on every page of a built site, once in the light colour scheme and
  * once in the dark one, and exits with 1 when it finds a violation.
  *
- *     bun audit.ts <dist folder>
+ *     bun audit.ts [--base /path/] [--width 375] <dist folder>
  *
- * The pages are the ones `sitemap.xml` lists, plus `/404.html`. The folder is
- * served on a free local port, whatever host the sitemap names. Chrome is
- * looked for in its usual place on macOS and Linux; set `CHROME` to the path
- * of its executable to use another.
+ * The pages are the ones `sitemap.xml` lists, plus the 404 page. The folder is
+ * served on a free local port, whatever host the sitemap names: at the root,
+ * or under `--base` for a site built to live under a path, such as a GitHub
+ * Pages project site. The window is 1280 pixels wide unless `--width` says
+ * otherwise. Chrome is looked for in its usual place on macOS and Linux; set
+ * `CHROME` to the path of its executable to use another.
  */
 import { join, resolve } from "node:path";
+import { parseArgs } from "node:util";
 import type { AxeResults, Result } from "axe-core";
 import puppeteer, { type Browser, type Page } from "puppeteer-core";
 
 const TAGS = ["wcag2a", "wcag21a", "wcag2aa", "wcag21aa"];
 const SCHEMES = ["light", "dark"] as const;
+const USAGE = "Usage: bun audit.ts [--base /path/] [--width 375] <dist folder>";
+const DEFAULT_WIDTH = 1280;
+const HEIGHT = 800;
 
 type Scheme = (typeof SCHEMES)[number];
 
 type Violation = { path: string; scheme: Scheme; result: Result };
+
+type Options = { dist: string; base: string; width: number };
 
 const DEFAULT_CHROME: Partial<Record<NodeJS.Platform, string>> = {
   darwin: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -37,13 +45,50 @@ function chromePath(): string {
   return path;
 }
 
-function serve(dist: string): ReturnType<typeof Bun.serve> {
+function readArgs(args: string[]) {
+  try {
+    return parseArgs({
+      args,
+      options: { base: { type: "string" }, width: { type: "string" } },
+      allowPositionals: true,
+    });
+  } catch (error) {
+    throw new AuditFailure(`${(error as Error).message}\n${USAGE}`);
+  }
+}
+
+function parseOptions(args: string[]): Options {
+  const { values, positionals } = readArgs(args);
+  const [folder] = positionals;
+  if (folder === undefined || positionals.length > 1) {
+    throw new AuditFailure(USAGE);
+  }
+  const base = values.base ?? "/";
+  if (!base.startsWith("/") || !base.endsWith("/")) {
+    throw new AuditFailure(`--base must start and end with /, not ${base}`);
+  }
+  const width =
+    values.width === undefined ? DEFAULT_WIDTH : Number(values.width);
+  if (!Number.isInteger(width) || width <= 0) {
+    throw new AuditFailure(
+      `--width must be a whole number of pixels, not ${values.width}`,
+    );
+  }
+  return { dist: resolve(folder), base, width };
+}
+
+/** Serves the folder under `base`, and nothing outside it. */
+function serve(dist: string, base: string): ReturnType<typeof Bun.serve> {
   return Bun.serve({
     port: 0,
     hostname: "127.0.0.1",
     async fetch(request) {
       const { pathname } = new URL(request.url);
-      const path = pathname.endsWith("/") ? `${pathname}index.html` : pathname;
+      if (!pathname.startsWith(base)) {
+        return new Response("Not found", { status: 404 });
+      }
+      const inside = pathname.slice(base.length - 1);
+      const path = inside.endsWith("/") ? `${inside}index.html` : inside;
       const file = Bun.file(join(dist, decodeURIComponent(path)));
       return (await file.exists())
         ? new Response(file)
@@ -53,7 +98,7 @@ function serve(dist: string): ReturnType<typeof Bun.serve> {
 }
 
 /** The path of every `<loc>` in the sitemap, then the 404 page's. */
-async function pagePaths(dist: string): Promise<string[]> {
+async function pagePaths(dist: string, base: string): Promise<string[]> {
   const sitemap = await Bun.file(join(dist, "sitemap.xml")).text();
   const paths = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(
     ([, loc = ""]) => new URL(loc).pathname,
@@ -61,7 +106,7 @@ async function pagePaths(dist: string): Promise<string[]> {
   if (paths.length === 0) {
     throw new AuditFailure("sitemap.xml lists no pages");
   }
-  return [...paths, "/404.html"];
+  return [...paths, `${base}404.html`];
 }
 
 async function open(page: Page, url: string, scheme: Scheme): Promise<void> {
@@ -130,17 +175,13 @@ function report(violations: Violation[]): string {
 }
 
 async function main(): Promise<number> {
-  const [folder] = process.argv.slice(2);
-  if (folder === undefined) {
-    throw new AuditFailure("Usage: bun audit.ts <dist folder>");
-  }
-  const dist = resolve(folder);
+  const { dist, base, width } = parseOptions(process.argv.slice(2));
   const axeSource = await Bun.file(
     Bun.resolveSync("axe-core/axe.min.js", import.meta.dir),
   ).text();
-  const paths = await pagePaths(dist);
+  const paths = await pagePaths(dist, base);
 
-  const server = serve(dist);
+  const server = serve(dist, base);
   let browser: Browser | undefined;
   try {
     browser = await puppeteer.launch({
@@ -148,7 +189,8 @@ async function main(): Promise<number> {
       headless: true,
     });
     const page = await browser.newPage();
-    await checkEmulation(page, new URL("/", server.url).href);
+    await page.setViewport({ width, height: HEIGHT });
+    await checkEmulation(page, new URL(base, server.url).href);
 
     const violations: Violation[] = [];
     for (const path of paths) {
@@ -160,7 +202,7 @@ async function main(): Promise<number> {
       }
     }
 
-    const audited = `${paths.length} pages in ${SCHEMES.length} colour schemes`;
+    const audited = `${paths.length} pages in ${SCHEMES.length} colour schemes, ${width} pixels wide`;
     if (violations.length > 0) {
       console.error(report(violations));
       console.error(`\n${violations.length} violations across ${audited}`);

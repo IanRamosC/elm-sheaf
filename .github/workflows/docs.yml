@@ -1,0 +1,64 @@
+name: Docs
+
+# Publishes the documentation website in docs/ to GitHub Pages. ci.yml builds
+# and checks it on every push and pull request; this deploys it from main.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "src/**"
+      - "cli/**"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+# One deploy at a time, and one under way is never cancelled halfway.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: cli/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+
+      - name: Install Elm
+        run: npm install --global elm@0.19.3-0
+
+      - name: Install dependencies
+        working-directory: cli
+        run: bun install --frozen-lockfile
+
+      - name: Build the website
+        working-directory: docs
+        run: bun ../cli/src/index.ts build
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: docs/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
