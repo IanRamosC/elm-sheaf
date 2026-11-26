@@ -236,6 +236,15 @@ describe("parseConfig", () => {
     }
   });
 
+  test("names the site's themes when a theme is unknown", () => {
+    const errors = errorsOf(
+      '{"siteUrl":"https://example.com/","highlight":{"theme":{"dark":"zzzzzzzz"},"themes":{"mine":"t.json"}}}',
+    );
+    expect(errors[0]?.message).toBe(
+      "The dark theme \"zzzzzzzz\" is not one of Shiki's themes or the site's.",
+    );
+  });
+
   test("suggests the Shiki theme closest to an unknown one", () => {
     const errors = errorsOf(
       '{"siteUrl":"https://example.com/","highlight":{"theme":{"light":"github-lite"}}}',

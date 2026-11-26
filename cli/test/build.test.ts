@@ -428,7 +428,16 @@ describe("build", () => {
 
     const result = await build(root, options(root, { output: undefined }));
 
-    expect(titlesOf(result)).toEqual(["BAD CONFIG"]);
+    expect(!result.ok && result.error).toEqual([
+      {
+        severity: "error",
+        title: "BAD CONFIG",
+        message:
+          '"highlight.grammars.nginx" names `nginx.json`, which doesn\'t exist.',
+        sourcePath: "sheaf.json",
+        hint: "Paths in sheaf.json are relative to the site's folder.",
+      },
+    ]);
   });
 
   test("explains a site without sheaf.json", async () => {

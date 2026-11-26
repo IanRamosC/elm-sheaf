@@ -323,7 +323,7 @@ function parseTheme(
     1,
   );
   return err({
-    message: `The ${variant} theme "${value}" is not one of Shiki's themes.`,
+    message: `The ${variant} theme "${value}" is not one of Shiki's themes${siteThemes.size > 0 ? " or the site's" : ""}.`,
     hint:
       closest === undefined
         ? "The themes are listed at https://shiki.style/themes."

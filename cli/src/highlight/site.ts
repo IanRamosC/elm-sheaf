@@ -175,7 +175,7 @@ function badFile(
   return {
     severity: "error",
     title: "BAD CONFIG",
-    message: `"highlight.${kind}.${name}" names ${path}, which ${problem}`,
+    message: `"highlight.${kind}.${name}" names \`${path}\`, which ${problem}`,
     sourcePath: "sheaf.json",
     hint: "Paths in sheaf.json are relative to the site's folder.",
   };

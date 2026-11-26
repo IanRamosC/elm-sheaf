@@ -245,16 +245,16 @@ describe("a site's own grammars and themes", () => {
       true,
     );
     expect(errors.map(({ message }) => message)).toEqual([
-      '"highlight.grammars.missing" names highlight/missing.json, which doesn\'t exist.',
+      '"highlight.grammars.missing" names `highlight/missing.json`, which doesn\'t exist.',
       expect.stringContaining(
-        '"highlight.grammars.folder" names highlight/folder.json, which can\'t be read',
+        '"highlight.grammars.folder" names `highlight/folder.json`, which can\'t be read',
       ),
       expect.stringContaining(
-        '"highlight.grammars.broken" names highlight/broken.json, which isn\'t valid JSON:',
+        '"highlight.grammars.broken" names `highlight/broken.json`, which isn\'t valid JSON:',
       ),
-      '"highlight.grammars.list" names highlight/list.json, which isn\'t a TextMate grammar: it needs "scopeName" and "patterns".',
-      '"highlight.grammars.half" names highlight/no-patterns.json, which isn\'t a TextMate grammar: it needs "scopeName" and "patterns".',
-      '"highlight.themes.plain" names highlight/no-colours.json, which isn\'t a VS Code theme: it needs "tokenColors" or "colors".',
+      '"highlight.grammars.list" names `highlight/list.json`, which isn\'t a TextMate grammar: it needs "scopeName" and "patterns".',
+      '"highlight.grammars.half" names `highlight/no-patterns.json`, which isn\'t a TextMate grammar: it needs "scopeName" and "patterns".',
+      '"highlight.themes.plain" names `highlight/no-colours.json`, which isn\'t a VS Code theme: it needs "tokenColors" or "colors".',
     ]);
   });
 });
