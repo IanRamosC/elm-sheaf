@@ -55,7 +55,7 @@ the file for your system from the latest
 
 On a Mac with Apple Silicon, take `sheaf-darwin-arm64`, never the x64 file,
 which doesn't run under Rosetta on older versions of macOS. The x64 files need
-a processor with SSE4.2, which nearly every x64 processor from the last fifteen
+a processor with AVX, which nearly every x64 processor from the last fifteen
 years has. The Linux files need glibc, so they don't run on Alpine Linux.
 
 Each release also has a `SHA256SUMS` file. To check a download against it, put

@@ -21,7 +21,8 @@ how to try it today.
 
 ## Requirements
 
-- [Bun](https://bun.sh) 1.4.5 or newer.
+- [Bun](https://bun.sh) 1.4.5 or newer, or a standalone binary (see
+  [Without Bun](#without-bun)).
 - [Elm 0.19.3](https://guide.elm-lang.org/install/elm.html). A site made by
   `sheaf init` has Elm in its `package.json`, so `bun install` usually provides
   it.

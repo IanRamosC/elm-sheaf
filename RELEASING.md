@@ -30,20 +30,25 @@ A tag `v*` starts these jobs, each after the ones before it:
    `v` followed by the version in `cli/package.json`, and that version doesn't
    end in `-dev`.
 2. `binaries` runs `bun run build-binaries` on macOS, which writes the five
-   binaries and `THIRD_PARTY_LICENSES` into `cli/out/`, then writes
-   `SHA256SUMS` over them.
-3. `npm` publishes `cli/` with `npm publish --provenance --access public`,
+   binaries and `THIRD_PARTY_LICENSES` into `cli/out/`. It signs the two macOS
+   binaries ad hoc and verifies the signatures, then writes `SHA256SUMS` over
+   every file.
+3. `intel-binary` runs `sheaf-darwin-x64 --version` on an Intel Mac. That
+   binary is cross-compiled on Apple Silicon, so this is the first time the
+   file the release ships is run.
+4. `npm` publishes `cli/` with `npm publish --provenance --access public`,
    through npm's trusted publishing: it signs in with the workflow's OIDC
    token, so no npm token is stored anywhere. When npm already has the
    version, it skips the publish and says so in a notice.
-4. `release` creates the GitHub release with every file in `cli/out/`, or
+5. `release` creates the GitHub release with every file in `cli/out/`, or
    replaces the files of a release an earlier run created.
 
 npm comes before the GitHub release because npm never takes a version twice,
 while a release can be made again.
 
 Only `npm` can get an OIDC token (`id-token: write`), and only `release` can
-write to the repository (`contents: write`). Every other job reads.
+write to the repository (`contents: write`). The other jobs only read, and
+`intel-binary` has no permissions at all.
 
 ## The first release, 1.0.0
 
@@ -96,7 +101,8 @@ on npm, so 1.0.0 goes to npm by hand, and the workflow does the rest.
 9. Push the tag: `git push origin v1.0.0`. The workflow finds 1.0.0 on npm,
    skips it, and attaches the binaries to the release. Remove the worktree
    with `git worktree remove ../elm-sheaf-v1.0.0`.
-10. Start the next version, as in step 6 below.
+10. Start the next version, as in step 6 of
+    [Every later release](#every-later-release).
 
 From then on `bunx elm-sheaf init my-blog` makes a site that depends on the
 published packages: `elm-sheaf` from npm and `ianramosc/elm-sheaf` from the
@@ -133,7 +139,7 @@ and checks the documentation itself, so it is run by hand. A tag without the
 1. Check that every exposed value has its documentation:
 
    ```sh
-   elm make --docs="$TMPDIR/docs.json"
+   elm make --docs="${TMPDIR:-/tmp}/docs.json"
    ```
 
 2. From the second version on, let Elm choose the version from the API
@@ -159,8 +165,8 @@ and checks the documentation itself, so it is run by hand. A tag without the
 
 ## A release that stopped halfway
 
-Running the whole workflow again is always safe: `ci`, `tag-check` and
-`binaries` only repeat their work, `npm` skips a version npm already has, and
+Running the whole workflow again is always safe: `ci`, `tag-check`,
+`binaries` and `intel-binary` only repeat their work, `npm` skips a version npm already has, and
 `release` replaces the files of a release that exists. Use "Re-run all jobs"
 in the Actions tab, or:
 
