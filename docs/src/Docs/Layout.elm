@@ -59,7 +59,12 @@ frame content main =
         , siteHeader
         , main
         , footer [ class "site-footer" ]
-            [ p [] [ text "Sheaf is open source under the BSD 3-Clause license." ] ]
+            [ p []
+                [ text "Sheaf is open source under the BSD 3-Clause "
+                , a [ href "https://github.com/IanRamosC/elm-sheaf/blob/main/LICENSE" ] [ text "licence" ]
+                , text "."
+                ]
+            ]
         ]
     }
 

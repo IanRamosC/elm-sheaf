@@ -384,13 +384,15 @@ pre {
     top: 1rem;
   }
 
-  .sidebar summary {
-    display: none;
-  }
+  @supports selector(::details-content) {
+    .sidebar summary {
+      display: none;
+    }
 
-  .sidebar details::details-content {
-    content-visibility: visible;
-    block-size: auto;
+    .sidebar details::details-content {
+      content-visibility: visible;
+      block-size: auto;
+    }
   }
 
   .sidebar ol {
