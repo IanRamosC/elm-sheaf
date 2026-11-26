@@ -1,10 +1,16 @@
 import { bundledLanguagesInfo } from "shiki/langs";
 
 /** GPL-3.0, which Sheaf's BSD-3-Clause binaries can't carry. */
-export const EXCLUDED_GRAMMARS = ["ada", "gnuplot", "nginx", "org", "racket"];
+export const EXCLUDED_GRAMMARS: readonly string[] = [
+  "ada",
+  "gnuplot",
+  "nginx",
+  "org",
+  "racket",
+];
 
 /** GPL-3.0, which Sheaf's BSD-3-Clause binaries can't carry. */
-export const EXCLUDED_THEMES = ["aurora-x"];
+export const EXCLUDED_THEMES: readonly string[] = ["aurora-x"];
 
 /** Each name a code block can use for an excluded grammar, aliases included, with the grammar's own name. */
 const excludedLanguages = new Map(

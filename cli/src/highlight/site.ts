@@ -5,6 +5,7 @@ import type { LanguageRegistration, ThemeRegistration } from "shiki/core";
 import type { Config } from "../config/config";
 import { isErrno } from "../content/files";
 import type { Diagnostic } from "../diagnostics/diagnostic";
+import { isObject } from "../json";
 import { collect, err, ok, type Result } from "../result";
 import { shikiAliases } from "./languages";
 
@@ -196,8 +197,4 @@ function isTheme(json: unknown): json is Omit<ThemeRegistration, "name"> {
   return (
     isObject(json) && (Array.isArray(json.tokenColors) || isObject(json.colors))
   );
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

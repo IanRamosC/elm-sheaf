@@ -1,6 +1,7 @@
 import { type FSWatcher, readFileSync, statSync, watch } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isErrno } from "../content/files";
+import { isObject } from "../json";
 
 const debounceMilliseconds = 100;
 
@@ -60,10 +61,6 @@ function parseHighlightFiles(sheafJson: string): string[] | undefined {
   } catch {
     return undefined;
   }
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /** What `parse` makes of the file at `path`, or `undefined` when it can't be read. */

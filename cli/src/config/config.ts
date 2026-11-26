@@ -3,6 +3,7 @@ import { bundledThemes } from "shiki/themes";
 import type { Diagnostic } from "../diagnostics/diagnostic";
 import { excludedHint, isExcludedTheme } from "../highlight/excluded";
 import { aliasedGrammar } from "../highlight/languages";
+import { isObject } from "../json";
 import { err, ok, type Result } from "../result";
 import { suggestions } from "../suggest";
 
@@ -351,10 +352,6 @@ function unknownKeys(
           : { hint: `Did you mean "${closest}"?` }),
       };
     });
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 const FULL_URL_HINT = "Use a full URL such as https://example.com/";
