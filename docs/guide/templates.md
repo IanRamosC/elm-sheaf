@@ -145,13 +145,14 @@ Markdown, and `image` is the cover from the `image` key (see
 `depth` is 1 for `#` to 6 for `######`, `id` is the heading's `id` on the page,
 and `text` is its plain text, with inline code kept and images and footnote
 references left out. Headings inside components, blockquotes and lists are
-listed too, so pick the depths you want:
+listed too, so pick the depths you want. A heading with no letters or digits,
+such as `## !!!`, has an empty `id`, so leave it out too:
 
 ```elm
 tableOfContents : Document PostMeta -> Html
 tableOfContents document =
     document.headings
-        |> List.filter (\heading -> heading.depth == 2 || heading.depth == 3)
+        |> List.filter (\heading -> (heading.depth == 2 || heading.depth == 3) && heading.id /= "")
         |> List.map (\heading -> li [] [ a [ href ("#" ++ heading.id) ] [ text heading.text ] ])
         |> ul []
 ```
@@ -189,7 +190,7 @@ read from the lowest number to the highest (see
 published document without a date, no document of it has neighbours (a
 collection of pages usually has no dates). Drafts are neighbours only in a
 build that includes them. A document has the same neighbours on its own page
-and in every listing.
+and in every listing, when the routes are given the same collection.
 
 ### Paths and links
 
@@ -349,7 +350,8 @@ The route kinds are:
 - `Route.single`: one page at a fixed path.
 - `Route.eachItem`: a page per document; `:slug` in the pattern is the
   document's slug. A collection needs one of these for links to its documents.
-- `Route.paginated`: the documents, newest first, `perPage` at a time. Page `k`
+- `Route.paginated`: the documents, newest first (or in the collection's
+  order), `perPage` at a time. Page `k`
   is at `page/<k>/` under the first page. The template gets a `Listing`: the
   documents and a `Pagination` with the page number, the number of pages and
   the URLs of the previous and next pages.

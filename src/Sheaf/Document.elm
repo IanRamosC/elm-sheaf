@@ -56,12 +56,12 @@ lists, so a table of contents keeps the depths it wants:
     tableOfContents : List Heading -> Html
     tableOfContents headings =
         headings
-            |> List.filter (\heading -> heading.depth == 2 || heading.depth == 3)
+            |> List.filter (\heading -> (heading.depth == 2 || heading.depth == 3) && heading.id /= "")
             |> List.map (\heading -> li [] [ a [ href ("#" ++ heading.id) ] [ text heading.text ] ])
             |> ul []
 
 A heading with no letters or digits, such as `## !!!`, has an empty `id`, and
-no link to itself on the page.
+no link to itself on the page, so the table of contents leaves it out.
 
 -}
 type alias Heading =

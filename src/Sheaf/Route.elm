@@ -129,7 +129,9 @@ notFound =
 
 This is also where links to the collection's documents point. When several
 `eachItem` routes use the same collection, links use the first in the site's
-list of routes.
+list of routes. Redirects, like links, use the first `eachItem` route of a
+collection, and `previous` and `next` follow the order of this route's
+collection.
 
 -}
 eachItem : String -> Collection meta -> (Document meta -> Page) -> Route

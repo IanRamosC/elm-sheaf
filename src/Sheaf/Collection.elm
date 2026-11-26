@@ -42,8 +42,8 @@ ordered by slug.
         Collection.named "docs" docMeta
             |> Collection.orderedBy .order
 
-Listing and grouped routes over this collection follow the order, and its
-documents need no date. Feeds are still newest first, so a collection in a
+Listing and grouped routes over this collection follow the order, as do
+`previous` and `next` on its documents, and its documents need no date. Feeds are still newest first, so a collection in a
 feed still needs dates.
 
 -}
