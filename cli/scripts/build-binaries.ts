@@ -10,6 +10,8 @@
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
+import { grammars, injections } from "tm-grammars";
+import { themes } from "tm-themes";
 
 export const TARGETS = [
   "bun-darwin-arm64",
@@ -126,15 +128,93 @@ async function readPackage(folder: string): Promise<BundledPackage> {
   };
 }
 
-function thirdPartyLicenses(packages: BundledPackage[]): string {
+/** What tm-grammars and tm-themes record about each grammar and theme. */
+type Upstream = { name: string; license?: string; source: string };
+
+/**
+ * The grammars and themes in the bundle. `@shikijs/langs` and
+ * `@shikijs/themes` hold one file for each, built from tm-grammars and
+ * tm-themes, which record where each came from and under which licence.
+ * Their versions in package.json are the ones Shiki's own lockfile builds
+ * from; a file with no record stops the build, as a missing licence does.
+ */
+function bundledUpstream(
+  metafile: Bun.BuildMetafile,
+  shikiPackage: "langs" | "themes",
+  known: Upstream[],
+): Upstream[] {
+  const byName = new Map(known.map((entry) => [entry.name, entry]));
+  const folder = `@shikijs/${shikiPackage}/dist/`;
+  return Object.keys(metafile.inputs)
+    .map((input) => input.split(sep).join("/"))
+    .filter((input) => input.includes(folder) && input.endsWith(".mjs"))
+    .map((input) => {
+      const name = input.slice(input.lastIndexOf("/") + 1, -".mjs".length);
+      const entry = byName.get(name);
+      if (entry === undefined) {
+        throw new Error(
+          `${input} has no record in tm-grammars or tm-themes; check that their versions match Shiki's`,
+        );
+      }
+      return entry;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+type Collection = {
+  title: string;
+  packageName: string;
+  version: string;
+  entries: Upstream[];
+  license: string;
+  notice: string;
+};
+
+async function collection(
+  title: string,
+  packageName: "tm-grammars" | "tm-themes",
+  entries: Upstream[],
+): Promise<Collection> {
+  // Read from the folder: neither package exports its package.json.
+  const folder = join(cli, "node_modules", packageName);
+  const manifest: { version: string } = await Bun.file(
+    join(folder, "package.json"),
+  ).json();
+  return {
+    title,
+    packageName,
+    version: manifest.version,
+    entries,
+    license: (await Bun.file(join(folder, "LICENSE")).text()).trim(),
+    notice: (await Bun.file(join(folder, "NOTICE")).text()).trim(),
+  };
+}
+
+function thirdPartyLicenses(
+  packages: BundledPackage[],
+  collections: Collection[],
+): string {
   const rule = "=".repeat(72);
   const sections = packages.map(
     ({ name, version, license, text }) =>
       `${rule}\n${name} ${version} (${license})\n${rule}\n\n${text}\n`,
   );
+  const upstream = collections.map(
+    ({ title, packageName, version, entries, license, notice }) =>
+      [
+        `${rule}\n${title}, from ${packageName} ${version}\n${rule}\n`,
+        `Shiki's packages above carry these ${entries.length} ${title.toLowerCase()}, collected by ${packageName}. Each is under its own licence, named here with the place it comes from; "not stated" means its source names none. The licence and notices of ${packageName}, which give the full text of each one's licence, follow the list.\n`,
+        ...entries.map(
+          ({ name, license: spdx, source }) =>
+            `${name} (${spdx ?? "not stated"}) ${source}`,
+        ),
+        `\n${packageName} licence:\n\n${license}\n\n${packageName} notices:\n\n${notice}\n`,
+      ].join("\n"),
+  );
   return [
-    "Sheaf's standalone binaries contain the following npm packages, each under the licence that follows its name.\n",
+    "Sheaf's standalone binaries contain the following npm packages, each under the licence that follows its name, and the grammars and themes listed after them.\n",
     ...sections,
+    ...upstream,
     `${rule}\nBun\n${rule}\n\nThe binaries also contain Bun, the runtime they are compiled with. Bun's licence, and the licences of the libraries it includes, are at ${BUN_LICENSING}\n`,
   ].join("\n");
 }
@@ -164,12 +244,27 @@ async function main(args: string[]): Promise<void> {
   if (metafile === undefined) return;
 
   const packages = await bundledPackages(metafile);
+  const collections = await Promise.all([
+    collection(
+      "Grammars",
+      "tm-grammars",
+      bundledUpstream(metafile, "langs", [...grammars, ...injections]),
+    ),
+    collection(
+      "Themes",
+      "tm-themes",
+      bundledUpstream(metafile, "themes", themes),
+    ),
+  ]);
   await writeFile(
     join(out, "THIRD_PARTY_LICENSES"),
-    thirdPartyLicenses(packages),
+    thirdPartyLicenses(packages, collections),
+  );
+  const [grammarCount, themeCount] = collections.map(
+    ({ entries }) => entries.length,
   );
   process.stdout.write(
-    `THIRD_PARTY_LICENSES  ${packages.length} packages, and Bun\n`,
+    `THIRD_PARTY_LICENSES  ${packages.length} packages, ${grammarCount} grammars, ${themeCount} themes, and Bun\n`,
   );
 }
 
