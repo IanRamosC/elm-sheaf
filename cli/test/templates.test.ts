@@ -6,6 +6,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -37,6 +38,11 @@ describe("the default starter", () => {
 
   beforeAll(async () => {
     root = await initStarter();
+    // A second post, a day older than the welcome post, so each has a neighbour.
+    writeFileSync(
+      join(root, "content/posts/older.md"),
+      "---\ntitle: An older post\ndate: 2026-01-01\n---\n\nHi.\n",
+    );
     built = await build(root, {
       mode: "production",
       now: new Date("2026-01-03T00:00:00Z"),
@@ -72,6 +78,35 @@ describe("the default starter", () => {
     expect(post).toContain('<pre class="shiki"');
     expect(post).toContain('<aside class="callout note">');
     expect(post).toContain('property="og:type" content="article"');
+  });
+
+  test("the welcome post lists its sections", () => {
+    const contents = read("posts/welcome/index.html").match(
+      /<nav aria-label="Contents">.*?<\/nav>/s,
+    )?.[0];
+    expect(contents).toBeDefined();
+    expect(contents).toContain('href="#what-to-edit-first"');
+    expect(contents).toContain('href="#code"');
+    expect(contents).toContain('href="#older-and-newer-posts"');
+  });
+
+  test("a post with few sections has no contents", () => {
+    expect(read("posts/older/index.html")).not.toContain(
+      'aria-label="Contents"',
+    );
+  });
+
+  test("each post links to its older and newer neighbour", () => {
+    const morePosts = (path: string) =>
+      read(path).match(/<nav aria-label="More posts">.*?<\/nav>/s)?.[0] ?? "";
+    expect(morePosts("posts/welcome/index.html")).toContain("Older");
+    expect(morePosts("posts/welcome/index.html")).toContain(
+      'href="/posts/older/"',
+    );
+    expect(morePosts("posts/older/index.html")).toContain("Newer");
+    expect(morePosts("posts/older/index.html")).toContain(
+      'href="/posts/welcome/"',
+    );
   });
 
   test("each feed is linked once from the head", () => {

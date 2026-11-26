@@ -139,6 +139,25 @@ h2 {
   margin: 2.5rem 0 0.75rem;
 }
 
+/* Hidden with opacity, not display, so that it can still take focus. */
+.heading-link {
+  color: var(--muted);
+  text-decoration: none;
+  opacity: 0;
+}
+
+:is(h1, h2, h3, h4, h5, h6):hover .heading-link,
+.heading-link:focus-visible {
+  opacity: 1;
+}
+
+/* Touch screens have no hover to reveal it. */
+@media (hover: none) {
+  .heading-link {
+    opacity: 1;
+  }
+}
+
 img,
 picture,
 svg,
@@ -245,6 +264,47 @@ pre {
 
 .archive time {
   min-width: 10rem;
+}
+
+.contents-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.contents {
+  margin: 0.25rem 0 2rem;
+  padding: 0.5rem 0 0.5rem 2.25rem;
+  border-left: 3px solid var(--surface);
+  font-size: 0.95rem;
+}
+
+.contents ol {
+  padding-left: 1.25rem;
+}
+
+.neighbours {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  margin: 3rem 0 0;
+  padding: 1.5rem 0 0;
+  border-top: 1px solid var(--surface);
+  list-style: none;
+}
+
+.neighbours li {
+  flex: 1 1 14rem;
+}
+
+.neighbours .older {
+  text-align: right;
+}
+
+.neighbour-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .pagination {

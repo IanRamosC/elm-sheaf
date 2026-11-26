@@ -16,7 +16,7 @@ more fields without changing them.
 import Sheaf
 import Sheaf.Blog as Blog
 import Sheaf.Date as Date exposing (Date)
-import Sheaf.Document exposing (Document)
+import Sheaf.Document exposing (Document, Heading, Neighbour)
 import Sheaf.Head as Head
 import Sheaf.Html exposing (Html, a, article, h1, h2, header, li, nav, ol, p, span, text, time, ul)
 import Sheaf.Html.Attributes exposing (attribute, class, datetime, href, siteHref)
@@ -42,7 +42,8 @@ type alias Titled meta =
 -- PAGES
 
 
-{-| A post, at `/posts/<slug>/`.
+{-| A post, at `/posts/<slug>/`: its contents when it has three or more
+sections, and links to the older and newer posts at the end.
 -}
 post : Sheaf.Metadata -> Document (Post meta) -> Page
 post site document =
@@ -57,8 +58,10 @@ post site document =
                     , p [ class "byline" ] (published document :: tagLinks document.meta.tags)
                     ]
                     :: cover document
+                    :: contents document.headings
                     :: document.body
                 )
+            , neighbours document
             ]
         }
 
@@ -188,6 +191,101 @@ cover document =
         Just image ->
             -- The cover is at the top of the page, where lazy loading only delays it.
             Image.view [ attribute "loading" "eager" ] image
+
+        Nothing ->
+            text ""
+
+
+{-| A post's h2 and h3 headings, each h3 under the h2 before it, linked to
+where they are. A post with fewer than three has none.
+-}
+contents : List Heading -> Html
+contents headings =
+    let
+        listed : List Heading
+        listed =
+            List.filter (\heading -> (heading.depth == 2 || heading.depth == 3) && heading.id /= "") headings
+    in
+    if List.length listed < 3 then
+        text ""
+
+    else
+        nav [ attribute "aria-label" "Contents" ]
+            [ p [ class "contents-label" ] [ text "Contents" ]
+            , ol [ class "contents" ] (List.map contentsEntry (sectionsOf listed))
+            ]
+
+
+type alias Section =
+    { heading : Heading
+    , subsections : List Heading
+    }
+
+
+{-| Each h2 with the h3s after it. An h3 before the first h2 is a section of
+its own.
+-}
+sectionsOf : List Heading -> List Section
+sectionsOf headings =
+    let
+        step : Heading -> ( List Heading, List Section ) -> ( List Heading, List Section )
+        step heading ( subsections, sections ) =
+            if heading.depth == 2 then
+                ( [], { heading = heading, subsections = subsections } :: sections )
+
+            else
+                ( heading :: subsections, sections )
+
+        ( leading, grouped ) =
+            List.foldr step ( [], [] ) headings
+    in
+    List.map (\heading -> { heading = heading, subsections = [] }) leading ++ grouped
+
+
+contentsEntry : Section -> Html
+contentsEntry section =
+    if List.isEmpty section.subsections then
+        li [] [ headingLink section.heading ]
+
+    else
+        li []
+            [ headingLink section.heading
+            , ol [] (List.map (\subsection -> li [] [ headingLink subsection ]) section.subsections)
+            ]
+
+
+headingLink : Heading -> Html
+headingLink heading =
+    a [ href ("#" ++ heading.id) ] [ text heading.text ]
+
+
+{-| Links to the posts before and after this one, newer first, as the pages of
+posts are.
+-}
+neighbours : Document (Post meta) -> Html
+neighbours document =
+    case ( document.next, document.previous ) of
+        ( Nothing, Nothing ) ->
+            text ""
+
+        ( newer, older ) ->
+            nav [ attribute "aria-label" "More posts" ]
+                [ ul [ class "neighbours" ]
+                    [ neighbourLink "newer" "Newer" newer
+                    , neighbourLink "older" "Older" older
+                    ]
+                ]
+
+
+neighbourLink : String -> String -> Maybe (Neighbour (Post meta)) -> Html
+neighbourLink kind label neighbour =
+    case neighbour of
+        Just other ->
+            li [ class kind ]
+                [ span [ class "neighbour-label" ] [ text label ]
+                , text " "
+                , Sheaf.link other.ref [ text other.meta.title ]
+                ]
 
         Nothing ->
             text ""

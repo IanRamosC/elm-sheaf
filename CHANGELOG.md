@@ -52,3 +52,14 @@ numbers are those of the npm package `elm-sheaf`.
   `static/favicon.svg`.
 - Diagnostics name the file and line, suggest the closest match, and list
   every problem of a kind at once.
+- `Collection.orderedBy` reads a collection in the order of a number from its
+  documents' frontmatter, instead of by date.
+- `Document.previous` and `Document.next` link a document to its neighbours in
+  its collection, and the starter's posts end with links to the older and
+  newer post.
+- `Document.headings` lists a document's headings, and each heading links to
+  itself with a `#`. The starter's longer posts start with a table of contents.
+- `aliases` in frontmatter keeps a document's old URLs working, with a redirect
+  page at each one.
+- Every build writes a `robots.txt` naming the sitemap, unless the site has its
+  own.

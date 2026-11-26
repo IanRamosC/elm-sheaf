@@ -31,3 +31,10 @@ greet : String -> String
 greet name =
     "Hello, " ++ name ++ "!"
 ```
+
+## Older and newer posts
+
+A post with three or more sections, like this one, starts with a list of them,
+and every post ends with links to the posts written before and after it. Each
+heading has a `#` link to itself, shown when you point at the heading, for
+sharing one section.
