@@ -7,9 +7,10 @@ on:
   workflow_call:
 
 # A literal prefix rather than github.workflow: a called workflow sees its
-# caller's name, and would cancel the caller's own run.
+# caller's name, and would cancel the caller's own run. The event keeps a
+# release rehearsed on a branch from cancelling that branch's push run.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 permissions:

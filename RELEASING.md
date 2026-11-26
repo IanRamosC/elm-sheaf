@@ -50,6 +50,11 @@ Only `npm` can get an OIDC token (`id-token: write`), and only `release` can
 write to the repository (`contents: write`). The other jobs only read, and
 `intel-binary` has no permissions at all.
 
+To rehearse a release before tagging, run `gh workflow run release.yml --ref
+<branch>`, or "Run workflow" in the Actions tab: it runs `ci`, `binaries` and
+`intel-binary`, checking the Intel binary against `cli/package.json`'s version,
+and skips `tag-check`, `npm` and `release`.
+
 ## The first release, 1.0.0
 
 Trusted publishing is set up in the settings of a package that already exists

@@ -7,6 +7,7 @@ const WORKFLOW = join(import.meta.dir, "../../.github/workflows/release.yml");
 
 type Step = {
   name?: string;
+  env?: Record<string, string>;
   uses?: string;
   run?: string;
   with?: Record<string, unknown>;
@@ -15,6 +16,8 @@ type Step = {
 
 type Job = {
   uses?: string;
+  if?: string;
+  outputs?: Record<string, string>;
   "runs-on"?: string;
   needs?: string | string[];
   permissions?: Record<string, string>;
@@ -23,7 +26,10 @@ type Job = {
 };
 
 type Workflow = {
-  on?: { push?: { tags?: string[]; branches?: string[] } };
+  on?: {
+    push?: { tags?: string[]; branches?: string[] };
+    workflow_dispatch?: unknown;
+  };
   jobs?: Record<string, Job>;
 };
 
@@ -49,9 +55,55 @@ describe("the release workflow", () => {
   const workflow = readWorkflow();
   const jobs = workflow.jobs ?? {};
 
-  test("runs on version tags only", () => {
+  test("runs on version tags, and on no branch", () => {
     expect(workflow.on?.push?.tags).toEqual(["v*"]);
     expect(workflow.on?.push?.branches).toBeUndefined();
+  });
+
+  describe("a rehearsal, run by hand without a tag", () => {
+    const onTagsOnly = "startsWith(github.ref, 'refs/tags/')";
+
+    test("can be started from the Actions tab", () => {
+      expect(Object.keys(workflow.on ?? {})).toContain("workflow_dispatch");
+    });
+
+    test.each(["tag-check", "npm", "release"])(
+      "skips %s, which needs a tag",
+      (name) => {
+        expect(jobs[name]?.if).toBe(onTagsOnly);
+      },
+    );
+
+    test("still builds the binaries once tag-check is skipped, but never after it fails on a tag", () => {
+      const condition = jobs.binaries?.if ?? "";
+      expect(condition).toContain("!cancelled()");
+      expect(condition).toContain("needs.ci.result == 'success'");
+      expect(condition).toContain("needs.tag-check.result == 'success'");
+      expect(condition).toContain("needs.tag-check.result == 'skipped'");
+      expect(condition).toContain(`!${onTagsOnly}`);
+    });
+
+    test("still runs the Intel binary, whose need binaries waited on the skipped tag-check", () => {
+      expect(jobs["intel-binary"]?.if).toContain(
+        "needs.binaries.result == 'success'",
+      );
+    });
+
+    test("checks the Intel binary's version against cli/package.json", () => {
+      const version = stepsOf(jobs.binaries).find(({ run }) =>
+        run?.includes("cli/package.json"),
+      );
+      expect(version?.run).toContain("GITHUB_OUTPUT");
+      expect(jobs.binaries?.outputs?.version).toContain("steps.");
+      const run = stepsOf(jobs["intel-binary"]).find(({ run }) =>
+        run?.includes("--version"),
+      );
+      expect(run?.env?.PACKAGE_VERSION).toContain(
+        "needs.binaries.outputs.version",
+      );
+      expect(run?.run).toContain("refs/tags/");
+      expect(run?.run).toContain("$PACKAGE_VERSION");
+    });
   });
 
   test("runs the CI workflow", () => {

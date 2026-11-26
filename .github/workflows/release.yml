@@ -1,8 +1,12 @@
 name: Release
 
+# A tag v* releases. Running it by hand from the Actions tab rehearses a
+# release without a tag: it builds, signs and tries the binaries, and skips
+# every job that needs a tag or publishes.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 # Two pushes of the same tag never publish at once, and a release under way is
 # never cancelled halfway.
@@ -19,6 +23,7 @@ jobs:
       contents: read
 
   tag-check:
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -39,13 +44,30 @@ jobs:
 
   # Built on macOS, which has codesign: the macOS binaries need a signature
   # that verifies, or macOS refuses to run them.
+  #
+  # A skipped need would skip this job too, so its condition is spelt out:
+  # tag-check must pass on a tag, and is skipped on a rehearsal.
   binaries:
     needs: [ci, tag-check]
+    if: >-
+      ${{
+        !cancelled()
+        && needs.ci.result == 'success'
+        && (needs.tag-check.result == 'success'
+            || (needs.tag-check.result == 'skipped'
+                && !startsWith(github.ref, 'refs/tags/')))
+      }}
     runs-on: macos-latest
     permissions:
       contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+
+      - name: Read the CLI's version
+        id: version
+        run: echo "version=$(jq --raw-output .version cli/package.json)" >> "$GITHUB_OUTPUT"
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -85,8 +107,11 @@ jobs:
 
   # The Intel binary is cross-compiled on Apple Silicon, so it runs here, on
   # an Intel Mac, before anything is published.
+  # Its own condition, because tag-check, skipped on a rehearsal, is among
+  # the jobs this one waits for through binaries.
   intel-binary:
     needs: binaries
+    if: ${{ !cancelled() && needs.binaries.result == 'success' }}
     runs-on: macos-15-intel
     permissions: {}
     steps:
@@ -95,13 +120,21 @@ jobs:
           name: binaries
           path: out
 
+      # The tag's version on a release, and cli/package.json's on a rehearsal.
       - name: Run the Intel binary
         working-directory: out
+        env:
+          PACKAGE_VERSION: ${{ needs.binaries.outputs.version }}
         run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            expected=${GITHUB_REF_NAME#v}
+          else
+            expected=$PACKAGE_VERSION
+          fi
           chmod +x sheaf-darwin-x64
           version=$(./sheaf-darwin-x64 --version)
-          if [ "$version" != "${GITHUB_REF_NAME#v}" ]; then
-            echo "::error::sheaf-darwin-x64 --version printed $version, not ${GITHUB_REF_NAME#v}."
+          if [ "$version" != "$expected" ]; then
+            echo "::error::sheaf-darwin-x64 --version printed $version, not $expected."
             exit 1
           fi
 
@@ -110,6 +143,7 @@ jobs:
   # npm never takes it again, so that a re-run can still reach the release.
   npm:
     needs: intel-binary
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -137,6 +171,7 @@ jobs:
   # to date.
   release:
     needs: npm
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: write
