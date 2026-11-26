@@ -155,8 +155,8 @@ stylesheet =
     Internal.Stylesheet
 
 
-{-| `<link rel="icon">`, the icon browsers show for the site, with its media
-type, such as
+{-| `<link rel="icon">`, the icon browsers show for the site. Give it the file's
+media type, as in
 `Head.icon { path = "/favicon.svg", mediaType = "image/svg+xml" }` for
 `static/favicon.svg`.
 -}

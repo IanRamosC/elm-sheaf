@@ -169,8 +169,8 @@ tagLinks names =
 ### The head
 
 `Sheaf.Head` makes the tags of a page's `<head>`: `description`, `canonical`,
-`stylesheet`, `icon`, `rssFeed`, `atomFeed`, `meta`, and Open Graph and Twitter tags for
-link previews. The starter's layout starts every page with:
+`stylesheet`, `icon`, `rssFeed`, `atomFeed`, `meta`, and Open Graph and Twitter
+tags for link previews. The starter's layout starts every page with:
 
 ```elm
 Head.canonical
