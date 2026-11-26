@@ -59,6 +59,9 @@ numbers are those of the npm package `elm-sheaf`.
   newer post.
 - `Document.headings` lists a document's headings, and each heading links to
   itself with a `#`. The starter's longer posts start with a table of contents.
+- `Route.eachItemIn` makes a page for each document, like `Route.eachItem`,
+  and gives its template every document of the collection in order, for a
+  sidebar.
 - `aliases` in frontmatter keeps a document's old URLs working, with a redirect
   page at each one.
 - Every build writes a `robots.txt` naming the sitemap, unless the site has its

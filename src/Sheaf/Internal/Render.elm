@@ -14,6 +14,7 @@ import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Check as Check exposing (CheckedPage, LinkProblem(..), Location(..), UncheckedPage)
 import Sheaf.Internal.Component as Component exposing (Component)
 import Sheaf.Internal.Feed as Feed
+import Sheaf.Internal.Frontmatter as Frontmatter
 import Sheaf.Internal.Grouping as Grouping exposing (GroupPages, Grouped)
 import Sheaf.Internal.Head exposing (FeedFormat(..))
 import Sheaf.Internal.Hint as Hint
@@ -448,12 +449,21 @@ pagesOf context bodies groupings index route =
                 neighboursOf : Document -> Site.Neighbours
                 neighboursOf =
                     Listing.neighbours item.order item.collection bodies
+
+                -- Applied once, so the collection is decoded once for all its pages.
+                templateFor : Site.Neighbours -> Result (List Frontmatter.Problem) (List Html -> Page)
+                templateFor =
+                    if item.listsCollection then
+                        item.templateFor (List.map .document (Tuple.first (Listing.listOf item.order item.collection bodies)))
+
+                    else
+                        item.templateFor []
             in
             bodies
                 |> List.filter (\( document, _ ) -> document.collection == item.collection)
                 |> List.filterMap
                     (\( document, body ) ->
-                        case ( item.templateFor (neighboursOf document), body ) of
+                        case ( templateFor (neighboursOf document), body ) of
                             ( Ok template, Ok html ) ->
                                 let
                                     made : UncheckedPage

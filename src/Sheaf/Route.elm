@@ -1,7 +1,7 @@
 module Sheaf.Route exposing
     ( Route, Page
     , single, notFound
-    , eachItem
+    , eachItem, eachItemIn
     , paginated, allItems, Listing, Pagination
     , groupedBy, allGroups, Group
     )
@@ -31,7 +31,7 @@ of route fills only its own: `/posts/:slug/` is an item route's pattern, and
 
 # A page for each document
 
-@docs eachItem
+@docs eachItem, eachItemIn
 
 
 # Lists of documents
@@ -128,19 +128,49 @@ notFound =
     Route.eachItem "/posts/:slug/" posts Theme.Post.view
 
 This is also where links to the collection's documents point. When several
-`eachItem` routes use the same collection, links use the first in the site's
-list of routes. Redirects, like links, use the first `eachItem` route of a
-collection, and `previous` and `next` follow the order of this route's
-collection.
+item routes use the same collection, links use the first in the site's list of
+routes, whether made by `eachItem` or [`eachItemIn`](#eachItemIn). Redirects,
+like links, use the first item route of a collection, and `previous` and
+`next` follow the order of this route's collection.
 
 -}
 eachItem : String -> Collection meta -> (Document meta -> Page) -> Route
 eachItem pattern collection template =
+    itemRoute { listsCollection = False } pattern collection (\_ -> template)
+
+
+{-| Like [`eachItem`](#eachItem), but the template also gets every published
+document of the collection, newest first or in the collection's order, such
+as for a sidebar.
+
+    Route.eachItemIn "/guide/:slug/" guide Theme.Guide.view
+
+Each document comes as a [`Neighbour`](Sheaf-Document#Neighbour), without its
+body. Like a listing route, it orders them by date, so each needs a date,
+unless the collection is given
+[`Collection.orderedBy`](Sheaf-Collection#orderedBy).
+
+-}
+eachItemIn : String -> Collection meta -> (List (Neighbour meta) -> Document meta -> Page) -> Route
+eachItemIn =
+    itemRoute { listsCollection = True }
+
+
+itemRoute : { listsCollection : Bool } -> String -> Collection meta -> (List (Neighbour meta) -> Document meta -> Page) -> Route
+itemRoute { listsCollection } pattern collection template =
     Site.EachItem
         { pattern = pattern
         , collection = name collection
         , order = sortOrder collection
-        , templateFor = decode collection >> Result.map (\toDocument body -> template (toDocument body))
+        , listsCollection = listsCollection
+        , templateFor =
+            \documents ->
+                let
+                    summaries : List (Neighbour meta)
+                    summaries =
+                        List.filterMap (summarize collection) documents
+                in
+                decode collection >> Result.map (\toDocument body -> template summaries (toDocument body))
         }
 
 
@@ -297,26 +327,11 @@ decodeMeta frontmatter document =
 
 
 {-| Decode a document's frontmatter and its neighbours', then wait for its
-rendered body. A neighbour that does not decode is left out: its problems are
-reported where its own page or listing decodes it.
+rendered body.
 -}
 decode : Collection meta -> Neighbours -> Result (List Problem) (List Html -> Document meta)
-decode (Site.Collection collection) { document, previous, next } =
-    let
-        neighbour : Protocol.Document -> Maybe (Neighbour meta)
-        neighbour around =
-            decodeMeta collection.frontmatter around
-                |> Result.toMaybe
-                |> Maybe.map
-                    (\meta ->
-                        { ref = Ref.fromId around.id
-                        , slug = around.slug
-                        , date = Maybe.map InternalDate.fromProtocol around.date
-                        , meta = meta
-                        }
-                    )
-    in
-    decodeMeta collection.frontmatter document
+decode ((Site.Collection { frontmatter }) as collection) { document, previous, next } =
+    decodeMeta frontmatter document
         |> Result.map
             (\meta body ->
                 let
@@ -341,9 +356,27 @@ decode (Site.Collection collection) { document, previous, next } =
                 , meta = meta
                 , image = Maybe.map Image.fromProtocol document.image
                 , headings = Markdown.headings document.tree
-                , previous = Maybe.andThen neighbour previous
-                , next = Maybe.andThen neighbour next
+                , previous = Maybe.andThen (summarize collection) previous
+                , next = Maybe.andThen (summarize collection) next
                 , body = body
+                }
+            )
+
+
+{-| A document as a neighbour or in a whole collection, without its body. A
+document that does not decode is left out: its problems are reported where its
+own page or listing decodes it.
+-}
+summarize : Collection meta -> Protocol.Document -> Maybe (Neighbour meta)
+summarize (Site.Collection collection) document =
+    decodeMeta collection.frontmatter document
+        |> Result.toMaybe
+        |> Maybe.map
+            (\meta ->
+                { ref = Ref.fromId document.id
+                , slug = document.slug
+                , date = Maybe.map InternalDate.fromProtocol document.date
+                , meta = meta
                 }
             )
 

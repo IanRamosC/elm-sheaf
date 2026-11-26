@@ -89,10 +89,11 @@ together, in `templateFor`.
 
 An item route decodes the frontmatter of a document and of its neighbours,
 and gives the template waiting for the document's rendered body, which may
-never come. A listing route gets its documents with their bodies, already in
-its collection's order, and decodes them all. A grouped route also keeps how
-to find a document's group values, because the renderer groups the documents
-before any template runs.
+never come. One that lists its whole collection gets the collection's
+documents in order first, once for all its pages. A listing route gets its
+documents with their bodies, already in its collection's order, and decodes
+them all. A grouped route also keeps how to find a document's group values,
+because the renderer groups the documents before any template runs.
 
 -}
 type Route
@@ -102,7 +103,8 @@ type Route
         { pattern : String
         , collection : String
         , order : SortOrder
-        , templateFor : Neighbours -> Result (List Problem) (List Html -> Page)
+        , listsCollection : Bool
+        , templateFor : List Protocol.Document -> Neighbours -> Result (List Problem) (List Html -> Page)
         }
     | Paginated
         { pattern : String
@@ -303,8 +305,8 @@ itemPattern route =
             Nothing
 
 
-{-| The collection a route lists by date, if it lists one. Its documents
-need a date.
+{-| The collection a route lists by date, if it lists one, as an item route
+that sees its whole collection does. Its documents need a date.
 -}
 datedCollection : Route -> Maybe String
 datedCollection route =
@@ -321,13 +323,17 @@ datedCollection route =
         AllGroups groups ->
             byDate groups.grouping.order groups.grouping.collection
 
+        EachItem item ->
+            if item.listsCollection then
+                byDate item.order item.collection
+
+            else
+                Nothing
+
         Single _ ->
             Nothing
 
         NotFound _ ->
-            Nothing
-
-        EachItem _ ->
             Nothing
 
 

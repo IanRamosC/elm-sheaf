@@ -28,6 +28,7 @@ suite =
         , orderedTests
         , readingOrderTests
         , neighbourTests
+        , eachItemInTests
         , headingTests
         , notFoundTests
         , badRouteTests
@@ -547,6 +548,80 @@ neighbourTests =
 listedNeighbours : List (Document meta) -> String
 listedNeighbours items =
     String.join ", " (List.map (\item -> item.slug ++ " (" ++ neighbours item ++ ")") items)
+
+
+
+-- THE WHOLE COLLECTION
+
+
+{-| The slugs of the whole collection, then the page's own.
+-}
+collectionPage : List (Neighbour meta) -> Document meta -> Page
+collectionPage collection document =
+    page [ Html.text (String.join "," (List.map .slug collection) ++ " | " ++ document.slug) ]
+
+
+eachItemInTests : Test
+eachItemInTests =
+    describe "eachItemIn"
+        [ test "eachItemIn gives every page the whole collection" <|
+            \_ ->
+                request [ "docs" ] [ doc "c" 3, doc "a" 1, doc "b" 2 ]
+                    |> render [ Route.eachItemIn "/docs/:slug/" docs collectionPage ]
+                    |> Expect.all
+                        [ bodyAt "docs/a/index.html" >> Expect.equal (Just "a,b,c | a")
+                        , bodyAt "docs/b/index.html" >> Expect.equal (Just "a,b,c | b")
+                        , bodyAt "docs/c/index.html" >> Expect.equal (Just "a,b,c | c")
+                        ]
+        , test "eachItemIn lists by date newest first" <|
+            \_ ->
+                request [ "posts" ] threePosts
+                    |> render [ Route.eachItemIn "/posts/:slug/" posts collectionPage ]
+                    |> bodyAt "posts/a/index.html"
+                    |> Expect.equal (Just "c,b,a | a")
+        , test "eachItemIn leaves out excluded drafts" <|
+            \_ ->
+                let
+                    unbuilt : Source
+                    unbuilt =
+                        dated "b" "2024-02-01"
+                in
+                request [ "posts" ] [ dated "a" "2024-01-01", { unbuilt | excluded = True }, dated "c" "2024-03-01" ]
+                    |> render [ Route.eachItemIn "/posts/:slug/" posts collectionPage ]
+                    |> Expect.all
+                        [ paths >> Expect.equal [ "posts/a/index.html", "posts/c/index.html" ]
+                        , bodyAt "posts/a/index.html" >> Expect.equal (Just "c,a | a")
+                        ]
+        , test "eachItemIn pages are link targets" <|
+            \_ ->
+                request [ "docs" ] [ doc "intro" 1 ]
+                    |> render
+                        [ Route.single "/" (page [ Sheaf.link (Ref.fromId "docs/intro") [ Html.text "Intro" ] ])
+                        , Route.eachItemIn "/guide/:slug/" docs collectionPage
+                        ]
+                    |> bodyAt "index.html"
+                    |> Expect.equal (Just "<a href=\"/blog/guide/intro/\">Intro</a>")
+        , test "eachItemIn reports frontmatter problems once" <|
+            \_ ->
+                let
+                    untitled : Source
+                    untitled =
+                        doc "b" 2
+                in
+                request [ "docs" ] [ doc "a" 1, { untitled | frontmatter = List.filter (\( key, _ ) -> key /= "title") untitled.frontmatter }, doc "c" 3 ]
+                    |> render [ Route.eachItemIn "/docs/:slug/" docs collectionPage ]
+                    |> Expect.all
+                        [ titles >> Expect.equal [ "MISSING FIELD" ]
+                        , paths >> Expect.equal [ "docs/a/index.html", "docs/c/index.html" ]
+                        , bodyAt "docs/a/index.html" >> Expect.equal (Just "a,c | a")
+                        ]
+        , test "eachItemIn by date needs a date on every document" <|
+            \_ ->
+                request [ "posts" ] [ dated "a" "2024-01-01", post "b" ]
+                    |> render [ Route.eachItemIn "/posts/:slug/" posts collectionPage ]
+                    |> titles
+                    |> Expect.equal [ "MISSING DATE" ]
+        ]
 
 
 

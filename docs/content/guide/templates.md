@@ -197,6 +197,28 @@ collection of pages usually has no dates). Drafts are neighbours only in a
 build that includes them. A document has the same neighbours on its own page
 and in every listing, when the routes are given the same collection.
 
+A template given to `Route.eachItemIn` also gets every published document of
+the collection, as `Neighbour` records in the order a listing would show them,
+for a sidebar or a list of the other posts in a series:
+
+```elm
+sidebar : List (Neighbour GuideMeta) -> Document GuideMeta -> Html
+sidebar guide current =
+    nav [ class "sidebar" ]
+        [ ul []
+            (List.map
+                (\page ->
+                    if page.slug == current.slug then
+                        li [ attribute "aria-current" "page" ] [ text page.meta.title ]
+
+                    else
+                        li [] [ Sheaf.link page.ref [ text page.meta.title ] ]
+                )
+                guide
+            )
+        ]
+```
+
 ### Paths and links
 
 A site can be served under a path, such as `https://example.com/blog/` (see
@@ -355,7 +377,10 @@ The route kinds are:
 
 - `Route.single`: one page at a fixed path.
 - `Route.eachItem`: a page per document; `:slug` in the pattern is the
-  document's slug. A collection needs one of these for links to its documents.
+  document's slug. A collection needs one of these, or `Route.eachItemIn`, for
+  links to its documents.
+- `Route.eachItemIn`: a page per document, like `Route.eachItem`, whose
+  template also gets every document of the collection (see [Pages](#pages)).
 - `Route.paginated`: the documents, newest first (or in the collection's
   order), `perPage` at a time. Page `k`
   is at `page/<k>/` under the first page. The template gets a `Listing`: the
@@ -380,8 +405,8 @@ Group values are turned into slugs by Sheaf: `Elm` and `elm` share the page
 only collide because of punctuation, such as `C` and `C++`, are
 `GROUP COLLISION`, and a value with no letter or digit is `EMPTY GROUP SLUG`.
 
-Collections listed by `paginated`, `groupedBy`, `allItems`, `allGroups` or a
-feed are sorted by date, so their documents need one (see
+Collections listed by `paginated`, `groupedBy`, `allItems`, `allGroups`,
+`eachItemIn` or a feed are sorted by date, so their documents need one (see
 [Content](content.md#dates-and-drafts)), unless the collection is ordered with
 `Collection.orderedBy` and isn't in a feed (see
 [Ordering by a number](#ordering-by-a-number)).
@@ -409,8 +434,8 @@ docs =
 ```
 
 with `order: 3` in each document's frontmatter. `paginated`, `groupedBy`,
-`allItems` and `allGroups` then list the documents from the lowest number to
-the highest, and documents with the same number by slug. The documents don't
+`allItems`, `allGroups` and `eachItemIn` then list the documents from the
+lowest number to the highest, and documents with the same number by slug. The documents don't
 need a date. A document without the number fails to decode, like any other
 required field; use `Frontmatter.withDefault "order" 0 Frontmatter.int` to make
 it optional.
@@ -428,5 +453,6 @@ every link made absolute. The function you pass gives each item's title and
 summary.
 
 A feed's items link to their documents, so the collection needs a
-`Route.eachItem` route; without one, the feed is `NO PAGE FOR FEED`. Every site
-also gets a `sitemap.xml` of every page except the 404 page.
+`Route.eachItem` or `Route.eachItemIn` route; without one, the feed is
+`NO PAGE FOR FEED`. Every site also gets a `sitemap.xml` of every page except
+the 404 page.
