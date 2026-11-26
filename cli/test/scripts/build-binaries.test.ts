@@ -19,6 +19,13 @@ function entriesIn(notices: string): string[] {
     .flatMap((line) => /^(\S+) \([^)]+\) https?:\/\//.exec(line)?.[1] ?? []);
 }
 
+/** Each grammar or theme line, as `name (licence) source`. */
+function entryLines(notices: string): string[] {
+  return notices
+    .split("\n")
+    .filter((line) => /^\S+ \([^)]+\) https?:\/\//.test(line));
+}
+
 describe("the binaries' notices", () => {
   test(
     "list no grammar or theme that Sheaf leaves out",
@@ -35,6 +42,10 @@ describe("the binaries' notices", () => {
       expect(entries).toContain("elm");
       expect(entries).toContain("github-dark");
       expect(noticeFiles).toContain("elm.json");
+      // A GPL grammar or theme added to Shiki must be left out too.
+      expect(
+        entryLines(notices).filter((line) => /\(A?GPL/.test(line)),
+      ).toEqual([]);
       for (const name of [...EXCLUDED_GRAMMARS, ...EXCLUDED_THEMES]) {
         expect(entries).not.toContain(name);
         expect(noticeFiles).not.toContain(`${name}.json`);
