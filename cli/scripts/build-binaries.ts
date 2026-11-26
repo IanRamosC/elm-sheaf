@@ -1,13 +1,14 @@
 /**
  * Compiles the CLI into a standalone binary for each system Sheaf supports,
- * and writes the licences of the npm packages bundled into them.
+ * and writes Sheaf's own licence and the licences of the npm packages bundled
+ * into them.
  *
  *     bun run build-binaries                         every target
  *     bun run build-binaries --target bun-linux-x64  one target
  *
  * Everything goes into `cli/out/`.
  */
-import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readdir, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
 import { grammars, injections } from "tm-grammars";
@@ -29,6 +30,7 @@ export type Target = (typeof TARGETS)[number];
 
 const cli = resolve(import.meta.dir, "..");
 const out = join(cli, "out");
+const repository = resolve(cli, "..");
 
 const BUN_LICENSING = "https://bun.com/docs/project/license";
 
@@ -341,6 +343,8 @@ async function main(args: string[]): Promise<void> {
   }
   if (metafile === undefined) return;
 
+  await writeLicense(out);
+  process.stdout.write("LICENSE\n");
   const { text, packages, collections } = await notices(metafile);
   await writeFile(join(out, "THIRD_PARTY_LICENSES"), text);
   const [grammarCount, themeCount] = collections.map(
@@ -349,6 +353,11 @@ async function main(args: string[]): Promise<void> {
   process.stdout.write(
     `THIRD_PARTY_LICENSES  ${packages.length} packages, ${grammarCount} grammars, ${themeCount} themes, and Bun\n`,
   );
+}
+
+/** Copies Sheaf's own licence into `folder`, to ship next to the binaries. */
+export async function writeLicense(folder: string): Promise<void> {
+  await copyFile(join(repository, "LICENSE"), join(folder, "LICENSE"));
 }
 
 /** The text of `THIRD_PARTY_LICENSES` for a bundle. */

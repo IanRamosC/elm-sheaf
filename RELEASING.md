@@ -30,9 +30,9 @@ A tag `v*` starts these jobs, each after the ones before it:
    `v` followed by the version in `cli/package.json`, and that version doesn't
    end in `-dev`.
 2. `binaries` runs `bun run build-binaries` on macOS, which writes the five
-   binaries and `THIRD_PARTY_LICENSES` into `cli/out/`. It signs the two macOS
-   binaries ad hoc and verifies the signatures, then writes `SHA256SUMS` over
-   every file.
+   binaries, Sheaf's `LICENSE` and `THIRD_PARTY_LICENSES` into `cli/out/`. It
+   signs the two macOS binaries ad hoc and verifies the signatures, then
+   writes `SHA256SUMS` over every file.
 3. `intel-binary` runs `sheaf-darwin-x64 --version` on an Intel Mac. That
    binary is cross-compiled on Apple Silicon, so this is the first time the
    file the release ships is run.

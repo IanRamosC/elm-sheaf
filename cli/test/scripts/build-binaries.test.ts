@@ -1,8 +1,12 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { bundleOptions, thirdPartyNotices } from "../../scripts/build-binaries";
+import {
+  bundleOptions,
+  thirdPartyNotices,
+  writeLicense,
+} from "../../scripts/build-binaries";
 import {
   EXCLUDED_GRAMMARS,
   EXCLUDED_THEMES,
@@ -53,4 +57,15 @@ describe("the binaries' notices", () => {
     },
     { timeout: 60_000 },
   );
+});
+
+describe("the binaries' licence", () => {
+  test("is Sheaf's own LICENSE, copied next to them", async () => {
+    await writeLicense(out);
+    const license = readFileSync(join(out, "LICENSE"), "utf8");
+    expect(license).toBe(
+      readFileSync(join(import.meta.dir, "../../../LICENSE"), "utf8"),
+    );
+    expect(license).toContain("BSD 3-Clause");
+  });
 });
