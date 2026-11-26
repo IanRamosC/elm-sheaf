@@ -206,7 +206,7 @@ missingDates listed published =
             (\document ->
                 { severity = Error
                 , title = "MISSING DATE"
-                , message = "This document has no date, but `" ++ document.collection ++ "` is listed by date."
+                , message = "This document has no date, but `" ++ document.collection ++ "` is listed by date or in a feed."
                 , sourcePath = Just document.sourcePath
                 , span = Maybe.map .value (Dict.get "" document.frontmatterPositions)
                 , hint = Just "Add `date: YYYY-MM-DD` to its frontmatter, or start its file name with the date."

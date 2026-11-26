@@ -151,7 +151,7 @@ titles.
 | `BAD SLUG` | A file or folder name can't become a URL path segment; set `slug` to fix it. |
 | `BAD DATE` | The date at the start of a file name isn't a real date. |
 | `BAD ALIAS` | An entry of `aliases` isn't a path on the site such as `/2019/old-name/`: it is a full URL, has a `..`, `?`, `#`, `%` or empty segment, or isn't text. |
-| `MISSING DATE` | A document of a collection listed by date has no date. |
+| `MISSING DATE` | A document of a collection listed by date or in a feed has no date. |
 | `DUPLICATE DOCUMENT` | Two documents of a collection have the same slug. |
 | `NAME CLASH` | Two slugs of a collection become the same Elm name, or two collection folders the same Elm module. |
 | `UNUSABLE SLUG` | A slug has no ASCII letter or digit to make an Elm name from. |

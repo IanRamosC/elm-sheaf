@@ -227,7 +227,7 @@ missingDateTests =
                             >> Expect.equal
                                 [ { severity = Error
                                   , title = "MISSING DATE"
-                                  , message = "This document has no date, but `posts` is listed by date."
+                                  , message = "This document has no date, but `posts` is listed by date or in a feed."
                                   , sourcePath = Just "content/posts/undated.md"
                                   , span = Just (span 1 1 4)
                                   , hint = Just "Add `date: YYYY-MM-DD` to its frontmatter, or start its file name with the date."
@@ -381,19 +381,19 @@ orderedTests =
 
 
 {-| The slugs of the collection's documents in reading order, as the host
-sends them.
+sends them, or why the request does not decode.
 -}
-readingOrderOf : SortOrder -> String -> List Source -> Maybe (List String)
+readingOrderOf : SortOrder -> String -> List Source -> Result String (Maybe (List String))
 readingOrderOf order collection sources =
-    case Decode.decodeValue Protocol.requestDecoder (request [ collection ] sources) of
-        Ok decoded ->
-            decoded.documents
-                |> List.map (\document -> ( document, Ok [] ))
-                |> Listing.readingOrder order collection
-                |> Maybe.map (List.map (Tuple.first >> .slug))
-
-        Err _ ->
-            Nothing
+    Decode.decodeValue Protocol.requestDecoder (request [ collection ] sources)
+        |> Result.mapError Decode.errorToString
+        |> Result.map
+            (\decoded ->
+                decoded.documents
+                    |> List.map (\document -> ( document, Ok [] ))
+                    |> Listing.readingOrder order collection
+                    |> Maybe.map (List.map (Tuple.first >> .slug))
+            )
 
 
 readingOrderTests : Test
@@ -402,18 +402,18 @@ readingOrderTests =
         [ test "by date, the oldest comes first" <|
             \_ ->
                 readingOrderOf Site.ByDate "posts" fivePosts
-                    |> Expect.equal (Just [ "a", "b", "c", "d", "e" ])
+                    |> Expect.equal (Ok (Just [ "a", "b", "c", "d", "e" ]))
         , test "by date, an undated document leaves no order" <|
             \_ ->
                 readingOrderOf Site.ByDate "posts" [ dated "a" "2026-11-01", post "b" ]
-                    |> Expect.equal Nothing
+                    |> Expect.equal (Ok Nothing)
         , test "by a key, it is the order of a listing" <|
             \_ ->
                 readingOrderOf
                     (Site.ByKey (\document -> Result.toMaybe (Decode.decodeValue (Decode.field "order" Decode.int) document.frontmatter)))
                     "docs"
                     [ doc "a" 3, doc "c" 1, doc "b" 1 ]
-                    |> Expect.equal (Just [ "b", "c", "a" ])
+                    |> Expect.equal (Ok (Just [ "b", "c", "a" ]))
         ]
 
 

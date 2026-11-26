@@ -311,7 +311,9 @@ only collide because of punctuation, such as `C` and `C++`, are
 
 Collections listed by `paginated`, `groupedBy`, `allItems`, `allGroups` or a
 feed are sorted by date, so their documents need one (see
-[Content](content.md#dates-and-drafts)).
+[Content](content.md#dates-and-drafts)), unless the collection is ordered with
+`Collection.orderedBy` and isn't in a feed (see
+[Ordering by a number](#ordering-by-a-number)).
 
 ### Ordering by a number
 
