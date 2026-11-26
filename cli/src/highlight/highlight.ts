@@ -46,6 +46,13 @@ export async function createCodeHighlighter(
   site: SiteHighlight = noSiteHighlight,
 ): Promise<CodeHighlighter> {
   const theme = (name: string) => site.themes.get(name) ?? bundledTheme(name);
+  // Each site grammar has Shiki's other names for the grammar it replaces.
+  const siteLanguages = new Set(
+    [...site.grammars.values()].flatMap(({ name, aliases = [] }) => [
+      name,
+      ...aliases,
+    ]),
+  );
   const shiki = await createHighlighterCore({
     // The JavaScript engine needs no WebAssembly and gives the same tokens on
     // every machine.
@@ -54,7 +61,7 @@ export async function createCodeHighlighter(
     // The site's grammars come last: of two with one name, Shiki keeps the later.
     langs: [
       ...languages
-        .filter((language) => !site.grammars.has(language))
+        .filter((language) => !siteLanguages.has(language))
         .filter(isIncludedLanguage)
         .map((language) => bundledLanguages[language]),
       ...site.grammars.values(),
@@ -65,10 +72,10 @@ export async function createCodeHighlighter(
     [Symbol.dispose]: () => shiki.dispose(),
     knows: (language) =>
       isSpecialLang(language) ||
-      site.grammars.has(language) ||
+      siteLanguages.has(language) ||
       isIncludedLanguage(language),
     languages: () => [
-      ...site.grammars.keys(),
+      ...siteLanguages,
       ...Object.keys(bundledLanguages).filter(isIncludedLanguage),
     ],
     highlight: (code, language) =>

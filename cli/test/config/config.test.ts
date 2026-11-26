@@ -209,6 +209,33 @@ describe("parseConfig", () => {
     ]);
   });
 
+  test("rejects a grammar named by one of a Shiki grammar's other names", () => {
+    const errors = errorsOf(
+      '{"siteUrl":"https://example.com/","highlight":{"grammars":{"js":"js.json"}}}',
+    );
+    expect(errors).toEqual([
+      {
+        severity: "error",
+        title: "BAD CONFIG",
+        message:
+          '"highlight.grammars.js" uses `js`, which is another name for Shiki\'s `javascript` grammar.',
+        sourcePath: "sheaf.json",
+        hint: 'Name the grammar "javascript". It then replaces Shiki\'s under all of its names, `js` included.',
+      },
+    ]);
+  });
+
+  test("rejects a grammar named like plain text", () => {
+    for (const name of ["text", "plaintext", "txt", "plain", "ansi"]) {
+      const errors = errorsOf(
+        `{"siteUrl":"https://example.com/","highlight":{"grammars":{"${name}":"g.json"}}}`,
+      );
+      expect(errors.map(({ message }) => message)).toEqual([
+        `"highlight.grammars.${name}" uses \`${name}\`, which Shiki keeps for code without highlighting.`,
+      ]);
+    }
+  });
+
   test("suggests the Shiki theme closest to an unknown one", () => {
     const errors = errorsOf(
       '{"siteUrl":"https://example.com/","highlight":{"theme":{"light":"github-lite"}}}',

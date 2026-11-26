@@ -93,12 +93,17 @@ from files in your site:
 ```
 
 Each key is a name: a code block marked `nginx` uses the grammar named
-`nginx`, and `highlight.theme` uses a theme's name. Each value is the path of a JSON file,
-relative to the site's folder: a TextMate grammar, with `scopeName` and
-`patterns`, or a VS Code colour theme, with `tokenColors` or `colors`. These
-are the formats VS Code extensions ship and Shiki loads. A name can be any,
-including one of Shiki's, and your file is used instead of Shiki's. This is how
-a site gets back the GPL-3.0 grammars and theme that Sheaf leaves out.
+`nginx`, and `highlight.theme` uses a theme's name. Each value is the path of a
+JSON file, relative to the site's folder: a TextMate grammar, with `scopeName`
+and `patterns`, or a VS Code colour theme, with `tokenColors` or `colors`.
+These are the formats VS Code extensions ship and Shiki loads.
+
+A name can be anything, including one of Shiki's names, and your file is used
+instead of Shiki's. A grammar replaces Shiki's grammar of that name together
+with its other names: a `javascript` grammar is also used for blocks marked
+`js`. So a grammar can't take one of those other names, such as `js`, or one of
+the plain names, such as `text`. This is also how a site gets back the GPL-3.0
+grammars and theme that Sheaf leaves out.
 
 A file that is missing, isn't JSON or isn't a grammar or theme is `BAD CONFIG`,
 naming the key and the file. Code is highlighted again when one of the files

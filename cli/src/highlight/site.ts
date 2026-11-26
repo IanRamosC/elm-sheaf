@@ -6,6 +6,7 @@ import type { Config } from "../config/config";
 import { isErrno } from "../content/files";
 import type { Diagnostic } from "../diagnostics/diagnostic";
 import { collect, err, ok, type Result } from "../result";
+import { shikiAliases } from "./languages";
 
 /** The grammars and themes a site adds to Shiki's, read from the files `sheaf.json` names. */
 export type SiteHighlight = {
@@ -105,7 +106,11 @@ async function loadGrammar(
       ),
     );
   }
-  return ok({ text, registration: { ...json, name } });
+  // Shiki's other names for the grammar it replaces become the site's too.
+  return ok({
+    text,
+    registration: { ...json, name, aliases: shikiAliases(name) },
+  });
 }
 
 async function loadTheme(

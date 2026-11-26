@@ -124,6 +124,51 @@ describe("a site's own grammars and themes", () => {
     ]);
   });
 
+  test("take over every name of the grammar they replace", async () => {
+    const root = siteWithFiles();
+    const highlighted = await highlightWith(
+      root,
+      highlightConfig({ javascript: "highlight/toy.tmLanguage.json" }),
+      "```js\nserver = 1\n```\n",
+    );
+
+    const [keyword] = highlighted?.lines[0] ?? [];
+    expect(keyword).toMatchObject({ content: "server" });
+    expect(keyword?.style).toMatch(/color:#D73A49/i);
+  });
+
+  test("replace a grammar that another one embeds", async () => {
+    const root = siteWithFiles();
+    const config = highlightConfig({
+      javascript: "highlight/toy.tmLanguage.json",
+    });
+    const body =
+      "```js\nserver = 1\n```\n\n```html\n<script>server</script>\n```\n";
+    const site = await loadSiteHighlight(root, config);
+    if (!site.ok) throw new Error(site.error[0]?.message);
+    const document = documentOf(body);
+    const tree = parseMarkdown(document);
+    if (!tree.ok) throw new Error("parse failed");
+    using highlighter = await createCodeHighlighter(
+      config.theme,
+      languagesIn([tree.value]),
+      new HighlightCache(),
+      site.value,
+    );
+    const highlighted = highlightCode(tree.value, document, highlighter);
+    if (!highlighted.ok) throw new Error(highlighted.error[0]?.hint);
+    const [js, html] = highlightsIn(highlighted.value);
+
+    expect(js?.lines[0]?.map(({ content }) => content)).toEqual([
+      "server",
+      " = 1",
+    ]);
+    expect(js?.lines[0]?.[0]?.style).toMatch(/color:#D73A49/i);
+    expect(html?.lines[0]?.map(({ content }) => content).join("")).toBe(
+      "<script>server</script>",
+    );
+  });
+
   test("give a theme that highlight.theme can name", async () => {
     const root = siteWithFiles();
     const highlighted = await highlightWith(

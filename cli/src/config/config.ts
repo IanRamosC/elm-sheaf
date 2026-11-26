@@ -1,6 +1,8 @@
+import { isSpecialLang } from "shiki/core";
 import { bundledThemes } from "shiki/themes";
 import type { Diagnostic } from "../diagnostics/diagnostic";
 import { excludedHint, isExcludedTheme } from "../highlight/excluded";
+import { aliasedGrammar } from "../highlight/languages";
 import { err, ok, type Result } from "../result";
 import { suggestions } from "../suggest";
 
@@ -244,7 +246,10 @@ function parsePaths(
   const paths = new Map<string, string>();
   const problems: Problem[] = [];
   for (const [name, path] of Object.entries(value)) {
-    if (typeof path === "string") {
+    const badName = key === "grammars" ? grammarNameProblem(name) : undefined;
+    if (badName !== undefined) {
+      problems.push(badName);
+    } else if (typeof path === "string") {
       paths.set(name, path);
     } else {
       problems.push({
@@ -254,6 +259,25 @@ function parsePaths(
     }
   }
   return problems.length > 0 ? err(problems) : ok(paths);
+}
+
+/**
+ * A site's grammar replaces Shiki's grammar of that name under all of its
+ * names, so it must take the grammar's own name rather than one of the others.
+ */
+function grammarNameProblem(name: string): Problem | undefined {
+  if (isSpecialLang(name)) {
+    return {
+      message: `"highlight.grammars.${name}" uses \`${name}\`, which Shiki keeps for code without highlighting.`,
+      hint: "Give the grammar another name.",
+    };
+  }
+  const grammar = aliasedGrammar(name);
+  if (grammar === undefined) return undefined;
+  return {
+    message: `"highlight.grammars.${name}" uses \`${name}\`, which is another name for Shiki's \`${grammar}\` grammar.`,
+    hint: `Name the grammar "${grammar}". It then replaces Shiki's under all of its names, \`${name}\` included.`,
+  };
 }
 
 function parseThemes(
