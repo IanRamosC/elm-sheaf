@@ -15,6 +15,7 @@ type Step = {
 
 type Job = {
   uses?: string;
+  "runs-on"?: string;
   needs?: string | string[];
   permissions?: Record<string, string>;
   defaults?: { run?: { "working-directory"?: string } };
@@ -63,23 +64,67 @@ describe("the release workflow", () => {
     expect(runs.some((run) => run.includes("GITHUB_REF_NAME"))).toBe(true);
   });
 
-  test("runs its jobs in order: ci and tag-check, binaries, npm, release", () => {
+  test("runs its jobs in order: ci and tag-check, binaries, intel-binary, npm, release", () => {
     expect(Object.keys(jobs).sort()).toEqual(
-      ["binaries", "ci", "npm", "release", "tag-check"].sort(),
+      ["binaries", "ci", "intel-binary", "npm", "release", "tag-check"].sort(),
     );
     expect(needsOf(jobs.ci)).toEqual([]);
     expect(needsOf(jobs["tag-check"])).toEqual([]);
     expect(needsOf(jobs.binaries).sort()).toEqual(["ci", "tag-check"]);
-    expect(needsOf(jobs.npm)).toEqual(["binaries"]);
+    expect(needsOf(jobs["intel-binary"])).toEqual(["binaries"]);
+    expect(needsOf(jobs.npm)).toEqual(["intel-binary"]);
     expect(needsOf(jobs.release)).toEqual(["npm"]);
   });
 
-  test("builds the binaries and writes their checksums", () => {
-    const runs = stepsOf(jobs.binaries).map(({ run }) => run ?? "");
-    expect(runs.some((run) => run.includes("bun run build-binaries"))).toBe(
-      true,
+  describe("the binaries job", () => {
+    const binaries = jobs.binaries;
+    const steps = stepsOf(binaries);
+    const indexOf = (found: (step: Step) => boolean) => steps.findIndex(found);
+    const build = indexOf(
+      ({ run }) => !!run?.includes("bun run build-binaries"),
     );
-    expect(runs.some((run) => run.includes("SHA256SUMS"))).toBe(true);
+    const sign = indexOf(
+      ({ run }) => !!run?.includes("codesign --force --sign -"),
+    );
+    const checksums = indexOf(({ run }) => !!run?.includes("SHA256SUMS"));
+
+    test("builds the binaries", () => {
+      expect(build).toBeGreaterThanOrEqual(0);
+    });
+
+    test("signs both macOS binaries ad hoc and verifies them, after the build", () => {
+      const run = steps[sign]?.run ?? "";
+      expect(sign).toBeGreaterThan(build);
+      for (const binary of ["sheaf-darwin-x64", "sheaf-darwin-arm64"]) {
+        expect(run).toMatch(
+          new RegExp(`codesign --force --sign - [^\\n]*out/${binary}`),
+        );
+        expect(run).toMatch(
+          new RegExp(`codesign --verify --strict [^\\n]*out/${binary}`),
+        );
+      }
+    });
+
+    test("writes the checksums of every file in cli/out/, after signing", () => {
+      const step = steps[checksums];
+      expect(checksums).toBeGreaterThan(sign);
+      expect(step && folderOf(binaries, step)).toBe("cli/out");
+      expect(step?.run).toMatch(
+        /\b(shasum --algorithm 256|shasum -a 256|sha256sum) -- \*/,
+      );
+    });
+  });
+
+  test("runs the Intel macOS binary on an Intel Mac", () => {
+    const intel = jobs["intel-binary"];
+    expect(intel?.["runs-on"]).toBe("macos-15-intel");
+    const steps = stepsOf(intel);
+    expect(
+      steps.some(({ uses }) => uses?.startsWith("actions/download-artifact@")),
+    ).toBe(true);
+    expect(
+      steps.some(({ run }) => run?.includes("./sheaf-darwin-x64 --version")),
+    ).toBe(true);
   });
 
   test("publishes to npm from cli/ with provenance, through OIDC", () => {

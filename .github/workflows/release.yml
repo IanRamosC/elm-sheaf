@@ -37,8 +37,8 @@ jobs:
             exit 1
           fi
 
-  # Built on macOS, as they are by hand, so that the macOS binaries carry the
-  # ad-hoc signature Apple Silicon requires.
+  # Built on macOS, which has codesign: the macOS binaries need a signature
+  # that verifies, or macOS refuses to run them.
   binaries:
     needs: [ci, tag-check]
     runs-on: macos-latest
@@ -59,6 +59,16 @@ jobs:
         working-directory: cli
         run: bun run build-binaries
 
+      # build-binaries signs them too. Signing again here keeps the release
+      # from depending on that, and the verification fails the job on a
+      # signature macOS would reject.
+      - name: Sign the macOS binaries
+        working-directory: cli
+        run: |
+          codesign --force --sign - out/sheaf-darwin-x64 out/sheaf-darwin-arm64
+          codesign --verify --strict -vv out/sheaf-darwin-x64 out/sheaf-darwin-arm64
+          out/sheaf-darwin-arm64 --version
+
       - name: Write the checksums
         working-directory: cli/out
         run: |
@@ -73,11 +83,33 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # The Intel binary is cross-compiled on Apple Silicon, so it runs here, on
+  # an Intel Mac, before anything is published.
+  intel-binary:
+    needs: binaries
+    runs-on: macos-15-intel
+    permissions: {}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: binaries
+          path: out
+
+      - name: Run the Intel binary
+        working-directory: out
+        run: |
+          chmod +x sheaf-darwin-x64
+          version=$(./sheaf-darwin-x64 --version)
+          if [ "$version" != "${GITHUB_REF_NAME#v}" ]; then
+            echo "::error::sheaf-darwin-x64 --version printed $version, not ${GITHUB_REF_NAME#v}."
+            exit 1
+          fi
+
   # Trusted publishing authenticates through OIDC and needs npm 11.5.1 or
   # newer, which Node 24 bundles. A version npm already has is skipped, since
   # npm never takes it again, so that a re-run can still reach the release.
   npm:
-    needs: binaries
+    needs: intel-binary
     runs-on: ubuntu-latest
     permissions:
       contents: read

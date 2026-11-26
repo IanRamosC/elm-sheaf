@@ -113,7 +113,36 @@ async function compile(target: Target): Promise<Built> {
   if (!result.success || result.metafile === undefined) {
     throw new AggregateError(result.logs, `Compiling ${target} failed`);
   }
+  if (isMacTarget(target) && canSign()) await signAdHoc(binary);
   return { binary, metafile: result.metafile };
+}
+
+function isMacTarget(target: Target): boolean {
+  return target.startsWith("bun-darwin-");
+}
+
+/** `codesign` comes with macOS only. */
+function canSign(): boolean {
+  return process.platform === "darwin";
+}
+
+/**
+ * Replaces a macOS binary's signature with an ad-hoc one. A binary
+ * cross-compiled for the other architecture keeps the signature of Bun's own
+ * executable, which no longer matches once Sheaf is appended to it, and macOS
+ * refuses to run a binary whose signature doesn't verify.
+ */
+async function signAdHoc(binary: string): Promise<void> {
+  for (const command of [
+    ["codesign", "--force", "--sign", "-", binary],
+    ["codesign", "--verify", "--strict", binary],
+  ]) {
+    const child = Bun.spawn(command, { stdout: "ignore", stderr: "pipe" });
+    const stderr = await new Response(child.stderr).text();
+    if ((await child.exited) !== 0) {
+      throw new Error(`${command.slice(0, 2).join(" ")} failed:\n${stderr}`);
+    }
+  }
 }
 
 type BundledPackage = {
@@ -302,7 +331,13 @@ async function main(args: string[]): Promise<void> {
     const built = await compile(target);
     metafile = built.metafile;
     const size = Bun.file(built.binary).size / 1024 / 1024;
-    process.stdout.write(`${binaryName(target)}  ${size.toFixed(1)} MB\n`);
+    const unsigned =
+      isMacTarget(target) && !canSign()
+        ? "  (not re-signed: codesign needs macOS, so sign it there before release)"
+        : "";
+    process.stdout.write(
+      `${binaryName(target)}  ${size.toFixed(1)} MB${unsigned}\n`,
+    );
   }
   if (metafile === undefined) return;
 
