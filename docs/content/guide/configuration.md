@@ -1,4 +1,8 @@
-# Configuration
+---
+title: Configuration
+order: 4
+description: What goes in sheaf.json and in the site's Elm code, and how to set the site URL, syntax highlighting and images.
+---
 
 Most of a site is configured in Elm. `sheaf.json`, at the root of the site,
 holds only what Sheaf needs before any Elm runs. The starter's is one line:

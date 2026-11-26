@@ -30,7 +30,7 @@ Did you mean `summary`?
 
 The starter looks like this:
 
-![The home page of the starter blog that sheaf init creates](https://raw.githubusercontent.com/IanRamosC/elm-sheaf/main/docs/images/home-light.png)
+![The home page of the starter blog that sheaf init creates](https://raw.githubusercontent.com/IanRamosC/elm-sheaf/main/docs/static/images/home-light.png)
 
 ## A short example
 
@@ -213,15 +213,15 @@ your site, in `cli/templates/`, is also offered under the
 [eleventy]: https://www.11ty.dev/docs/languages/
 [astro]: https://docs.astro.build/
 [astro-schema]: https://docs.astro.build/en/guides/content-collections/
-[getting-started]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/getting-started.md
-[install]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/getting-started.md#install-sheaf
+[getting-started]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/content/guide/getting-started.md
+[install]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/content/guide/getting-started.md#install-sheaf
 [releases]: https://github.com/IanRamosC/elm-sheaf/releases
-[content]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/content.md
-[templates]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/templates.md
-[configuration]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/configuration.md
-[static-files-and-images]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/static-files-and-images.md
-[deploying]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/deploying.md
-[cli]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/cli.md
+[content]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/content/guide/content.md
+[templates]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/content/guide/templates.md
+[configuration]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/content/guide/configuration.md
+[static-files-and-images]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/content/guide/static-files-and-images.md
+[deploying]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/content/guide/deploying.md
+[cli]: https://github.com/IanRamosC/elm-sheaf/blob/main/docs/content/guide/cli.md
 [contributing]: https://github.com/IanRamosC/elm-sheaf/blob/main/CONTRIBUTING.md
 [security]: https://github.com/IanRamosC/elm-sheaf/blob/main/SECURITY.md
 [ci]: https://github.com/IanRamosC/elm-sheaf/actions/workflows/ci.yml

@@ -1,4 +1,8 @@
-# Static files and images
+---
+title: Static files and images
+order: 5
+description: How files in static/ are copied, how images next to content are resized and encoded, and how to use cover images.
+---
 
 ## Static files
 

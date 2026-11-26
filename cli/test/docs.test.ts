@@ -1,10 +1,12 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
+import { splitFrontmatter } from "../src/content/frontmatter";
+import { HeadingIds } from "../src/markdown/heading-id";
 
 const REPO = join(import.meta.dir, "../..");
 const ENTRY = join(import.meta.dir, "../src/index.ts");
-const GUIDE = join(REPO, "docs/guide");
+const GUIDE = join(REPO, "docs/content/guide");
 
 function read(path: string): string {
   return readFileSync(path, "utf8");
@@ -16,6 +18,17 @@ function guidePages(): string[] {
     .filter((name) => name.endsWith(".md"))
     .sort()
     .map((name) => join(GUIDE, name));
+}
+
+type Page = {
+  data: Record<string, unknown>;
+  body: string;
+};
+
+function guidePage(path: string): Page {
+  const split = splitFrontmatter(read(path), path);
+  if (!split.ok) throw new Error(`${path} has invalid frontmatter`);
+  return split.value;
 }
 
 function filesUnder(directory: string, extension: string): string[] {
@@ -152,6 +165,89 @@ describe("the documentation", () => {
       "static-files-and-images.md",
       "templates.md",
     ]);
+    const pages = guidePages().map((path) => guidePage(path).data);
+    for (const data of pages) {
+      expect(typeof data.title).toBe("string");
+      expect(Number.isInteger(data.order)).toBe(true);
+      expect(typeof data.description).toBe("string");
+    }
+    const byOrder = pages
+      .map((data) => [data.order, data.title])
+      .sort(([a], [b]) => Number(a) - Number(b));
+    expect(byOrder).toEqual([
+      [1, "Getting started"],
+      [2, "Content"],
+      [3, "Templates"],
+      [4, "Configuration"],
+      [5, "Static files and images"],
+      [6, "Deploying"],
+      [7, "CLI reference"],
+    ]);
+  });
+
+  test("gives no page a title heading", () => {
+    const titled = guidePages()
+      .filter((path) =>
+        splitMarkdown(guidePage(path).body).prose.some((line) =>
+          line.startsWith("# "),
+        ),
+      )
+      .map((path) => relative(REPO, path));
+    expect(titled).toEqual([]);
+  });
+
+  test("links to fragments that exist", () => {
+    const idsOf = (path: string) => {
+      const sheaf = new HeadingIds();
+      const github = new Map<string, number>();
+      return splitMarkdown(guidePage(path).body)
+        .prose.map((line) => /^#{1,6} +(.+?) *#*$/.exec(line)?.[1])
+        .filter((text) => text !== undefined)
+        .map((text) => {
+          const plain = text.replaceAll("`", "");
+          const base = plain
+            .toLowerCase()
+            .replace(/[^\p{L}\p{N}\p{M} _-]/gu, "")
+            .replaceAll(" ", "-");
+          const repeats = github.get(base) ?? 0;
+          github.set(base, repeats + 1);
+          return {
+            sheaf: sheaf.next(plain),
+            github: repeats === 0 ? base : `${base}-${repeats}`,
+          };
+        });
+    };
+    const unequal: string[] = [];
+    const missing: string[] = [];
+    for (const path of guidePages()) {
+      const prose = splitMarkdown(guidePage(path).body)
+        .prose.join("\n")
+        .replace(/`[^`]*`/g, "");
+      for (const match of prose.matchAll(
+        /\]\(([^)#\s]*)#([^)\s]+)(?:\s+"[^"]*")?\)/g,
+      )) {
+        const target = match[1] ? join(dirname(path), match[1]) : path;
+        if (!existsSync(target)) continue;
+        const heading = idsOf(target).find((ids) => ids.github === match[2]);
+        const label = `${relative(REPO, path)}: ${match[1]}#${match[2]}`;
+        if (heading === undefined) missing.push(label);
+        else if (heading.sheaf !== heading.github) unequal.push(label);
+      }
+    }
+    expect(missing).toEqual([]);
+    expect(unequal).toEqual([]);
+  });
+
+  test("links out of the guide with absolute URLs", () => {
+    const escaping = guidePages().flatMap((path) => {
+      const prose = splitMarkdown(guidePage(path).body)
+        .prose.join("\n")
+        .replace(/`[^`]*`/g, "");
+      return [...prose.matchAll(/\]\((\.\.\/[^)\s]*)/g)].map(
+        (match) => `${relative(REPO, path)}: ${match[1]}`,
+      );
+    });
+    expect(escaping).toEqual([]);
   });
 
   test("gives each command only the options its usage line lists", () => {
@@ -268,7 +364,10 @@ function imagesShownBy(path: string): string[] {
 
 describe("the repository's images", () => {
   const ASSETS = join(REPO, ".github/assets");
-  const IMAGES = join(REPO, "docs/images");
+  const IMAGES = [
+    join(REPO, "docs/content/guide"),
+    join(REPO, "docs/static/images"),
+  ];
   const filesIn = (directory: string, extension: string) =>
     existsSync(directory) ? filesUnder(directory, extension) : [];
 
@@ -307,7 +406,10 @@ describe("the repository's images", () => {
   });
 
   test("keep every PNG under 300 KB", () => {
-    const pngs = [...filesIn(ASSETS, ".png"), ...filesIn(IMAGES, ".png")];
+    const pngs = [
+      ...filesIn(ASSETS, ".png"),
+      ...IMAGES.flatMap((directory) => filesIn(directory, ".png")),
+    ];
     expect(pngs.length).toBeGreaterThan(0);
     const large = pngs
       .filter((path) => Bun.file(path).size >= 300 * 1024)

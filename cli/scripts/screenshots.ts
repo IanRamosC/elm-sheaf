@@ -18,7 +18,8 @@ import { inflateSync } from "node:zlib";
 
 const REPO = join(import.meta.dir, "../..");
 const CLI = join(REPO, "cli/src/index.ts");
-const IMAGES = join(REPO, "docs/images");
+const HOME_IMAGES = join(REPO, "docs/static/images");
+const POST_IMAGES = join(REPO, "docs/content/guide");
 const ASSETS = join(REPO, ".github/assets");
 const MAX_BYTES = 300 * 1024;
 
@@ -167,7 +168,10 @@ async function main(): Promise<void> {
 
     try {
       for (const shot of SHOTS) {
-        const output = join(IMAGES, shot.file);
+        const output = join(
+          shot.path === "/" ? HOME_IMAGES : POST_IMAGES,
+          shot.file,
+        );
         await screenshot(
           new URL(shot.path, server.url).href,
           output,

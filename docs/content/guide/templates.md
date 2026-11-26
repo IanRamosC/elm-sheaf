@@ -1,9 +1,14 @@
-# Templates
+---
+title: Templates
+order: 3
+description: How a site's Elm code describes its metadata, routes, feeds and components.
+---
 
 A Sheaf site is an Elm value: the site's metadata, its routes, its feeds and its
 components. This page shows how the pieces fit together. The reference for each
-function is its documentation comment in [`src/Sheaf/`](../../src/Sheaf), which
-will be on the Elm package website once the package is published.
+function is its documentation comment in
+[`src/Sheaf/`](https://github.com/IanRamosC/elm-sheaf/blob/main/src/Sheaf),
+which will be on the Elm package website once the package is published.
 
 ## `Site.elm`
 
@@ -305,7 +310,8 @@ mistake is reported as, is in [Content](content.md#components).
 ## Routes
 
 Without the preset, a site is `Sheaf.site` with your own collections and
-routes. The [`routes` fixture](../../cli/test/fixtures/routes/src/Site.elm)
+routes. The
+[`routes` fixture](https://github.com/IanRamosC/elm-sheaf/blob/main/cli/test/fixtures/routes/src/Site.elm)
 builds notes with topics this way:
 
 ```elm

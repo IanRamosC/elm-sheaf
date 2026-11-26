@@ -1,4 +1,8 @@
-# Deploying
+---
+title: Deploying
+order: 6
+description: How to build the site and put it on any host that serves static files.
+---
 
 `sheaf build` writes the whole site to `dist/`: HTML, CSS, images, feeds and
 `sitemap.xml`, with no JavaScript and nothing that needs a server. Any host

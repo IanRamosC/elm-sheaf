@@ -47,13 +47,13 @@ anything.
 Each [release](https://github.com/IanRamosC/elm-sheaf/releases) has a
 standalone binary for macOS, Linux and Windows, which needs no Bun, only Elm
 0.19.3 on your `PATH`.
-[Getting started](https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/getting-started.md#install-sheaf)
+[Getting started](https://github.com/IanRamosC/elm-sheaf/blob/main/docs/content/guide/getting-started.md#install-sheaf)
 says which file to download and how to install it on each system.
 
 ## Documentation
 
 The [repository README](https://github.com/IanRamosC/elm-sheaf#readme) and its
-[guide](https://github.com/IanRamosC/elm-sheaf/blob/main/docs/guide/getting-started.md)
+[guide](https://github.com/IanRamosC/elm-sheaf/blob/main/docs/content/guide/getting-started.md)
 cover the content format, templates, configuration and deployment.
 
 ## Licence

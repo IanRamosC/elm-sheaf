@@ -117,7 +117,7 @@ cli/                     the npm package elm-sheaf: the CLI and the host that ru
   scripts/               build-binaries, smoke-binary, check-starter.sh, embed-starter, screenshots
   test/                  bun tests, and fixture sites in test/fixtures/
 tools/a11y/              the axe audit that check-starter.sh runs over the built starter
-docs/guide/              the user guide
+docs/content/guide/     the user guide
 .github/workflows/       ci.yml for every push and pull request, release.yml for version tags
 RELEASING.md             how both packages are released
 ```
@@ -150,7 +150,7 @@ Write code a reviewer can read without the author in the room:
 - The Elm package depends only on `elm/core`, `elm/json` and `elm/time`, and
   released Elm code has no `Debug`.
 - Error messages follow Elm's: say what is wrong, point at where, and suggest a
-  fix. A new diagnostic needs a line in [the CLI reference](docs/guide/cli.md);
+  fix. A new diagnostic needs a line in [the CLI reference](docs/content/guide/cli.md);
   `cli/test/docs.test.ts` fails until it has one.
 
 Pull requests should be small enough to review in one sitting, with tests for

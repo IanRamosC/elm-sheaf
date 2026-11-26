@@ -1,4 +1,8 @@
-# Getting started
+---
+title: Getting started
+order: 1
+description: Install Sheaf, create a blog from the starter, and see it running on your machine.
+---
 
 This page takes you from nothing to a blog running on your machine. It assumes
 you know Elm; it doesn't assume you know Sheaf.
@@ -173,9 +177,9 @@ site rebuilds and the page reloads when you save.
 
 The welcome post follows the reader's colour scheme:
 
-![The welcome post in the light colour scheme](../images/post-light.png)
+![The welcome post in the light colour scheme](post-light.png)
 
-![The welcome post in the dark colour scheme](../images/post-dark.png)
+![The welcome post in the dark colour scheme](post-dark.png)
 
 ## What's in the site
 

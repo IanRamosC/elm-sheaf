@@ -1,4 +1,8 @@
-# CLI reference
+---
+title: CLI reference
+order: 7
+description: Every sheaf command and option, and every diagnostic Sheaf can report.
+---
 
 ```
 Usage: sheaf <command> [options]

@@ -1,4 +1,8 @@
-# Content
+---
+title: Content
+order: 2
+description: How Sheaf finds documents, what it reads from their frontmatter, when a document is published, and how documents link to each other.
+---
 
 Content is Markdown with YAML frontmatter, kept in `content/`. This page covers
 how Sheaf finds documents, what it reads from their frontmatter, when a
