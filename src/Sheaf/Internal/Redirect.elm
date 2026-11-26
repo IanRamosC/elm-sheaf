@@ -20,11 +20,14 @@ type alias Redirect =
     }
 
 
-{-| Where an alias is written in `dist/`. An alias ending in `.html` is that
-file, and any other is a folder, written as its `index.html`, because a server
-would send a file without an extension as something other than HTML.
+{-| Where an alias is written in `dist/`. An alias ending in `.html`, in any
+case, is that file, and any other is a folder, written as its `index.html`,
+because a server would send a file without an extension as something other
+than HTML.
 
     fileOf "/old.html" == "old.html"
+
+    fileOf "/Old.HTML" == "Old.HTML"
 
     fileOf "/old" == "old/index.html"
 
@@ -36,7 +39,7 @@ fileOf alias =
         relative =
             Path.dropLeadingSlash alias
     in
-    if String.endsWith ".html" relative then
+    if String.endsWith ".html" (String.toLower relative) then
         relative
 
     else if relative == "" || String.endsWith "/" relative then

@@ -634,6 +634,12 @@ redirectTests =
                     |> render [ postRoute ]
                     |> paths
                     |> Expect.equal [ "posts/new/index.html", "old/index.html", "old.html" ]
+        , test "an alias ending in .html in any case is that file" <|
+            \_ ->
+                request [ "posts" ] [ aliased "new" [ "/Old.HTML" ] ]
+                    |> render [ postRoute ]
+                    |> paths
+                    |> Expect.equal [ "posts/new/index.html", "Old.HTML" ]
         , test "redirects carry the base path" <|
             \_ ->
                 requestUnder "/repo/" [ "posts" ] [ aliased "new" [ "/old/" ] ]
