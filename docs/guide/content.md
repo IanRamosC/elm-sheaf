@@ -112,7 +112,9 @@ in a file name and `BAD FRONTMATTER` in the frontmatter.
 
 A collection that some route lists by date, such as the blog's posts, needs a
 date on every document. One without is `MISSING DATE`. Documents that are only
-rendered one per page, such as the blog's pages, don't need one.
+rendered one per page, such as the blog's pages, don't need one, and nor do
+those of a collection ordered by a number (see
+[Templates](templates.md#ordering-by-a-number)).
 
 A document is left out of `sheaf build` when it has `draft: true`, or when its
 date is later than the moment the build starts. `sheaf dev` includes both, and

@@ -1,25 +1,26 @@
 module Sheaf.Internal.Listing exposing
-    ( Body, listOf, paginate, whole
+    ( Body, listOf, readingOrder, paginate, whole
     , missingDates, frontmatterDiagnostic
     )
 
-{-| What listing routes share: their documents in date order, cut into pages,
-and the problems that keep a listing from being written.
+{-| What listing routes share: their documents in order, cut into pages, and
+the problems that keep a listing from being written.
 
-@docs Body, listOf, paginate, whole
+@docs Body, listOf, readingOrder, paginate, whole
 @docs missingDates, frontmatterDiagnostic
 
 -}
 
 import Dict
 import Sheaf.Html exposing (Html)
+import Sheaf.Internal.Compare as Compare
 import Sheaf.Internal.Date as Date
 import Sheaf.Internal.Frontmatter as Frontmatter
 import Sheaf.Internal.Path as Path
 import Sheaf.Internal.Pattern as Pattern
 import Sheaf.Internal.Protocol exposing (Diagnostic, Document, Severity(..))
 import Sheaf.Internal.Results as Results
-import Sheaf.Internal.Site exposing (FrontmatterProblems, ListedDocument, Pagination)
+import Sheaf.Internal.Site exposing (FrontmatterProblems, ListedDocument, Pagination, SortOrder(..))
 
 
 {-| A published document and its rendered body, or the problems of its body.
@@ -28,24 +29,74 @@ type alias Body =
     ( Document, Result (List Diagnostic) (List Html) )
 
 
-{-| The published documents of a collection, newest first, and whether every
-one of them can be listed: one without a date, or whose body has problems,
-would leave a hole in the listing. Their problems are reported on their own,
-and the frontmatter of each is still checked, so a body with problems is
-given as empty.
+{-| The published documents of a collection in order, and whether every one
+of them can be listed: one whose body has problems, or without a date in a
+listing by date, would leave a hole in the listing. Their problems are
+reported on their own, and the frontmatter of each is still checked, so a body
+with problems is given as empty.
 -}
-listOf : String -> List Body -> ( List ListedDocument, Bool )
-listOf collection bodies =
+listOf : SortOrder -> String -> List Body -> ( List ListedDocument, Bool )
+listOf order collection bodies =
     let
         listed : List Body
         listed =
-            bodies
-                |> List.filter (\( document, _ ) -> document.collection == collection)
-                |> List.sortWith (\( a, _ ) ( b, _ ) -> newestFirst a b)
+            sorted order (inCollection collection bodies)
+
+        canBeListed : Document -> Bool
+        canBeListed document =
+            case order of
+                ByDate ->
+                    document.date /= Nothing
+
+                ByKey _ ->
+                    True
     in
     ( List.map (\( document, body ) -> { document = document, body = Result.withDefault [] body }) listed
-    , List.all (\( document, body ) -> document.date /= Nothing && isOk body) listed
+    , List.all (\( document, body ) -> canBeListed document && isOk body) listed
     )
+
+
+{-| The published documents of a collection in the order they are read: by
+date, the oldest first, which is the reverse of a listing; otherwise in the
+order of a listing. A collection by date with an undated document has no
+reading order.
+-}
+readingOrder : SortOrder -> String -> List Body -> Maybe (List Body)
+readingOrder order collection bodies =
+    let
+        documents : List Body
+        documents =
+            inCollection collection bodies
+    in
+    case order of
+        ByDate ->
+            if List.all (\( document, _ ) -> document.date /= Nothing) documents then
+                Just (List.reverse (sorted order documents))
+
+            else
+                Nothing
+
+        ByKey _ ->
+            Just (sorted order documents)
+
+
+inCollection : String -> List Body -> List Body
+inCollection collection bodies =
+    List.filter (\( document, _ ) -> document.collection == collection) bodies
+
+
+sorted : SortOrder -> List Body -> List Body
+sorted order bodies =
+    case order of
+        ByDate ->
+            List.sortWith (\( a, _ ) ( b, _ ) -> newestFirst a b) bodies
+
+        ByKey keyOf ->
+            -- Each key decodes the document's frontmatter, so it is found once.
+            bodies
+                |> List.map (\body -> ( keyOf (Tuple.first body), body ))
+                |> List.sortWith (\( keyA, ( a, _ ) ) ( keyB, ( b, _ ) ) -> Compare.both (lowestFirst keyA keyB) (Compare.byCodePoint a.slug b.slug))
+                |> List.map Tuple.second
 
 
 isOk : Result e a -> Bool
@@ -144,8 +195,8 @@ frontmatterDiagnostic document problem =
 -- DATES
 
 
-{-| A listing orders its documents by date, so each needs one. A document is
-reported once, however many routes list its collection.
+{-| A listing by date and a feed order their documents by date, so each needs
+one. A document is reported once, however many routes list its collection.
 -}
 missingDates : List String -> List Document -> List Diagnostic
 missingDates listed published =
@@ -172,7 +223,7 @@ newestFirst a b =
         ( Just dateA, Just dateB ) ->
             case Date.compareNewestFirst (Date.fromProtocol dateA) (Date.fromProtocol dateB) of
                 EQ ->
-                    compare a.slug b.slug
+                    Compare.byCodePoint a.slug b.slug
 
                 order ->
                     order
@@ -186,4 +237,24 @@ newestFirst a b =
             GT
 
         ( Nothing, Nothing ) ->
-            compare a.slug b.slug
+            Compare.byCodePoint a.slug b.slug
+
+
+{-| The lowest key first. A document whose frontmatter does not decode has no
+key, and is put last: the listing is not written, but it is still put in
+order to check every document's frontmatter.
+-}
+lowestFirst : Maybe Int -> Maybe Int -> Order
+lowestFirst a b =
+    case ( a, b ) of
+        ( Just keyA, Just keyB ) ->
+            compare keyA keyB
+
+        ( Just _, Nothing ) ->
+            LT
+
+        ( Nothing, Just _ ) ->
+            GT
+
+        ( Nothing, Nothing ) ->
+            EQ

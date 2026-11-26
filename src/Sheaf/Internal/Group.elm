@@ -13,6 +13,7 @@ any of them writes no pages.
 
 import Dict exposing (Dict)
 import Json.Decode as Decode
+import Sheaf.Internal.Compare as Compare
 import Sheaf.Internal.Protocol exposing (Diagnostic, Document, GroupSlug, Severity(..), Span)
 import Sheaf.Internal.Results as Results
 
@@ -65,7 +66,7 @@ group slugs valued =
                 |> List.filterMap Result.toMaybe
                 |> List.foldr (\( slug, use ) -> Dict.update slug (\uses -> Just (use :: Maybe.withDefault [] uses))) Dict.empty
                 |> Dict.toList
-                |> List.sortWith (\( a, _ ) ( b, _ ) -> byCodePoint a b)
+                |> List.sortWith (\( a, _ ) ( b, _ ) -> Compare.byCodePoint a b)
     in
     { groups = List.map (\( slug, uses ) -> groupOf slug uses) bySlug
     , problems =
@@ -100,7 +101,7 @@ mostCommonSpelling : List (Use item) -> Maybe String
 mostCommonSpelling uses =
     Results.unique (List.map .value uses)
         |> List.map (\spelling -> ( spelling, List.length (List.filter (\use -> use.value == spelling) uses) ))
-        |> List.sortWith (\( a, countA ) ( b, countB ) -> compareBoth (compare countB countA) (byCodePoint a b))
+        |> List.sortWith (\( a, countA ) ( b, countB ) -> Compare.both (compare countB countA) (Compare.byCodePoint a b))
         |> List.head
         |> Maybe.map Tuple.first
 
@@ -130,30 +131,12 @@ collisionOf slug uses =
                                     , Results.unique (List.map (.item >> .document >> .sourcePath) usesOfFold)
                                     )
                                 )
-                            |> List.sortWith (\( a, _ ) ( b, _ ) -> byCodePoint a b)
+                            |> List.sortWith (\( a, _ ) ( b, _ ) -> Compare.byCodePoint a b)
                     }
                 )
 
         _ ->
             Nothing
-
-
-compareBoth : Order -> Order -> Order
-compareBoth first second =
-    case first of
-        EQ ->
-            second
-
-        _ ->
-            first
-
-
-{-| JavaScript compares strings by UTF-16 code unit, which puts some
-characters outside the Basic Multilingual Plane before others inside it.
--}
-byCodePoint : String -> String -> Order
-byCodePoint a b =
-    compare (List.map Char.toCode (String.toList a)) (List.map Char.toCode (String.toList b))
 
 
 uniqueBy : (a -> key) -> List a -> List a

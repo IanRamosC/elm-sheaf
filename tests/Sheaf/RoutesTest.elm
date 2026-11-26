@@ -1,13 +1,19 @@
 module Sheaf.RoutesTest exposing (suite)
 
 import Expect
-import RenderFixtures exposing (PostMeta, Source, bodyAt, draft, error, headAt, page, paths, post, postMeta, postPage, posts, render, request, requestUnder, span, titles)
+import Json.Decode as Decode
+import Json.Encode as Encode
+import RenderFixtures exposing (PostMeta, Source, bodyAt, draft, error, headAt, page, paths, post, postMeta, postPage, posts, render, renderWithFeeds, request, requestUnder, requestWithSlugs, span, titles)
 import Sheaf
-import Sheaf.Collection as Collection
+import Sheaf.Collection as Collection exposing (Collection)
 import Sheaf.Document exposing (Document)
+import Sheaf.Feed as Feed
+import Sheaf.Frontmatter as Frontmatter
 import Sheaf.Head as Head
 import Sheaf.Html as Html
-import Sheaf.Internal.Protocol exposing (Diagnostic, Severity(..))
+import Sheaf.Internal.Listing as Listing
+import Sheaf.Internal.Protocol as Protocol exposing (Diagnostic, Severity(..))
+import Sheaf.Internal.Site as Site exposing (SortOrder)
 import Sheaf.Ref as Ref
 import Sheaf.Route as Route exposing (Listing, Page, Route)
 import Test exposing (Test, describe, test)
@@ -19,6 +25,8 @@ suite =
         [ paginatedTests
         , allItemsTests
         , missingDateTests
+        , orderedTests
+        , readingOrderTests
         , notFoundTests
         , badRouteTests
         , repeatedLinkTests
@@ -239,6 +247,173 @@ missingDateTests =
                     |> render [ Route.eachItem "/posts/:slug/" posts postPage ]
                     |> .diagnostics
                     |> Expect.equal []
+        ]
+
+
+
+-- ORDERED COLLECTIONS
+
+
+type alias DocMeta =
+    { title : String
+    , order : Int
+    , tags : List String
+    }
+
+
+docs : Collection DocMeta
+docs =
+    Collection.named "docs"
+        (Frontmatter.succeed DocMeta
+            |> Frontmatter.required "title" Frontmatter.string
+            |> Frontmatter.required "order" Frontmatter.int
+            |> Frontmatter.withDefault "tags" [] (Frontmatter.list Frontmatter.string)
+        )
+        |> Collection.orderedBy .order
+
+
+{-| An undated document of `docs`, tagged `guide`.
+-}
+doc : String -> Int -> Source
+doc slug order =
+    let
+        source : Source
+        source =
+            post slug
+    in
+    { source
+        | collection = "docs"
+        , frontmatter = ( "order", Encode.int order ) :: ( "tags", Encode.list Encode.string [ "guide" ] ) :: source.frontmatter
+    }
+
+
+{-| The slug and order of each document.
+-}
+orders : List (Document DocMeta) -> String
+orders items =
+    String.join " " (List.map (\item -> item.slug ++ "=" ++ String.fromInt item.meta.order) items)
+
+
+docsArchive : Route
+docsArchive =
+    Route.allItems "/docs/" docs (\items -> page [ Html.text (orders items) ])
+
+
+orderedTests : Test
+orderedTests =
+    describe "an ordered collection"
+        [ test "an ordered collection lists by its order" <|
+            \_ ->
+                request [ "docs" ] [ doc "a" 3, doc "b" 1, doc "c" 2 ]
+                    |> render [ docsArchive ]
+                    |> bodyAt "docs/index.html"
+                    |> Expect.equal (Just "b=1 c=2 a=3")
+        , test "ties fall back to the slug" <|
+            \_ ->
+                request [ "docs" ] [ doc "b" 1, doc "a" 1 ]
+                    |> render [ docsArchive ]
+                    |> bodyAt "docs/index.html"
+                    |> Expect.equal (Just "a=1 b=1")
+        , test "ties are broken by code point, not by UTF-16 code unit" <|
+            \_ ->
+                request [ "docs" ] [ doc "𝒶" 1, doc "ｚ" 1 ]
+                    |> render [ docsArchive ]
+                    |> bodyAt "docs/index.html"
+                    |> Expect.equal (Just "ｚ=1 𝒶=1")
+        , test "a document without its order is a frontmatter problem, reported once" <|
+            \_ ->
+                let
+                    unordered : Source
+                    unordered =
+                        doc "b" 1
+                in
+                request [ "docs" ] [ doc "a" 2, { unordered | frontmatter = List.filter (\( key, _ ) -> key /= "order") unordered.frontmatter } ]
+                    |> render [ docsArchive, Route.eachItem "/docs/:slug/" docs (\_ -> page []) ]
+                    |> Expect.all
+                        [ titles >> Expect.equal [ "MISSING FIELD" ]
+                        , paths >> Expect.equal [ "docs/a/index.html" ]
+                        ]
+        , test "an ordered collection needs no dates" <|
+            \_ ->
+                request [ "docs" ] [ doc "a" 2, doc "b" 1 ]
+                    |> render [ docsArchive, Route.paginated "/docs/all/" { perPage = 1 } docs (\_ -> page []) ]
+                    |> Expect.all
+                        [ .diagnostics >> Expect.equal []
+                        , paths >> Expect.equal [ "docs/index.html", "docs/all/index.html", "docs/all/page/2/index.html" ]
+                        ]
+        , test "paginated and grouped routes follow the order" <|
+            \_ ->
+                requestWithSlugs [ ( "guide", "guide", "guide" ) ] [ "docs" ] [ doc "a" 3, doc "b" 1, doc "c" 2 ]
+                    |> render
+                        [ Route.paginated "/docs/" { perPage = 2 } docs (\listing -> page [ Html.text (orders listing.items) ])
+                        , Route.groupedBy "/topics/:group/" { by = .tags, perPage = Nothing } docs (\_ listing -> page [ Html.text (orders listing.items) ])
+                        , Route.allGroups "/topics/" .tags docs (\groups -> page [ Html.text (String.join "; " (List.map (\group -> group.name ++ ": " ++ orders group.items) groups)) ])
+                        ]
+                    |> Expect.all
+                        [ bodyAt "docs/index.html" >> Expect.equal (Just "b=1 c=2")
+                        , bodyAt "topics/guide/index.html" >> Expect.equal (Just "b=1 c=2 a=3")
+                        , bodyAt "topics/index.html" >> Expect.equal (Just "guide: b=1 c=2 a=3")
+                        ]
+        , test "a feed of an ordered collection is still by date" <|
+            \_ ->
+                let
+                    datedDoc : String -> Int -> String -> Source
+                    datedDoc slug order isoDate =
+                        let
+                            source : Source
+                            source =
+                                doc slug order
+                        in
+                        { source | date = Just isoDate }
+                in
+                request [ "docs" ] [ datedDoc "a" 1 "2026-11-01", datedDoc "b" 2 "2026-11-03", datedDoc "c" 3 "2026-11-02" ]
+                    |> renderWithFeeds
+                        [ Route.eachItem "/docs/:slug/" docs (\_ -> page []) ]
+                        [ Feed.fromCollection { rss = "/feed.xml", atom = "/atom.xml", limit = Nothing } docs (\meta -> { title = meta.title, summary = Nothing }) ]
+                    |> .feeds
+                    |> List.concatMap (.items >> List.map .documentId)
+                    |> Expect.equal [ "docs/b", "docs/c", "docs/a" ]
+        ]
+
+
+
+-- READING ORDER
+
+
+{-| The slugs of the collection's documents in reading order, as the host
+sends them.
+-}
+readingOrderOf : SortOrder -> String -> List Source -> Maybe (List String)
+readingOrderOf order collection sources =
+    case Decode.decodeValue Protocol.requestDecoder (request [ collection ] sources) of
+        Ok decoded ->
+            decoded.documents
+                |> List.map (\document -> ( document, Ok [] ))
+                |> Listing.readingOrder order collection
+                |> Maybe.map (List.map (Tuple.first >> .slug))
+
+        Err _ ->
+            Nothing
+
+
+readingOrderTests : Test
+readingOrderTests =
+    describe "reading order"
+        [ test "by date, the oldest comes first" <|
+            \_ ->
+                readingOrderOf Site.ByDate "posts" fivePosts
+                    |> Expect.equal (Just [ "a", "b", "c", "d", "e" ])
+        , test "by date, an undated document leaves no order" <|
+            \_ ->
+                readingOrderOf Site.ByDate "posts" [ dated "a" "2026-11-01", post "b" ]
+                    |> Expect.equal Nothing
+        , test "by a key, it is the order of a listing" <|
+            \_ ->
+                readingOrderOf
+                    (Site.ByKey (\document -> Result.toMaybe (Decode.decodeValue (Decode.field "order" Decode.int) document.frontmatter)))
+                    "docs"
+                    [ doc "a" 3, doc "c" 1, doc "b" 1 ]
+                    |> Expect.equal (Just [ "b", "c", "a" ])
         ]
 
 

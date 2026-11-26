@@ -169,7 +169,7 @@ renderSite (Site site) request =
                 , Component.siteProblems site.components
                 , List.concatMap Results.errors feeds
                 , unknownCollections used request.collections
-                , Listing.missingDates (Results.unique (List.filterMap Site.listedCollection site.routes ++ feedCollections)) published
+                , Listing.missingDates (Results.unique (List.filterMap Site.datedCollection site.routes ++ feedCollections)) published
                 , List.concatMap (Tuple.second >> Results.errors) bodies
                 , Grouping.diagnostics goodRoutes groupings
                 , List.concatMap Results.errors made
@@ -399,7 +399,7 @@ pagesOf context bodies groupings index route =
         Paginated listing ->
             let
                 ( items, complete ) =
-                    Listing.listOf listing.collection bodies
+                    Listing.listOf listing.order listing.collection bodies
             in
             Listing.paginate { basePath = context.basePath, pattern = listing.pattern, perPage = listing.perPage } items
                 |> List.map (\page -> Result.map (madeAt page.url) (listing.templateFor page.pagination page.items))
@@ -408,7 +408,7 @@ pagesOf context bodies groupings index route =
         AllItems listing ->
             let
                 ( items, complete ) =
-                    Listing.listOf listing.collection bodies
+                    Listing.listOf listing.order listing.collection bodies
             in
             [ Result.map (madeAt listing.pattern) (listing.templateFor items) ]
                 |> Listing.whole complete

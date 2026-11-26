@@ -52,7 +52,7 @@ groupDocuments : Dict String GroupSlug -> List Body -> Grouping -> Grouped
 groupDocuments slugs bodies grouping =
     let
         ( items, complete ) =
-            Listing.listOf grouping.collection bodies
+            Listing.listOf grouping.order grouping.collection bodies
 
         ( valued, invalid ) =
             List.foldr

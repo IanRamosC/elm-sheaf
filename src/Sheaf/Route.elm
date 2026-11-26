@@ -40,6 +40,10 @@ Listing routes order their documents newest first, by `date`, and documents of
 the same date by slug. So every published document of a collection they list
 needs a date, from the `date` frontmatter key or the start of its file name.
 
+A collection given [`Collection.orderedBy`](Sheaf-Collection#orderedBy) is
+listed by its number instead, lowest first, and its documents need no date.
+Each route follows the order of the collection it is given.
+
 @docs paginated, allItems, Listing, Pagination
 
 
@@ -56,7 +60,9 @@ such as by `String.toUpper`, has no slug and is reported. So are a value with
 no letters or digits, such as `+++`, and different words that share a slug,
 such as `C` and `C++`.
 
-Like listing routes, they order documents newest first, so each needs a date.
+Like listing routes, they order documents newest first, so each needs a date,
+unless the collection is given
+[`Collection.orderedBy`](Sheaf-Collection#orderedBy).
 
 @docs groupedBy, allGroups, Group
 
@@ -67,7 +73,7 @@ import Sheaf.Date exposing (Date)
 import Sheaf.Document exposing (Document)
 import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Date as InternalDate
-import Sheaf.Internal.Frontmatter as Frontmatter exposing (Problem)
+import Sheaf.Internal.Frontmatter as Frontmatter exposing (Frontmatter, Problem)
 import Sheaf.Internal.Image as Image
 import Sheaf.Internal.Protocol as Protocol
 import Sheaf.Internal.Results as Results
@@ -130,12 +136,13 @@ eachItem pattern collection template =
     Site.EachItem
         { pattern = pattern
         , collection = name collection
+        , order = sortOrder collection
         , templateFor = decode collection >> Result.map (\toDocument body -> template (toDocument body))
         }
 
 
-{-| The published documents of a collection, newest first, on pages of
-`perPage` documents each.
+{-| The published documents of a collection, newest first or in the
+collection's order, on pages of `perPage` documents each.
 
     Route.paginated "/" { perPage = 10 } posts Theme.Home.view
 
@@ -150,6 +157,7 @@ paginated pattern { perPage } collection template =
         { pattern = pattern
         , perPage = perPage
         , collection = name collection
+        , order = sortOrder collection
         , templateFor =
             \pagination items ->
                 decodeAll collection items
@@ -157,7 +165,8 @@ paginated pattern { perPage } collection template =
         }
 
 
-{-| One page with every published document of a collection, newest first.
+{-| One page with every published document of a collection, newest first or
+in the collection's order.
 
     Route.allItems "/archive/" posts Theme.Archive.view
 
@@ -167,6 +176,7 @@ allItems pattern collection template =
     Site.AllItems
         { pattern = pattern
         , collection = name collection
+        , order = sortOrder collection
         , templateFor = decodeAll collection >> Result.map template
         }
 
@@ -239,7 +249,7 @@ allGroups pattern by collection template =
 
 
 {-| A group's name, its most common spelling, and its published documents,
-newest first.
+newest first or in the collection's order.
 -}
 type alias Group meta =
     { name : String
@@ -248,13 +258,10 @@ type alias Group meta =
 
 
 groupingOf : (meta -> List String) -> Collection meta -> Site.Grouping
-groupingOf by (Site.Collection collection) =
-    { collection = collection.name
-    , valuesOf =
-        \document ->
-            Frontmatter.decode collection.frontmatter
-                { values = document.frontmatter, positions = document.frontmatterPositions }
-                |> Result.map by
+groupingOf by ((Site.Collection { frontmatter }) as collection) =
+    { collection = name collection
+    , valuesOf = \document -> Result.map by (decodeMeta frontmatter document)
+    , order = sortOrder collection
     }
 
 
@@ -267,12 +274,30 @@ name (Site.Collection collection) =
     collection.name
 
 
+{-| How routes over the collection order its documents. A document whose
+frontmatter does not decode has no number, and its problems are reported
+where the frontmatter is decoded for its template.
+-}
+sortOrder : Collection meta -> Site.SortOrder
+sortOrder (Site.Collection collection) =
+    case collection.order of
+        Just keyOf ->
+            Site.ByKey (\document -> Result.toMaybe (Result.map keyOf (decodeMeta collection.frontmatter document)))
+
+        Nothing ->
+            Site.ByDate
+
+
+decodeMeta : Frontmatter meta -> Protocol.Document -> Result (List Problem) meta
+decodeMeta frontmatter document =
+    Frontmatter.decode frontmatter { values = document.frontmatter, positions = document.frontmatterPositions }
+
+
 {-| Decode a document's frontmatter, then wait for its rendered body.
 -}
 decode : Collection meta -> Protocol.Document -> Result (List Problem) (List Html -> Document meta)
 decode (Site.Collection collection) document =
-    Frontmatter.decode collection.frontmatter
-        { values = document.frontmatter, positions = document.frontmatterPositions }
+    decodeMeta collection.frontmatter document
         |> Result.map
             (\meta body ->
                 let

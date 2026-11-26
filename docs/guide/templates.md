@@ -313,6 +313,39 @@ Collections listed by `paginated`, `groupedBy`, `allItems`, `allGroups` or a
 feed are sorted by date, so their documents need one (see
 [Content](content.md#dates-and-drafts)).
 
+### Ordering by a number
+
+A collection that isn't read by date, such as the pages of a manual, can be
+ordered by a number from its frontmatter with `Collection.orderedBy`:
+
+```elm
+type alias DocMeta =
+    { title : String
+    , order : Int
+    }
+
+
+docs : Collection DocMeta
+docs =
+    Collection.named "docs"
+        (Frontmatter.succeed DocMeta
+            |> Frontmatter.required "title" Frontmatter.string
+            |> Frontmatter.required "order" Frontmatter.int
+        )
+        |> Collection.orderedBy .order
+```
+
+with `order: 3` in each document's frontmatter. `paginated`, `groupedBy`,
+`allItems` and `allGroups` then list the documents from the lowest number to
+the highest, and documents with the same number by slug. The documents don't
+need a date. A document without the number fails to decode, like any other
+required field; use `Frontmatter.withDefault "order" 0 Frontmatter.int` to make
+it optional.
+
+Feeds are still sorted by date, newest first, so a collection in a feed still
+needs dates. Each route follows the order of the collection it's given, so a
+route given the collection without `orderedBy` lists it by date.
+
 ## Feeds
 
 `Feed.fromCollection` declares an RSS 2.0 feed and an Atom feed of a

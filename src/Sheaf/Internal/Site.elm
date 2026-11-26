@@ -1,17 +1,17 @@
 module Sheaf.Internal.Site exposing
-    ( Site(..), Metadata, Feed(..), Description, Route(..), Grouping, NamedGroup, ListedDocument, FrontmatterProblems, Pagination, Collection(..), Page
-    , nameOf, patternOf, collectionOf, itemPattern, listedCollection, perPageOf, groupingOf, groupedPattern
+    ( Site(..), Metadata, Feed(..), Description, Route(..), Grouping, NamedGroup, ListedDocument, FrontmatterProblems, Pagination, Collection(..), SortOrder(..), Page
+    , nameOf, patternOf, collectionOf, itemPattern, datedCollection, perPageOf, groupingOf, groupedPattern
     )
 
 {-| The site a user declares, behind `Sheaf`, `Sheaf.Route` and
 `Sheaf.Collection`, which only expose ways to build it.
 
-@docs Site, Metadata, Feed, Description, Route, Grouping, NamedGroup, ListedDocument, FrontmatterProblems, Pagination, Collection, Page
+@docs Site, Metadata, Feed, Description, Route, Grouping, NamedGroup, ListedDocument, FrontmatterProblems, Pagination, Collection, SortOrder, Page
 
 
 # What a route uses
 
-@docs nameOf, patternOf, collectionOf, itemPattern, listedCollection, perPageOf, groupingOf, groupedPattern
+@docs nameOf, patternOf, collectionOf, itemPattern, datedCollection, perPageOf, groupingOf, groupedPattern
 
 -}
 
@@ -64,13 +64,23 @@ type alias Description =
     }
 
 
-{-| A content folder and how to decode the frontmatter of its documents.
+{-| A content folder, how to decode the frontmatter of its documents, and
+the number in it that orders them, if not their date.
 -}
 type Collection meta
     = Collection
         { name : String
         , frontmatter : Frontmatter meta
+        , order : Maybe (meta -> Int)
         }
+
+
+{-| How a route orders its collection's documents: by date, or by a number
+from their decoded frontmatter, which is `Nothing` when it does not decode.
+-}
+type SortOrder
+    = ByDate
+    | ByKey (Protocol.Document -> Maybe Int)
 
 
 {-| The routes of one site use collections with different `meta` types, so a
@@ -79,9 +89,9 @@ together, in `templateFor`.
 
 An item route decodes a document's frontmatter and gives the template waiting
 for the document's rendered body, which may never come. A listing route gets
-its documents with their bodies, already in order, and decodes them all. A
-grouped route also keeps how to find a document's group values, because the
-renderer groups the documents before any template runs.
+its documents with their bodies, already in its collection's order, and
+decodes them all. A grouped route also keeps how to find a document's group
+values, because the renderer groups the documents before any template runs.
 
 -}
 type Route
@@ -90,17 +100,20 @@ type Route
     | EachItem
         { pattern : String
         , collection : String
+        , order : SortOrder
         , templateFor : Protocol.Document -> Result (List Problem) (List Html -> Page)
         }
     | Paginated
         { pattern : String
         , perPage : Int
         , collection : String
+        , order : SortOrder
         , templateFor : Pagination -> List ListedDocument -> Result (List FrontmatterProblems) Page
         }
     | AllItems
         { pattern : String
         , collection : String
+        , order : SortOrder
         , templateFor : List ListedDocument -> Result (List FrontmatterProblems) Page
         }
     | GroupedBy
@@ -116,16 +129,17 @@ type Route
         }
 
 
-{-| The collection a route groups, and the values each of its documents is
-grouped by, from its decoded frontmatter.
+{-| The collection a route groups, the values each of its documents is
+grouped by, from its decoded frontmatter, and the order of each group.
 -}
 type alias Grouping =
     { collection : String
     , valuesOf : Protocol.Document -> Result (List Problem) (List String)
+    , order : SortOrder
     }
 
 
-{-| A group's display name and its items, newest first.
+{-| A group's display name and its items, in the order of its collection.
 -}
 type alias NamedGroup item =
     { name : String
@@ -274,22 +288,23 @@ itemPattern route =
             Nothing
 
 
-{-| The collection a route lists by date, if it lists one.
+{-| The collection a route lists by date, if it lists one. Its documents
+need a date.
 -}
-listedCollection : Route -> Maybe String
-listedCollection route =
+datedCollection : Route -> Maybe String
+datedCollection route =
     case route of
         Paginated listing ->
-            Just listing.collection
+            byDate listing.order listing.collection
 
         AllItems listing ->
-            Just listing.collection
+            byDate listing.order listing.collection
 
         GroupedBy grouped ->
-            Just grouped.grouping.collection
+            byDate grouped.grouping.order grouped.grouping.collection
 
         AllGroups groups ->
-            Just groups.grouping.collection
+            byDate groups.grouping.order groups.grouping.collection
 
         Single _ ->
             Nothing
@@ -298,6 +313,16 @@ listedCollection route =
             Nothing
 
         EachItem _ ->
+            Nothing
+
+
+byDate : SortOrder -> String -> Maybe String
+byDate order collection =
+    case order of
+        ByDate ->
+            Just collection
+
+        ByKey _ ->
             Nothing
 
 

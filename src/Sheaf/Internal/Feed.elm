@@ -17,7 +17,7 @@ import Sheaf.Internal.Pattern as Pattern
 import Sheaf.Internal.Protocol as Protocol exposing (Diagnostic, Severity(..))
 import Sheaf.Internal.Results as Results
 import Sheaf.Internal.RouteCheck as RouteCheck
-import Sheaf.Internal.Site exposing (Description, Feed(..), ListedDocument)
+import Sheaf.Internal.Site exposing (Description, Feed(..), ListedDocument, SortOrder(..))
 
 
 {-| What a feed needs of the site: where it is served, and the pattern of the
@@ -50,7 +50,7 @@ render context resolve bodies (Feed feed) =
                 Just pattern ->
                     let
                         ( listed, complete ) =
-                            Listing.listOf feed.collection bodies
+                            Listing.listOf ByDate feed.collection bodies
                     in
                     case Results.combine (List.map (itemOf context resolve pattern feed.describe) listed) of
                         Ok dated ->
