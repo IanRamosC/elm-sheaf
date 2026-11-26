@@ -139,9 +139,13 @@ h2 {
   margin: 2.5rem 0 0.75rem;
 }
 
-/* Hidden with opacity, not display, so that it can still take focus. */
+/*
+ * Hidden with opacity, not display, so that it can still take focus. Without
+ * an underline, its normal weight sets it apart from the bold heading.
+ */
 .heading-link {
   color: var(--muted);
+  font-weight: 400;
   text-decoration: none;
   opacity: 0;
 }
