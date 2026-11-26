@@ -180,6 +180,11 @@ seven days, while the `binaries` job's files are kept.
 - **It failed before `npm`.** Nothing is published. If the fix needs a change
   to the code, delete the tag (`git push origin --delete v1.1.0` and
   `git tag --delete v1.1.0`), fix `main`, and tag again.
+- **The first tagged run, `v1.0.0`, failed.** 1.0.0 is already on npm from
+  the publish by hand, so never delete `v1.0.0` and tag another commit: the
+  release would no longer match what npm has. When the fix is outside the
+  repository, such as a setting on GitHub or npm, re-run the workflow.
+  Otherwise fix `main` and release 1.0.1.
 - **`npm` published, and `release` failed.** Re-run the workflow. The tag
   can't move, because npm already has that version from that commit.
 - **The published version is broken.** npm never takes a version twice:
