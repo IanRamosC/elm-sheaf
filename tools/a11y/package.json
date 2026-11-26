@@ -1,0 +1,19 @@
+{
+  "name": "sheaf-a11y",
+  "private": true,
+  "description": "Runs axe on a built site, in its light and dark colour schemes.",
+  "license": "BSD-3-Clause",
+  "type": "module",
+  "packageManager": "bun@1.4.5",
+  "scripts": {
+    "audit": "bun audit.ts"
+  },
+  "dependencies": {
+    "axe-core": "4.14.1",
+    "puppeteer-core": "25.19.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.5",
+    "typescript": "^7.0.2"
+  }
+}
