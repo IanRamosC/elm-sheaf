@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# Builds the starter site from this clone and checks what it writes: the HTML
-# with the Nu Html Checker, the links with lychee, and accessibility with axe
-# in both colour schemes.
+# Builds the starter site from this clone, with a second post that has an old
+# URL, and checks what it writes: the HTML with the Nu Html Checker, the links
+# with lychee, and accessibility with axe in both colour schemes.
 #
 #     cli/scripts/check-starter.sh
 #
@@ -39,11 +39,35 @@ step() {
 
 step "Building the starter"
 "${sheaf[@]}" init "$site" --local "$repo" >/dev/null
+# A second, older post, so each post links to the other, and an old URL of it,
+# so a redirect page is checked too.
+cat >"$site/content/posts/older.md" <<'POST'
+---
+title: An older post
+date: 2020-01-01
+aliases: [/old-welcome/]
+---
+
+Hi.
+POST
 (cd "$site" && "${sheaf[@]}" build)
 mv "$site/dist" "$root_out"
 (cd "$site" && "${sheaf[@]}" build --site-url https://example.com/blog/)
 mkdir -p "$blog_root"
 mv "$site/dist" "$blog_out"
+
+# The checks below only mean something if the pages they are meant to cover
+# were written.
+for out in "$root_out" "$blog_out"; do
+  if ! grep -q 'aria-label="More posts"' "$out/posts/older/index.html"; then
+    echo "$out/posts/older/index.html has no links to other posts" >&2
+    exit 1
+  fi
+  if ! grep -q 'http-equiv="refresh"' "$out/old-welcome/index.html"; then
+    echo "$out/old-welcome/index.html is not a redirect page" >&2
+    exit 1
+  fi
+done
 
 docker_run() {
   docker run --rm --volume "$work:$work:ro" "$@"
