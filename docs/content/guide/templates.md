@@ -435,8 +435,8 @@ docs =
 
 with `order: 3` in each document's frontmatter. `paginated`, `groupedBy`,
 `allItems`, `allGroups` and `eachItemIn` then list the documents from the
-lowest number to the highest, and documents with the same number by slug. The documents don't
-need a date. A document without the number fails to decode, like any other
+lowest number to the highest, and documents with the same number by slug. The
+documents don't need a date. A document without the number fails to decode, like any other
 required field; use `Frontmatter.withDefault "order" 0 Frontmatter.int` to make
 it optional.
 
