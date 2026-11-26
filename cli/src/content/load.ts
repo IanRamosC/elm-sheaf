@@ -182,9 +182,8 @@ function loadDocument(
   const draft = readKey("draft", parseDraft) ?? false;
   const image = readKey("image", parseImage);
   const aliases = parseAliases(data.aliases, positions, path);
-  if (!aliases.ok) problems.push(...aliases.error);
-
-  if (problems.length > 0 || !aliases.ok) return err(problems);
+  if (!aliases.ok) return err([...problems, ...aliases.error]);
+  if (problems.length > 0) return err(problems);
 
   const excluded =
     mode === "production" &&
@@ -414,7 +413,7 @@ function parseAliases(
     const problem = aliasProblem(value);
     return problem === undefined
       ? ok([value])
-      : err([badAlias(problem, keySpan, percentHint(value) ?? ALIAS_FORMS)]);
+      : err([badAlias(problem, keySpan, percentHint(value))]);
   }
   if (!Array.isArray(value)) {
     return err([

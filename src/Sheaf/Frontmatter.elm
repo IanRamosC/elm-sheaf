@@ -25,9 +25,10 @@ once, at the line and column where it is.
             |> Frontmatter.withDefault "tags" [] (Frontmatter.list Frontmatter.string)
             |> Frontmatter.optional "summary" Frontmatter.string
 
-The keys `slug`, `date`, `updated`, `draft` and `image` are read by Sheaf
-itself and never reach a `Frontmatter`. Templates get them from the `Document`.
-`aliases`, the old paths that redirect to a document, is read by Sheaf too.
+The keys `slug`, `date`, `updated`, `draft`, `image` and `aliases` are read by
+Sheaf itself and never reach a `Frontmatter`. Templates get the slug, the
+dates and the image from the `Document`, but not `aliases`, the old paths that
+Sheaf redirects to the document.
 
 @docs Frontmatter, Field
 

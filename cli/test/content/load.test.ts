@@ -165,31 +165,29 @@ describe("loadContent aliases", () => {
     expect(aliasesOf("aliases: []")).toEqual([]);
   });
 
-  test("rejects bad aliases", () => {
-    for (const alias of [
-      "https://x.com/a/",
-      "old/",
-      "/a/../b/",
-      "/a/?q=1",
-      "/a/#f",
-      "//x.com/a/",
-      "/a\\b/",
-      "/caf%C3%A9/",
-      "/a//b/",
-      "/a b/",
-    ]) {
-      const found = problems([
-        file("content/posts/a.md", `title: Hi\naliases: [/ok/, '${alias}']`),
-      ]);
+  test.each([
+    "https://x.com/a/",
+    "old/",
+    "/a/../b/",
+    "/a/?q=1",
+    "/a/#f",
+    "//x.com/a/",
+    "/a\\b/",
+    "/caf%C3%A9/",
+    "/a//b/",
+    "/a b/",
+  ])("rejects the alias %p", (alias) => {
+    const found = problems([
+      file("content/posts/a.md", `title: Hi\naliases: [/ok/, '${alias}']`),
+    ]);
 
-      expect(found).toEqual([
-        expect.objectContaining({
-          title: "BAD ALIAS",
-          sourcePath: "content/posts/a.md",
-          span: { start: { line: 3, column: 17 }, end: expect.anything() },
-        }),
-      ]);
-    }
+    expect(found).toEqual([
+      expect.objectContaining({
+        title: "BAD ALIAS",
+        sourcePath: "content/posts/a.md",
+        span: { start: { line: 3, column: 17 }, end: expect.anything() },
+      }),
+    ]);
   });
 
   test("points a bad alias that is not text at the item", () => {
@@ -204,8 +202,9 @@ describe("loadContent aliases", () => {
     });
   });
 
-  test("points aliases that are not a list at the key", () => {
-    for (const value of ["12", "{ a: /b/ }", "old/"]) {
+  test.each(["12", "{ a: /b/ }", "old/"])(
+    "points `aliases: %s` at the key",
+    (value) => {
       const [problem] = problems([
         file("content/posts/a.md", `aliases: ${value}`),
       ]);
@@ -214,7 +213,27 @@ describe("loadContent aliases", () => {
         title: "BAD ALIAS",
         span: { start: { line: 2, column: 1 }, end: { line: 2, column: 8 } },
       });
-    }
+    },
+  );
+
+  test("shows how to write aliases only when the value is not a path", () => {
+    const [notPaths] = problems([file("content/posts/a.md", "aliases: 12")]);
+    const [badPath] = problems([file("content/posts/a.md", "aliases: old/")]);
+
+    expect(notPaths?.hint).toContain("Write it as a list of paths");
+    expect(badPath?.message).toContain("An alias starts with `/`");
+    expect(badPath).not.toHaveProperty("hint");
+  });
+
+  test("reports a bad alias with the document's other problems", () => {
+    const found = problems([
+      file("content/posts/a.md", "slug: a b\naliases: [old/]"),
+    ]);
+
+    expect(found.map(({ title }) => title)).toEqual([
+      "BAD FRONTMATTER",
+      "BAD ALIAS",
+    ]);
   });
 
   test("suggests the decoded form of a percent-encoded alias", () => {
