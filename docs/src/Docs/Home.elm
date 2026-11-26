@@ -5,8 +5,8 @@ module Docs.Home exposing (view)
 
 import Docs.Layout as Layout
 import Sheaf.Document exposing (Document)
-import Sheaf.Html exposing (a, h1, p, text)
-import Sheaf.Html.Attributes exposing (class, siteHref)
+import Sheaf.Html exposing (Html, a, h1, img, p, text)
+import Sheaf.Html.Attributes exposing (alt, class, height, siteHref, siteSrc, width)
 import Sheaf.Route exposing (Page)
 
 
@@ -20,7 +20,7 @@ view documents =
                 , head = []
                 , body =
                     h1 [] [ text landing.meta.title ]
-                        :: landing.body
+                        :: afterPitch screenshots landing.body
                         ++ [ p [ class "call-to-action" ] [ a [ siteHref "/guide/" ] [ text "Read the guide" ] ] ]
                 }
 
@@ -31,3 +31,39 @@ view documents =
                 , head = []
                 , body = [ h1 [] [ text "Sheaf" ] ]
                 }
+
+
+{-| Puts `html` after the first paragraph of the page, which says what Sheaf
+is.
+-}
+afterPitch : Html -> List Html -> List Html
+afterPitch html body =
+    case body of
+        pitch :: rest ->
+            pitch :: html :: rest
+
+        [] ->
+            [ html ]
+
+
+{-| The starter's home page in the reader's colour scheme. The stylesheet
+shows one screenshot and hides the other.
+-}
+screenshots : Html
+screenshots =
+    p [ class "screenshots" ]
+        [ screenshot "light"
+        , screenshot "dark"
+        ]
+
+
+screenshot : String -> Html
+screenshot scheme =
+    img
+        [ class ("screenshot-" ++ scheme)
+        , siteSrc ("/images/home-" ++ scheme ++ ".png")
+        , alt "The home page of the starter blog that sheaf init creates"
+        , width 1280
+        , height 480
+        ]
+        []

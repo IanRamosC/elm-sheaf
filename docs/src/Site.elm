@@ -25,7 +25,7 @@ site =
         , routes =
             [ Route.allItems "/" pages Home.view
             , Route.allItems "/guide/" guide Guide.index
-            , Route.eachItem "/guide/:slug/" guide Guide.page
+            , Route.eachItemIn "/guide/:slug/" guide Guide.page
             , Route.notFound NotFound.view
             ]
         , feeds = []

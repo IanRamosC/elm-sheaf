@@ -73,6 +73,12 @@ function escapeHtml(text: string): string {
     .replace(/'/g, "&#39;");
 }
 
+/** The href of the page's link with this `rel`, if it has one. */
+function relHref(html: string, rel: string): string | undefined {
+  const link = new RegExp(`<a [^>]*rel="${rel}"[^>]*>`).exec(html)?.[0];
+  return link && /href="([^"]*)"/.exec(link)?.[1];
+}
+
 describe("the documentation site", () => {
   let site: Awaited<ReturnType<typeof buildDocs>>;
 
@@ -108,16 +114,93 @@ describe("the documentation site", () => {
 
   test("links each page to its neighbours", () => {
     const content = read("guide/content/index.html");
-    expect(content).toContain(`href="${BASE}/guide/getting-started/"`);
-    expect(content).toContain(`href="${BASE}/guide/templates/"`);
+    expect(relHref(content, "prev")).toBe(`${BASE}/guide/getting-started/`);
+    expect(relHref(content, "next")).toBe(`${BASE}/guide/templates/`);
 
     const first = read("guide/getting-started/index.html");
-    expect(first).not.toContain("Previous");
-    expect(first).toContain(`href="${BASE}/guide/content/"`);
+    expect(relHref(first, "prev")).toBeUndefined();
+    expect(relHref(first, "next")).toBe(`${BASE}/guide/content/`);
 
     const last = read("guide/cli/index.html");
-    expect(last).not.toContain("Next");
-    expect(last).toContain(`href="${BASE}/guide/deploying/"`);
+    expect(relHref(last, "prev")).toBe(`${BASE}/guide/deploying/`);
+    expect(relHref(last, "next")).toBeUndefined();
+  });
+
+  test("marks the current page in the sidebar", () => {
+    const html = read("guide/templates/index.html");
+    const current = [...html.matchAll(/<a [^>]*aria-current="page"[^>]*>/g)];
+    expect(current).toHaveLength(1);
+    expect(current[0]?.[0]).toContain(`href="${BASE}/guide/templates/"`);
+  });
+
+  test(
+    "shows contents on long pages only",
+    async () => {
+      const contents =
+        /<nav [^>]*aria-label="On this page"[^>]*>(.*?)<\/nav>/s.exec(
+          read("guide/templates/index.html"),
+        )?.[1];
+      expect(contents).toContain('href="#pages"');
+      expect(contents).toContain('href="#routes"');
+
+      const short = await buildDocs({
+        "content/guide/short.md": [
+          "---",
+          "title: Short",
+          "order: 99",
+          "description: A page with a single section.",
+          "---",
+          "",
+          "## The only section",
+          "",
+          "Nothing else.",
+          "",
+        ].join("\n"),
+      });
+      try {
+        expect(short.result.ok).toBe(true);
+        const html = readFileSync(
+          join(short.output, "guide/short/index.html"),
+          "utf8",
+        );
+        expect(html).toContain("The only section");
+        expect(html).not.toContain('aria-label="On this page"');
+      } finally {
+        rmSync(short.root, { recursive: true, force: true });
+      }
+    },
+    SLOW,
+  );
+
+  test("has the header links", () => {
+    const html = read("index.html");
+    expect(html).toMatch(new RegExp(`<a href="${BASE}/guide/"[^>]*>Guide</a>`));
+    expect(html).toContain(
+      '<a href="https://github.com/IanRamosC/elm-sheaf/tree/main/src/Sheaf" title="The API docs move to package.elm-lang.org with the 1.0.0 release">API</a>',
+    );
+    expect(html).toContain(
+      '<a href="https://github.com/IanRamosC/elm-sheaf">GitHub</a>',
+    );
+  });
+
+  test("shows the screenshots on the landing page", () => {
+    const html = read("index.html");
+    for (const scheme of ["light", "dark"]) {
+      const image = new RegExp(
+        `<img [^>]*src="${BASE}/images/home-${scheme}\\.png"[^>]*>`,
+      ).exec(html)?.[0];
+      expect(image).toMatch(/ alt="[^"]+"/);
+      expect(image).toContain(`class="screenshot-${scheme}"`);
+    }
+    // Each scheme's stylesheet hides the other scheme's screenshot.
+    const darkRules = [
+      ...read("style.css").matchAll(
+        /@media \(prefers-color-scheme: dark\) \{(.*?)\n\}/gs,
+      ),
+    ].map((match) => match[1]);
+    expect(
+      darkRules.some((rules) => rules?.includes(".screenshot-light")),
+    ).toBe(true);
   });
 
   test("describes each guide page", () => {
