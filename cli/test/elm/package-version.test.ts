@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { checkElmPackage } from "../../src/elm/package-version";
+import { elmJson as initElmJson } from "../../src/init/project-files";
 
 function elmJson(
   dependency: string | undefined,
@@ -43,6 +44,11 @@ describe("checkElmPackage", () => {
       expect(diagnostic?.hint).toContain(version);
     },
   );
+
+  // Keeps the version init writes inside the range the CLI supports.
+  test("accepts the elm.json init writes", () => {
+    expect(checkElmPackage(initElmJson(undefined), noLocal).ok).toBe(true);
+  });
 
   test("reports the dependency together with a local Sheaf.elm", () => {
     const result = checkElmPackage(
