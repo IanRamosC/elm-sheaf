@@ -322,3 +322,27 @@ test("the code of conduct names no email address", () => {
   const text = existsSync(path) ? read(path) : "";
   expect(text.match(/[\w.+-]+@[\w-]+\.[\w.]+/g) ?? []).toEqual([]);
 });
+
+test("no file in the repository refers to internal planning documents", () => {
+  const listed = Bun.spawnSync(["git", "ls-files", "-z"], { cwd: REPO });
+  expect(listed.exitCode).toBe(0);
+  const references = [/\bPlan \d+\b/, /follow-?ups? doc/i];
+  const found = listed.stdout
+    .toString()
+    .split("\0")
+    .filter((path) => path !== "")
+    .flatMap((path) => {
+      const bytes = readFileSync(join(REPO, path));
+      // Git's own test for a binary file: a NUL byte near the start.
+      if (bytes.subarray(0, 8000).includes(0)) return [];
+      return bytes
+        .toString("utf8")
+        .split("\n")
+        .flatMap((line, index) =>
+          references.some((reference) => reference.test(line))
+            ? [`${path}:${index + 1}: ${line.trim()}`]
+            : [],
+        );
+    });
+  expect(found).toEqual([]);
+});
