@@ -322,7 +322,12 @@ describe("sheaf", () => {
       const built = await sheaf(["build"], site);
 
       expect(created.exitCode).toBe(0);
-      expect(created.stdout).toContain(`cd '${site}'`);
+      expect(created.stdout.trimEnd().split("\n").slice(-4)).toEqual([
+        "Next steps:",
+        `  cd '${site}'`,
+        "  bun install",
+        "  bunx sheaf dev",
+      ]);
       expect(built.stdout).toContain("Built");
       expect(built.exitCode).toBe(0);
       expect(existsSync(join(site, "dist/index.html"))).toBe(true);
