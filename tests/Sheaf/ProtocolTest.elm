@@ -38,7 +38,7 @@ requestTests =
                 decodeRequest ProtocolFixtures.minimalRequest
                     |> Result.map .build
                     |> Expect.equal
-                        (Ok { siteUrl = "https://example.com", origin = "https://example.com", basePath = "/blog", mode = Production })
+                        (Ok { origin = "https://example.com", basePath = "/blog", mode = Production })
         , test "decodes the slug table by value" <|
             \_ ->
                 decodeRequest ProtocolFixtures.minimalRequest
@@ -136,10 +136,15 @@ requestTests =
                 decodeRequest ProtocolFixtures.minimalRequest
                     |> Result.map (.documents >> List.map .image)
                     |> Expect.equal (Ok [ Nothing ])
+        , test "decodes a document's aliases" <|
+            \_ ->
+                decodeRequest ProtocolFixtures.minimalRequest
+                    |> Result.map (.documents >> List.map .aliases)
+                    |> Expect.equal (Ok [ [ "/2019/hello/", "/hello.html" ] ])
         , test "rejects another protocol version" <|
             \_ ->
                 ProtocolFixtures.minimalRequest
-                    |> String.replace "\"protocolVersion\": 3" "\"protocolVersion\": 2"
+                    |> String.replace "\"protocolVersion\": 4" "\"protocolVersion\": 3"
                     |> decodeRequest
                     |> Result.mapError (always ())
                     |> Expect.equal (Err ())
@@ -212,7 +217,10 @@ responseTests =
                             , author = { name = "Ada", email = Nothing }
                             , language = "en"
                             }
-                        , pages = [ { path = "posts/hello-world/index.html", html = "<p>Hello</p>" } ]
+                        , pages =
+                            [ { path = "posts/hello-world/index.html", html = "<p>Hello</p>", aliasOf = Nothing }
+                            , { path = "old/index.html", html = "<p>Moved</p>", aliasOf = Just "content/posts/x.md" }
+                            ]
                         , feeds =
                             [ { rss = "feed.xml"
                               , atom = "atom.xml"

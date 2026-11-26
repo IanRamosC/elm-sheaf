@@ -1,7 +1,6 @@
 {
-  "protocolVersion": 3,
+  "protocolVersion": 4,
   "build": {
-    "siteUrl": "https://example.com",
     "origin": "https://example.com",
     "basePath": "/blog",
     "mode": "drafts"
@@ -127,6 +126,7 @@
           }
         }
       ],
+      "aliases": [],
       "image": {
         "url": "a.png",
         "alt": "A cat",

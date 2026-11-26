@@ -119,6 +119,7 @@ type alias Source =
     , excluded : Bool
     , frontmatter : List ( String, Value )
     , positions : List ( String, Span )
+    , aliases : List String
     , image : Maybe Value
     , body : List Value
     }
@@ -133,6 +134,7 @@ post slug =
     , excluded = False
     , frontmatter = [ ( "title", Encode.string slug ) ]
     , positions = []
+    , aliases = []
     , image = Nothing
     , body = [ paragraph [ textNode "Hi" ] ]
     }
@@ -173,11 +175,10 @@ requestWithSlugs slugs =
 requestWith : { basePath : String, slugs : List ( String, String, String ) } -> List String -> List Source -> Value
 requestWith { basePath, slugs } collections sources =
     Encode.object
-        [ ( "protocolVersion", Encode.int 3 )
+        [ ( "protocolVersion", Encode.int 4 )
         , ( "build"
           , Encode.object
-                [ ( "siteUrl", Encode.string ("https://example.com" ++ basePath) )
-                , ( "origin", Encode.string "https://example.com" )
+                [ ( "origin", Encode.string "https://example.com" )
                 , ( "basePath", Encode.string basePath )
                 , ( "mode", Encode.string "production" )
                 ]
@@ -211,6 +212,7 @@ encodeSource source =
          , ( "excluded", Encode.bool source.excluded )
          , ( "frontmatter", Encode.object source.frontmatter )
          , ( "frontmatterPositions", Encode.list (\( path, at ) -> Encode.object [ ( "path", Encode.string path ), ( "value", encodeSpan at ) ]) source.positions )
+         , ( "aliases", Encode.list Encode.string source.aliases )
          , ( "tree", markdownNode "root" [ ( "children", Encode.list identity source.body ) ] )
          ]
             ++ optional "image" source.image

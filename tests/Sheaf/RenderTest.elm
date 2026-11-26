@@ -51,6 +51,7 @@ pageTests =
                         , pages =
                             [ { path = "posts/hello-world/index.html"
                               , html = "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>hello-world</title></head><body><article><h1>hello-world</h1><p>Hi</p></article></body></html>"
+                              , aliasOf = Nothing
                               }
                             ]
                         , feeds = []
@@ -406,7 +407,7 @@ linkProblemTests =
                         }
         , test "a link to a collection without an item route has no page" <|
             \_ ->
-                request [ "notes" ] [ { collection = "notes", slug = "hello", date = Nothing, updated = Nothing, excluded = False, frontmatter = [], positions = [], image = Nothing, body = [] } ]
+                request [ "notes" ] [ { collection = "notes", slug = "hello", date = Nothing, updated = Nothing, excluded = False, frontmatter = [], positions = [], aliases = [], image = Nothing, body = [] } ]
                     |> render [ homeLinkingTo "notes/hello" ]
                     |> .diagnostics
                     |> List.filter (\diagnostic -> diagnostic.title == "NO PAGE FOR LINK")
@@ -678,7 +679,7 @@ badRequestTests =
                 Encode.object [ ( "protocolVersion", Encode.int 1 ) ]
                     |> render []
                     |> .diagnostics
-                    |> List.map (.message >> (\message -> String.contains "protocol version 1" message && String.contains "speaks 3" message))
+                    |> List.map (.message >> (\message -> String.contains "protocol version 1" message && String.contains "speaks 4" message))
                     |> Expect.equal [ True ]
         ]
 

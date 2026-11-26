@@ -27,6 +27,7 @@ once, at the line and column where it is.
 
 The keys `slug`, `date`, `updated`, `draft` and `image` are read by Sheaf
 itself and never reach a `Frontmatter`. Templates get them from the `Document`.
+`aliases`, the old paths that redirect to a document, is read by Sheaf too.
 
 @docs Frontmatter, Field
 

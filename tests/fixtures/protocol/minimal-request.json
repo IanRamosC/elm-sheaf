@@ -1,7 +1,6 @@
 {
-  "protocolVersion": 3,
+  "protocolVersion": 4,
   "build": {
-    "siteUrl": "https://example.com",
     "origin": "https://example.com",
     "basePath": "/blog",
     "mode": "production"
@@ -151,6 +150,10 @@
             }
           }
         }
+      ],
+      "aliases": [
+        "/2019/hello/",
+        "/hello.html"
       ],
       "tree": {
         "type": "root",

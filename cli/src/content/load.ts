@@ -1,14 +1,14 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import type { Config } from "../config/config";
-import type { Diagnostic } from "../diagnostics/diagnostic";
+import type { Diagnostic, Span } from "../diagnostics/diagnostic";
 import { elmModuleName } from "../elm/names";
 import { err, ok, type Result } from "../result";
 import { URL_SCHEMES } from "../url-schemes";
 import { type DocumentDate, publicationDate } from "./dates";
 import type { CoverImage, SourceDocument } from "./document";
 import { isErrno } from "./files";
-import { splitFrontmatter } from "./frontmatter";
+import { type FieldPosition, splitFrontmatter } from "./frontmatter";
 
 /** A Markdown file and its text; `path` is relative to the site root. */
 export type ContentFile = { path: string; source: string };
@@ -16,7 +16,7 @@ export type ContentFile = { path: string; source: string };
 /** `drafts` also builds drafts and documents dated in the future. */
 export type BuildMode = "production" | "drafts";
 
-const RESERVED_KEYS = ["slug", "date", "updated", "draft", "image"];
+const RESERVED_KEYS = ["slug", "date", "updated", "draft", "image", "aliases"];
 const COLLECTION_NAME = /^[a-z][a-z0-9-]*$/;
 const DATED_NAME = /^(\d{4}-\d{2}-\d{2})-(.+)$/;
 const DOCUMENT_FOLDER_INDEX = "index.md";
@@ -181,8 +181,10 @@ function loadDocument(
   const updated = readKey("updated", asDate);
   const draft = readKey("draft", parseDraft) ?? false;
   const image = readKey("image", parseImage);
+  const aliases = parseAliases(data.aliases, positions, path);
+  if (!aliases.ok) problems.push(...aliases.error);
 
-  if (problems.length > 0) return err(problems);
+  if (problems.length > 0 || !aliases.ok) return err(problems);
 
   const excluded =
     mode === "production" &&
@@ -198,6 +200,7 @@ function loadDocument(
     draft,
     excluded,
     ...(image && { image }),
+    aliases: aliases.value,
     frontmatter: withoutReservedKeys(data),
     frontmatterPositions: positions,
     body: split.value.body,
@@ -375,6 +378,107 @@ function parseImageSource(
     );
   }
   return ok({ src, alt });
+}
+
+const ALIAS_FORMS =
+  "Write it as a list of paths on this site, such as `aliases: [/2019/old-name/, /old.html]`.";
+
+/**
+ * Reads the `aliases` key: a list of paths on the site, or a single one. Each
+ * bad alias is reported at its own item, so all of them can be fixed at once;
+ * a value that is not a list is reported at the key.
+ */
+function parseAliases(
+  value: unknown,
+  positions: FieldPosition[],
+  sourcePath: string,
+): Result<string[], Diagnostic[]> {
+  if (value === undefined || value === null) return ok([]);
+  const badAlias = (
+    message: string,
+    span: Span | undefined,
+    hint: string | undefined,
+  ): Diagnostic => ({
+    severity: "error",
+    title: "BAD ALIAS",
+    message,
+    sourcePath,
+    ...(span && { span }),
+    ...(hint && { hint }),
+  });
+  const positionOf = (path: string) =>
+    positions.find((position) => position.path === path);
+  const keySpan = positionOf("aliases")?.key;
+
+  if (typeof value === "string") {
+    const problem = aliasProblem(value);
+    return problem === undefined
+      ? ok([value])
+      : err([badAlias(problem, keySpan, percentHint(value) ?? ALIAS_FORMS)]);
+  }
+  if (!Array.isArray(value)) {
+    return err([
+      badAlias("The `aliases` field is not valid.", keySpan, ALIAS_FORMS),
+    ]);
+  }
+
+  const aliases: string[] = [];
+  const problems: Diagnostic[] = [];
+  value.forEach((alias: unknown, index) => {
+    const span = positionOf(`aliases.${index}`)?.value;
+    if (typeof alias !== "string") {
+      const message = "Each alias must be a path, such as `/2019/old-name/`.";
+      problems.push(badAlias(message, span, undefined));
+      return;
+    }
+    const problem = aliasProblem(alias);
+    if (problem === undefined) {
+      aliases.push(alias);
+    } else {
+      problems.push(badAlias(problem, span, percentHint(alias)));
+    }
+  });
+  return problems.length > 0 ? err(problems) : ok(aliases);
+}
+
+/**
+ * Why `alias` cannot be a path on this site, if it cannot. Every segment
+ * between its slashes follows the rule for slugs, and only the last may be
+ * empty, as it is in `/old-name/`.
+ */
+function aliasProblem(alias: string): string | undefined {
+  if (!alias.startsWith("/")) {
+    return `\`${alias}\` is not a path on this site. An alias starts with \`/\`, such as \`/2019/old-name/\`.`;
+  }
+  const segments = alias.slice(1).split("/");
+  if (segments.slice(0, -1).includes("")) {
+    return `The alias \`${alias}\` has an empty segment between two slashes.`;
+  }
+  const bad = segments.find((segment) => segment !== "" && !isSlug(segment));
+  if (bad === "." || bad === "..") {
+    return `The alias \`${alias}\` has a \`${bad}\` segment. Write the path it leads to instead.`;
+  }
+  if (bad !== undefined) {
+    return `The alias \`${alias}\` has the segment \`${bad}\`, which cannot be part of a URL path. ${SLUG_RULE}`;
+  }
+  return undefined;
+}
+
+/**
+ * A percent-encoded alias would be written to a folder named after its
+ * escapes, which no server looks in, so the hint offers the decoded form.
+ */
+function percentHint(alias: string): string | undefined {
+  if (!alias.includes("%")) return undefined;
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(alias);
+  } catch {
+    return undefined;
+  }
+  return aliasProblem(decoded) === undefined
+    ? `Write the characters themselves, as \`${decoded}\`.`
+    : undefined;
 }
 
 function withoutReservedKeys(

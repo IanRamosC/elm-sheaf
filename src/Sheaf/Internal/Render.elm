@@ -466,4 +466,5 @@ write resolve language { unchecked, head } =
             , head = head
             , body = List.map (Html.resolveUrls resolve) unchecked.page.body
             }
+    , aliasOf = Nothing
     }

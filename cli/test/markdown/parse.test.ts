@@ -14,6 +14,7 @@ function documentWith(body: string, bodyStartLine = 1): SourceDocument {
     excluded: false,
     frontmatter: {},
     frontmatterPositions: [],
+    aliases: [],
     body,
     bodyStartLine,
   };

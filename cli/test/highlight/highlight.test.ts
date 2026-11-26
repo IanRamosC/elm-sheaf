@@ -37,6 +37,7 @@ function documentOf(body: string): SourceDocument {
     excluded: false,
     frontmatter: {},
     frontmatterPositions: [],
+    aliases: [],
     body,
     bodyStartLine: 1,
   };

@@ -6,9 +6,9 @@ import { embeddedFixtureModule } from "../../scripts/embed-protocol-fixtures";
 import type { SourceDocument } from "../../src/content/document";
 import { ContentFiles } from "../../src/content/files";
 import {
+  type BuildInfo,
   decodeResponse,
   encodeRequest,
-  PROTOCOL_VERSION,
   type Request,
   type Response,
 } from "../../src/elm/protocol";
@@ -53,14 +53,22 @@ function sourcesOf(request: Request) {
   });
 }
 
+/** The build settings a fixture's `build` was encoded from. */
+function buildOf({ build }: Request): BuildInfo {
+  return {
+    siteUrl: build.origin + build.basePath,
+    basePath: build.basePath,
+    mode: build.mode,
+  };
+}
+
 describe("encodeRequest", () => {
   for (const name of ["minimal-request", "all-nodes-request"]) {
     test(`produces the ${name} fixture`, () => {
       const expected = fixture(name) as Request;
-      expect(PROTOCOL_VERSION).toBe(3);
       expect(
         encodeRequest(
-          expected.build,
+          buildOf(expected),
           expected.collections,
           sourcesOf(expected),
           expected.slugs,
@@ -82,6 +90,22 @@ describe("encodeRequest", () => {
     );
     expect(request.build.origin).toBe("https://example.com");
   });
+
+  test("speaks protocol version 4, without the site URL, and sends every document's aliases", () => {
+    const expected = fixture("minimal-request") as Request;
+    const request = encodeRequest(
+      buildOf(expected),
+      expected.collections,
+      sourcesOf(expected),
+      expected.slugs,
+    );
+
+    expect(request.protocolVersion).toBe(4);
+    expect(request.build).not.toHaveProperty("siteUrl");
+    expect(request.documents.map((document) => document.aliases)).toEqual([
+      ["/2019/hello/", "/hello.html"],
+    ]);
+  });
 });
 
 describe("the all-nodes fixture tree", () => {
@@ -99,6 +123,7 @@ describe("the all-nodes fixture tree", () => {
       excluded: false,
       frontmatter: {},
       frontmatterPositions: [],
+      aliases: [],
       image: { src: "a.png", alt: "A cat" },
       body: readFileSync(join(FIXTURES, "all-nodes.md"), "utf8"),
       bodyStartLine: 1,
@@ -165,6 +190,15 @@ describe("decodeResponse", () => {
     expect(result.value.site.author.email).toBeNull();
     expect(result.value.feeds[0]?.items[0]?.summary).toBeNull();
     expect(result.value.sitemap[1]?.lastModified).toBeNull();
+  });
+
+  test("keeps the source path of the document an alias page redirects to", () => {
+    const result = decodeResponse(fixture("response-with-diagnostic"));
+    if (!result.ok) throw new Error(result.error);
+    expect(result.value.pages.map((page) => page.aliasOf)).toEqual([
+      undefined,
+      "content/posts/x.md",
+    ]);
   });
 
   test("rejects a response that is not an object", () => {

@@ -139,6 +139,93 @@ describe("loadContent documents", () => {
   });
 });
 
+describe("loadContent aliases", () => {
+  const aliasesOf = (frontmatter: string) =>
+    documents([file("content/posts/a.md", frontmatter)])[0]?.aliases;
+
+  test("reads aliases as a list of site paths", () => {
+    const [doc] = documents([
+      file("content/posts/a.md", "aliases: [/old/, /2019/x.html]"),
+    ]);
+
+    expect(doc?.aliases).toEqual(["/old/", "/2019/x.html"]);
+    expect(doc?.frontmatter).not.toHaveProperty("aliases");
+  });
+
+  test("aliases default to none", () => {
+    expect(aliasesOf("title: Hi")).toEqual([]);
+  });
+
+  test("a single alias may be a string", () => {
+    expect(aliasesOf("aliases: /old/")).toEqual(["/old/"]);
+  });
+
+  test("empty aliases are none", () => {
+    expect(aliasesOf("aliases:")).toEqual([]);
+    expect(aliasesOf("aliases: []")).toEqual([]);
+  });
+
+  test("rejects bad aliases", () => {
+    for (const alias of [
+      "https://x.com/a/",
+      "old/",
+      "/a/../b/",
+      "/a/?q=1",
+      "/a/#f",
+      "//x.com/a/",
+      "/a\\b/",
+      "/caf%C3%A9/",
+      "/a//b/",
+      "/a b/",
+    ]) {
+      const found = problems([
+        file("content/posts/a.md", `title: Hi\naliases: [/ok/, '${alias}']`),
+      ]);
+
+      expect(found).toEqual([
+        expect.objectContaining({
+          title: "BAD ALIAS",
+          sourcePath: "content/posts/a.md",
+          span: { start: { line: 3, column: 17 }, end: expect.anything() },
+        }),
+      ]);
+    }
+  });
+
+  test("points a bad alias that is not text at the item", () => {
+    const [problem, ...rest] = problems([
+      file("content/posts/a.md", "aliases: [1]"),
+    ]);
+
+    expect(rest).toEqual([]);
+    expect(problem).toMatchObject({
+      title: "BAD ALIAS",
+      span: { start: { line: 2, column: 11 }, end: { line: 2, column: 12 } },
+    });
+  });
+
+  test("points aliases that are not a list at the key", () => {
+    for (const value of ["12", "{ a: /b/ }", "old/"]) {
+      const [problem] = problems([
+        file("content/posts/a.md", `aliases: ${value}`),
+      ]);
+
+      expect(problem).toMatchObject({
+        title: "BAD ALIAS",
+        span: { start: { line: 2, column: 1 }, end: { line: 2, column: 8 } },
+      });
+    }
+  });
+
+  test("suggests the decoded form of a percent-encoded alias", () => {
+    const [problem] = problems([
+      file("content/posts/a.md", "aliases: [/caf%C3%A9/]"),
+    ]);
+
+    expect(problem?.hint).toContain("`/café/`");
+  });
+});
+
 describe("loadContent exclusion", () => {
   const files = [
     file("content/posts/draft.md", "draft: true"),

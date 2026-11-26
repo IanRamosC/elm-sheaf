@@ -205,6 +205,19 @@ missingFieldTests =
                     |> List.map .hint
                     |> Expect.equal
                         [ Just "Sheaf reads `date` itself, so it is not part of the frontmatter. Templates get it from the `Document` instead." ]
+        , test "explains that aliases become redirects" <|
+            \_ ->
+                let
+                    withAliases : Frontmatter (List String)
+                    withAliases =
+                        Frontmatter.succeed identity
+                            |> Frontmatter.required "aliases" (Frontmatter.list Frontmatter.string)
+                in
+                decodeWith withAliases [] []
+                    |> problemsOf
+                    |> List.map .hint
+                    |> Expect.equal
+                        [ Just "Sheaf reads `aliases` itself and writes a redirect to this document for each of them, so it is not part of the frontmatter." ]
         ]
 
 

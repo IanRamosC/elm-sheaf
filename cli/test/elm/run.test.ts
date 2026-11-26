@@ -72,7 +72,6 @@ const emptyResponseJs = JSON.stringify(emptyResponse);
 const emptyRequest: Request = {
   protocolVersion: PROTOCOL_VERSION,
   build: {
-    siteUrl: "https://example.com/",
     origin: "https://example.com",
     basePath: "/",
     mode: "production",

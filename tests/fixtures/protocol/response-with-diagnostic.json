@@ -12,6 +12,11 @@
     {
       "path": "posts/hello-world/index.html",
       "html": "<p>Hello</p>"
+    },
+    {
+      "path": "old/index.html",
+      "html": "<p>Moved</p>",
+      "aliasOf": "content/posts/x.md"
     }
   ],
   "feeds": [

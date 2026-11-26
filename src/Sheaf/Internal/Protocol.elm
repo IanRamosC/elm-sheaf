@@ -53,8 +53,7 @@ type alias Request =
 absolute URL is `origin ++ url`, where `url` already has the base path.
 -}
 type alias Build =
-    { siteUrl : String
-    , origin : String
+    { origin : String
     , basePath : String
     , mode : BuildMode
     }
@@ -89,6 +88,7 @@ type alias Document =
     , excluded : Bool
     , frontmatter : Decode.Value
     , frontmatterPositions : Dict String FieldPosition
+    , aliases : List String
     , image : Maybe DocumentImage
     , tree : Node
     }
@@ -163,7 +163,7 @@ type alias FieldPosition =
 -}
 protocolVersion : Int
 protocolVersion =
-    3
+    4
 
 
 {-| Decodes the host's request, which must speak this protocol version.
@@ -192,8 +192,7 @@ requestDecoder =
 
 buildDecoder : Decoder Build
 buildDecoder =
-    Decode.map4 Build
-        (Decode.field "siteUrl" Decode.string)
+    Decode.map3 Build
         (Decode.field "origin" Decode.string)
         (Decode.field "basePath" Decode.string)
         (Decode.field "mode" buildModeDecoder)
@@ -240,6 +239,7 @@ documentDecoder =
         |> andMap (Decode.field "excluded" Decode.bool)
         |> andMap (Decode.field "frontmatter" Decode.value)
         |> andMap (Decode.field "frontmatterPositions" fieldPositionsDecoder)
+        |> andMap (Decode.field "aliases" (Decode.list Decode.string))
         |> andMap (optionalField "image" documentImageDecoder)
         |> andMap (Decode.field "tree" nodeDecoder)
 
@@ -705,10 +705,13 @@ type alias Metadata =
 
 
 {-| A rendered page. The path is relative to `dist/`, without the base path.
+A redirect page has `aliasOf`, the source path of the document it redirects
+to.
 -}
 type alias Page =
     { path : String
     , html : String
+    , aliasOf : Maybe String
     }
 
 
@@ -830,9 +833,14 @@ encodeNullable encode maybe =
 encodePage : Page -> Encode.Value
 encodePage page =
     Encode.object
-        [ ( "path", Encode.string page.path )
-        , ( "html", Encode.string page.html )
-        ]
+        ([ ( "path", Encode.string page.path )
+         , ( "html", Encode.string page.html )
+         ]
+            ++ (page.aliasOf
+                    |> Maybe.map (\path -> [ ( "aliasOf", Encode.string path ) ])
+                    |> Maybe.withDefault []
+               )
+        )
 
 
 encodeDiagnostic : Diagnostic -> Encode.Value

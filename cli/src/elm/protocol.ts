@@ -7,7 +7,7 @@ import type { LocalImage, Node } from "../markdown/tree";
 import { err, ok, type Result } from "../result";
 
 /** Bumped whenever the JSON exchanged with the Elm worker changes shape. */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 export type BuildInfo = {
   siteUrl: string;
@@ -20,7 +20,6 @@ export type BuildInfo = {
  * an absolute URL is `origin + url`, where `url` already has the base path.
  */
 export type WireBuild = {
-  siteUrl: string;
   origin: string;
   basePath: string;
   mode: BuildMode;
@@ -46,6 +45,7 @@ export type RequestDocument = {
   excluded: boolean;
   frontmatter: SourceDocument["frontmatter"];
   frontmatterPositions: SourceDocument["frontmatterPositions"];
+  aliases: string[];
   image?: DocumentImage;
   tree: Node;
 };
@@ -60,8 +60,11 @@ export type Request = {
   documents: RequestDocument[];
 };
 
-/** `path` is relative to `dist/` and does not include the base path. */
-export type Page = { path: string; html: string };
+/**
+ * `path` is relative to `dist/` and does not include the base path. A
+ * redirect page has `aliasOf`, the source path of the document it redirects to.
+ */
+export type Page = { path: string; html: string; aliasOf?: string };
 
 export type SiteMetadata = {
   title: string;
@@ -116,7 +119,6 @@ export function encodeRequest(
   return {
     protocolVersion: PROTOCOL_VERSION,
     build: {
-      siteUrl: build.siteUrl,
       origin: new URL(build.siteUrl).origin,
       basePath: build.basePath,
       mode: build.mode,
@@ -134,6 +136,7 @@ export function encodeRequest(
       excluded: source.excluded,
       frontmatter: source.frontmatter,
       frontmatterPositions: source.frontmatterPositions,
+      aliases: source.aliases,
       ...(image && { image }),
       tree,
     })),
@@ -271,10 +274,19 @@ function decodePage(value: unknown, path: string): Decoded<Page> {
   }
   const pagePath = decodeText(raw.value.path, `${path}.path`);
   const html = decodeText(raw.value.html, `${path}.html`);
-  if (!pagePath.ok) {
-    return pagePath;
-  }
-  return html.ok ? ok({ path: pagePath.value, html: html.value }) : html;
+  const aliasOf = decodeOptional(
+    raw.value.aliasOf,
+    `${path}.aliasOf`,
+    decodeText,
+  );
+  if (!pagePath.ok) return pagePath;
+  if (!html.ok) return html;
+  if (!aliasOf.ok) return aliasOf;
+  return ok({
+    path: pagePath.value,
+    html: html.value,
+    ...(aliasOf.value !== undefined && { aliasOf: aliasOf.value }),
+  });
 }
 
 function decodeSiteMetadata(

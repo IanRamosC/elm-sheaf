@@ -505,12 +505,18 @@ noFrontmatterHint { start, end } =
 
 reservedKeys : List String
 reservedKeys =
-    [ "slug", "date", "updated", "draft", "image" ]
+    [ "slug", "date", "updated", "draft", "image", "aliases" ]
 
 
+{-| `aliases` is not on the `Document`, so its hint does not send the author
+there.
+-}
 reservedKeyHint : String -> Maybe String
 reservedKeyHint name =
-    if List.member name reservedKeys then
+    if name == "aliases" then
+        Just "Sheaf reads `aliases` itself and writes a redirect to this document for each of them, so it is not part of the frontmatter."
+
+    else if List.member name reservedKeys then
         Just ("Sheaf reads `" ++ name ++ "` itself, so it is not part of the frontmatter. Templates get it from the `Document` instead.")
 
     else

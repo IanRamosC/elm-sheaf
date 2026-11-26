@@ -26,6 +26,11 @@ export type SourceDocument = {
   excluded: boolean;
   /** The `image` key, which is resolved like an image in the body. */
   image?: CoverImage;
+  /**
+   * The `aliases` key: other paths on the site, such as `/2019/old-name/`,
+   * that redirect to this document. Without the base path.
+   */
+  aliases: string[];
   /** The user's own fields: every key except the reserved ones. */
   frontmatter: Record<string, unknown>;
   frontmatterPositions: FieldPosition[];
