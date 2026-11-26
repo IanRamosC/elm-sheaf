@@ -60,7 +60,10 @@ years has. The Linux files need glibc, so they don't run on Alpine Linux.
 
 Each release also has a `SHA256SUMS` file. To check a download against it, put
 both in one folder and run `shasum -a 256 -c --ignore-missing SHA256SUMS`
-(`sha256sum -c --ignore-missing SHA256SUMS` on Linux).
+(`sha256sum -c --ignore-missing SHA256SUMS` on Linux). On Windows, run
+`Get-FileHash .\sheaf-windows-x64.exe -Algorithm SHA256` in PowerShell and
+compare the hash it prints with the one on the `sheaf-windows-x64.exe` line of
+`SHA256SUMS`; PowerShell writes it in capitals.
 
 On **macOS and Linux**, make the file executable, rename it `sheaf` and move it
 into a folder on your `PATH`, such as `~/.local/bin`. With the Apple Silicon
