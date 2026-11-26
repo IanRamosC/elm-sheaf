@@ -38,7 +38,7 @@ moment the build starts.
 - `--site-url <url>` builds for this address instead of `siteUrl` in
   `sheaf.json`. It's checked the same way, and a bad value is `BAD CONFIG`.
 
-It prints `Built 7 pages in 0.8s` when it succeeds.
+It prints `Built 7 pages in 0.8s` when it succeeds, or `Built 7 pages and 2 redirects in 0.8s` when documents have aliases.
 
 ## `sheaf check`
 

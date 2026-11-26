@@ -175,7 +175,7 @@ describe("sheaf", () => {
         await dev.waitFor(/^Serving at /);
         const url = dev.output().match(/^Serving at (\S+)/m)?.[1] ?? "";
         expect(url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/blog\/$/);
-        await dev.waitFor(/^Rebuilt \d+ pages in \d+\.\d+s/);
+        await dev.waitFor(/^Rebuilt \d+ pages and 1 redirect in \d+\.\d+s/);
 
         const home = await (await fetch(url)).text();
         expect(home).toContain("Plans");

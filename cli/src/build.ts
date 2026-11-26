@@ -29,6 +29,7 @@ import {
 import { runElm } from "./elm/run";
 import { staticClashes } from "./emit/clashes";
 import { atomFeed, rssFeed } from "./emit/feeds";
+import { providesRobots, robotsTxt } from "./emit/robots";
 import { sitemapXml } from "./emit/sitemap";
 import { listStaticFiles } from "./emit/static";
 import { type OutputFile, writeGenerated, writeSite } from "./emit/write";
@@ -64,7 +65,9 @@ export type BuildOptions = {
 };
 
 export type BuildSuccess = {
+  /** The pages Elm rendered, not counting redirects. */
   pages: number;
+  redirects: number;
   warnings: Diagnostic[];
 };
 
@@ -165,20 +168,40 @@ export async function build(
     ...outputFiles(response, config.value),
     ...imageOutputs(imaged.value.published),
   ];
+  // A default: the site's own file, or a route's, takes its place unreported.
+  if (
+    !providesRobots([...outputs, ...staticFiles.value].map(({ path }) => path))
+  ) {
+    outputs.push(robotsFile(config.value));
+  }
   const clashes = staticClashes(outputs, staticFiles.value);
   if (clashes.length > 0) return err(clashes);
   if (options.output !== undefined) {
     await writeSite(options.output, outputs, staticFiles.value);
   }
+  const redirects = pages.filter(({ aliasOf }) => aliasOf !== undefined);
   return ok({
-    pages: pages.length,
+    pages: pages.length - redirects.length,
+    redirects: redirects.length,
     warnings: [...highlighted.value.warnings, ...diagnostics],
   });
 }
 
+/** The origin plus base path; `siteUrl.href` may lack the trailing slash that relative paths need. */
+function siteBase(config: Config): string {
+  return config.siteUrl.origin + config.basePath;
+}
+
+function robotsFile(config: Config): OutputFile {
+  return {
+    kind: "text",
+    path: "robots.txt",
+    content: robotsTxt(new URL("sitemap.xml", siteBase(config)).href),
+  };
+}
+
 function outputFiles(response: Response, config: Config): OutputFile[] {
-  // `siteUrl.href` may lack the trailing slash that relative feed paths need.
-  const site = config.siteUrl.origin + config.basePath;
+  const site = siteBase(config);
   const files: OutputFile[] = response.pages.map(({ path, html, aliasOf }) => ({
     kind: "text",
     path,

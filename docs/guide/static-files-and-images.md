@@ -24,6 +24,28 @@ needs a folder, is `STATIC FILE CLASH`, naming both. Paths are compared without
 regard to case. Anything under `static/_sheaf/` clashes, since Sheaf keeps that
 folder for its own files.
 
+## robots.txt
+
+Every build writes a `robots.txt` that lets crawlers read the whole site and
+names the sitemap:
+
+```
+User-agent: *
+Allow: /
+
+Sitemap: https://example.com/sitemap.xml
+```
+
+It is a default. To replace it, put your own at `static/robots.txt`, or write
+one from a route at `/robots.txt`; Sheaf then leaves its own out and reports
+nothing, so this is not a `STATIC FILE CLASH`. A file you write yourself should
+name the sitemap too, because Sheaf no longer does.
+
+Crawlers only read `/robots.txt` at the root of a domain. With a base path, such
+as `https://example.com/blog/`, Sheaf still writes the file inside it, next to
+the sitemap, but it only takes effect when the site is served at the root of its
+domain.
+
 ## Images in Markdown
 
 A Markdown image whose path is a local file is resized and encoded when the site

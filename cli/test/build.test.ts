@@ -70,6 +70,131 @@ describe("build", () => {
   );
 
   test(
+    "counts redirects apart from pages",
+    async () => {
+      const root = copyFixture("minimal");
+      writeFileSync(
+        join(root, "content/posts/2026-11-23-hello-world.md"),
+        "---\ntitle: Hello, world\naliases:\n  - /old/\n---\n\nHi.\n",
+      );
+
+      const result = await build(root, options(root));
+
+      expect(titlesOf(result)).toEqual([]);
+      expect(result.ok && [result.value.pages, result.value.redirects]).toEqual(
+        [1, 1],
+      );
+    },
+    SLOW,
+  );
+
+  describe("robots.txt", () => {
+    const sitemapLine = "Sitemap: https://example.com/blog/sitemap.xml";
+
+    /** Adds a route at `path` to the minimal site; its page says `mine`. */
+    function addRoute(root: string, path: string) {
+      const file = join(root, "src/Site.elm");
+      writeFileSync(
+        file,
+        readFileSync(file, "utf8")
+          .replace(
+            "import Sheaf.Route as Route",
+            "import Sheaf.Html exposing (text)\nimport Sheaf.Route as Route",
+          )
+          .replace(
+            "[ Route.eachItem",
+            `[ Route.single "${path}" { title = "Mine", head = [], body = [ text "mine" ] }\n            , Route.eachItem`,
+          ),
+      );
+    }
+
+    test(
+      "is written when the site has none, naming the sitemap",
+      async () => {
+        const root = copyFixture("blog");
+        rmSync(join(root, "static/robots.txt"), { force: true });
+
+        const result = await build(root, options(root));
+
+        expect(titlesOf(result)).toEqual([]);
+        expect(readFileSync(join(root, "dist/robots.txt"), "utf8")).toBe(
+          `User-agent: *\nAllow: /\n\n${sitemapLine}\n`,
+        );
+      },
+      SLOW,
+    );
+
+    test(
+      "gives way to a static robots.txt without a diagnostic",
+      async () => {
+        const root = copyFixture("minimal");
+
+        const result = await build(root, options(root));
+
+        expect(titlesOf(result)).toEqual([]);
+        expect(readFileSync(join(root, "dist/robots.txt"), "utf8")).toBe(
+          readFileSync(join(root, "static/robots.txt"), "utf8"),
+        );
+      },
+      SLOW,
+    );
+
+    test(
+      "gives way to a static file with another case",
+      async () => {
+        const root = copyFixture("minimal");
+        renameSync(
+          join(root, "static/robots.txt"),
+          join(root, "static/Robots.txt"),
+        );
+
+        const result = await build(root, options(root));
+
+        expect(titlesOf(result)).toEqual([]);
+        const robots = readdirSync(join(root, "dist")).filter(
+          (name) => name.toLowerCase() === "robots.txt",
+        );
+        expect(robots).toEqual(["Robots.txt"]);
+      },
+      SLOW,
+    );
+
+    test(
+      "gives way to a route's robots.txt",
+      async () => {
+        const root = copyFixture("minimal");
+        rmSync(join(root, "static/robots.txt"));
+        addRoute(root, "/robots.txt");
+
+        const result = await build(root, options(root));
+
+        expect(titlesOf(result)).toEqual([]);
+        expect(readFileSync(join(root, "dist/robots.txt"), "utf8")).toContain(
+          "mine",
+        );
+      },
+      SLOW,
+    );
+
+    test(
+      "is not written when a route's output is a folder named robots.txt",
+      async () => {
+        const root = copyFixture("minimal");
+        rmSync(join(root, "static/robots.txt"));
+        addRoute(root, "/robots.txt/");
+
+        const result = await build(root, options(root));
+
+        expect(titlesOf(result)).toEqual([]);
+        expect(statSync(join(root, "dist/robots.txt")).isDirectory()).toBe(
+          true,
+        );
+      },
+      SLOW,
+    );
+  });
+
+  test(
     "reports every broken link and writes nothing",
     async () => {
       const root = fixturePath("broken-links");

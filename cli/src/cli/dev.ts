@@ -9,7 +9,7 @@ import type { Diagnostic } from "../diagnostics/diagnostic";
 import { renderDiagnostic } from "../diagnostics/render";
 import { err, type Result } from "../result";
 import {
-  count,
+  pagesSummary,
   printDiagnostics,
   printErrorCount,
   type RenderedDiagnostic,
@@ -67,8 +67,9 @@ export async function runDev(
         await renderDiagnostics(result.value.warnings, siteRoot),
         colour,
       );
-      const pages = count(result.value.pages, "page");
-      write(paint("green", `Rebuilt ${pages} in ${seconds}s`, colour));
+      const { pages, redirects } = result.value;
+      const summary = pagesSummary(pages, redirects);
+      write(paint("green", `Rebuilt ${summary} in ${seconds}s`, colour));
       await warnIfBasePathChanged(siteRoot, basePath, colour);
     } else {
       // A crash while writing can leave part of a site behind.

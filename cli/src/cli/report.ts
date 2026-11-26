@@ -50,6 +50,14 @@ export function count(amount: number, noun: string): string {
   return `${amount} ${noun}${amount === 1 ? "" : "s"}`;
 }
 
+/** "12 pages", or "12 pages and 2 redirects" when there are redirects. */
+export function pagesSummary(pages: number, redirects: number): string {
+  const summary = count(pages, "page");
+  return redirects === 0
+    ? summary
+    : `${summary} and ${count(redirects, "redirect")}`;
+}
+
 export function write(line: string): void {
   process.stdout.write(`${line}\n`);
 }

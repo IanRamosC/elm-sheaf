@@ -6,7 +6,7 @@ import { initSite } from "../init/init";
 import { runDev } from "./dev";
 import { nextSteps, runtimeOf } from "./next-steps";
 import {
-  count,
+  pagesSummary,
   printDiagnostics,
   printErrorCount,
   renderDiagnostics,
@@ -202,10 +202,9 @@ async function runCommand(
       colour,
     );
     const verb = command === "build" ? "Built" : "Checked";
-    const { pages } = result.value;
-    write(
-      paint("green", `${verb} ${count(pages, "page")} in ${seconds}s`, colour),
-    );
+    const { pages, redirects } = result.value;
+    const summary = pagesSummary(pages, redirects);
+    write(paint("green", `${verb} ${summary} in ${seconds}s`, colour));
     return 0;
   }
 
