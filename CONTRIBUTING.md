@@ -76,8 +76,24 @@ Some test inputs are generated, and a test fails when they are out of date:
   `cli/test/__snapshots__/`. When a change to the output is intended, run
   `bun test --update-snapshots` in `cli/` and review the snapshot diff like
   code.
+- `sheaf init` writes the starter from `cli/src/init/starter.generated.ts`,
+  which embeds every file in `cli/templates/default/`, so the binaries carry it
+  too. After changing the starter, run `bun run embed-starter` in `cli/` and
+  commit both; `starter.test.ts` fails until you do.
 - Raising the pinned Bun changes the names of every image variant, so it is a
   commit of its own that updates the pin and the snapshots together.
+
+### Checks that need more than Bun
+
+CI runs two more checks that you can run yourself when you change what they
+cover. `cli/scripts/check-starter.sh` builds the starter site twice, at the
+root and under `/blog/`, and checks its HTML with the Nu Html Checker, its
+links with lychee and its accessibility with axe. It needs Docker running,
+Google Chrome (set `CHROME` to its executable when it isn't in its usual
+place), Elm 0.19.3 on your `PATH`, and `bun install` run in `cli/` and
+`tools/a11y/`. `bun run smoke-binary` in `cli/` builds the standalone binary
+for your machine and uses it to make and build a site in a folder outside the
+repository; it needs Elm 0.19.3 on your `PATH`.
 
 ## How the repository is laid out
 
@@ -96,9 +112,14 @@ cli/                     the npm package elm-sheaf: the CLI and the host that ru
   src/emit/              writing pages, feeds, the sitemap and static files
   src/dev/               the development server, file watching and live reload
   src/diagnostics/       the Diagnostic type and how it is printed
-  templates/default/     the starter that sheaf init copies
+  src/init/              sheaf init, and starter.generated.ts, the starter it writes
+  templates/default/     the starter's source, embedded by bun run embed-starter
+  scripts/               build-binaries, smoke-binary, check-starter.sh, embed-starter, screenshots
   test/                  bun tests, and fixture sites in test/fixtures/
+tools/a11y/              the axe audit that check-starter.sh runs over the built starter
 docs/guide/              the user guide
+.github/workflows/       ci.yml for every push and pull request, release.yml for version tags
+RELEASING.md             how both packages are released
 ```
 
 The host does all the IO: it reads the content, parses the Markdown,
