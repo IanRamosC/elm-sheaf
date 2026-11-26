@@ -2,7 +2,7 @@ module Sheaf.Head exposing
     ( Tag
     , description, canonical
     , openGraph, Kind(..), twitterCard, Card(..)
-    , stylesheet, rssFeed, atomFeed
+    , stylesheet, icon, rssFeed, atomFeed
     , meta
     )
 
@@ -45,7 +45,7 @@ is used as given. Any other path, such as `style.css` or
 
 # Linked files
 
-@docs stylesheet, rssFeed, atomFeed
+@docs stylesheet, icon, rssFeed, atomFeed
 
 
 # Anything else
@@ -153,6 +153,16 @@ type Card
 stylesheet : String -> Tag
 stylesheet =
     Internal.Stylesheet
+
+
+{-| `<link rel="icon">`, the icon browsers show for the site, with its media
+type, such as
+`Head.icon { path = "/favicon.svg", mediaType = "image/svg+xml" }` for
+`static/favicon.svg`.
+-}
+icon : { path : String, mediaType : String } -> Tag
+icon =
+    Internal.Icon
 
 
 {-| `<link rel="alternate">` to an RSS feed, so feed readers can find it.

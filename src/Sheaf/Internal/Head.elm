@@ -32,6 +32,7 @@ type Tag
         }
     | TwitterCard TwitterCard
     | Stylesheet String
+    | Icon { path : String, mediaType : String }
     | AlternateFeed FeedFormat { title : String, path : String }
     | Meta { name : String, content : String }
 
@@ -123,6 +124,19 @@ toHtml context tag =
                         Html.node "link"
                             [ Html.attribute "rel" "stylesheet"
                             , Html.attribute "href" href
+                            ]
+                            []
+                    )
+                |> maybeToList
+
+        Icon { path, mediaType } ->
+            resolve (Path.join context.basePath) path
+                |> Maybe.map
+                    (\href ->
+                        Html.node "link"
+                            [ Html.attribute "rel" "icon"
+                            , Html.attribute "href" href
+                            , Html.attribute "type" mediaType
                             ]
                             []
                     )
@@ -276,6 +290,9 @@ problems tag =
 
         Stylesheet path ->
             check "Head.stylesheet" path
+
+        Icon { path } ->
+            check "Head.icon" path
 
         AlternateFeed Rss { path } ->
             check "Head.rssFeed" path

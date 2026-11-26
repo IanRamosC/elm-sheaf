@@ -101,6 +101,10 @@ pathTests =
             \_ ->
                 render (Head.stylesheet "/style.css")
                     |> Expect.equal "<link rel=\"stylesheet\" href=\"/blog/style.css\">"
+        , test "an icon gets the base path and its media type" <|
+            \_ ->
+                render (Head.icon { path = "/favicon.svg", mediaType = "image/svg+xml" })
+                    |> Expect.equal "<link rel=\"icon\" href=\"/blog/favicon.svg\" type=\"image/svg+xml\">"
         , test "an http or https URL is used as given" <|
             \_ ->
                 ( render (Head.stylesheet "https://cdn.example.com/x.css")
@@ -141,6 +145,10 @@ problemTests =
                         , { function = "Head.atomFeed", path = "//cdn.example.com/atom.xml" }
                         , { function = "Head.openGraph", path = "data:image/png;base64,AAAA" }
                         ]
+        , test "reports an icon path without a leading slash" <|
+            \_ ->
+                Internal.problems (Head.icon { path = "favicon.svg", mediaType = "image/svg+xml" })
+                    |> Expect.equal [ { function = "Head.icon", path = "favicon.svg" } ]
         , test "leaves out a tag whose path is not valid" <|
             \_ ->
                 render (Head.stylesheet "style.css")

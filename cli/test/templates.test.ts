@@ -1,6 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { build } from "../src/build";
@@ -52,6 +58,13 @@ describe("the default starter", () => {
       expect(page).toContain('href="#main"');
       expect(page).toContain('<main id="main">');
     }
+  });
+
+  test("every page links the favicon, which is written to the site", () => {
+    expect(read("index.html")).toContain(
+      '<link rel="icon" href="/favicon.svg" type="image/svg+xml">',
+    );
+    expect(existsSync(join(root, "dist", "favicon.svg"))).toBe(true);
   });
 
   test("the welcome post has highlighted code and a callout", () => {

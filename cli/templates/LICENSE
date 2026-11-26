@@ -6,6 +6,9 @@ Copyright (c) 2026, Ian Ramos
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted.
 
+Except `default/static/favicon.svg`, which is Sheaf's logo and not part of this
+grant: replace it with your own icon.
+
 THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
 REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
 AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,

@@ -30,6 +30,7 @@ view site page =
         Head.canonical
             :: Head.description page.description
             :: Head.stylesheet "/style.css"
+            :: Head.icon { path = "/favicon.svg", mediaType = "image/svg+xml" }
             :: page.head
     , body =
         [ a [ class "skip-link", href "#main" ] [ text "Skip to content" ]

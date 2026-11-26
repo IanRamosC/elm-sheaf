@@ -19,7 +19,8 @@ bunx sheaf check     # check everything without writing the site
 - `src/Site.elm` holds the site's title, author and frontmatter; the templates
   are in `src/Theme/`.
 - `static/` is copied into the site as it is. `static/style.css` is the only
-  stylesheet.
+  stylesheet. `static/favicon.svg` is Sheaf's logo: replace it with your own
+  icon.
 - `sheaf.json` holds the address of the site, `siteUrl`.
 
 ## Publishing
@@ -38,4 +39,6 @@ directory `dist`.
 ## Licence
 
 This starter is offered under the 0BSD licence: use it however you like, with
-no notice required. Your site and everything you write in it are yours.
+no notice required. Your site and everything you write in it are yours. The
+exception is `static/favicon.svg`, which is Sheaf's logo and not part of the
+grant.

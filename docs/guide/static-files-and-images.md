@@ -7,6 +7,11 @@ Everything in `static/` is copied into the site as it is, at the same path:
 `/robots.txt`. Hidden files are copied too, so `static/.well-known/` works.
 Use it for stylesheets, fonts, a favicon, and files you link to, such as a PDF.
 
+The starter's `static/favicon.svg` is Sheaf's logo, linked from every page by
+`Head.icon { path = "/favicon.svg", mediaType = "image/svg+xml" }` in
+`src/Theme/Layout.elm`. Replace the file with your own icon; for a PNG or ICO,
+change the path and the media type to match.
+
 Symlinks in `static/` are followed only while they stay inside the site's
 folder, because everything in `static/` is published and a link out of it
 could publish a file from whichever machine builds the site. A link that leads

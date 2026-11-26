@@ -58,7 +58,10 @@ const TITLE = "[A-Z][A-Z0-9.]*(?: [A-Z0-9.]+)+";
 /** Every diagnostic title the code can report: a quoted capitalised string. */
 function titlesInCode(): Set<string> {
   const sources = [
-    ...filesUnder(join(REPO, "cli/src"), ".ts"),
+    ...filesUnder(join(REPO, "cli/src"), ".ts").filter(
+      // The starter's files, embedded as text, are not diagnostics.
+      (path) => !path.endsWith("starter.generated.ts"),
+    ),
     ...filesUnder(join(REPO, "src"), ".elm"),
   ];
   const quoted = new RegExp(`"(${TITLE})"`, "g");

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img">
+  <title>Sheaf</title>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#24599a"/>
+  <path d="M51 15.5 H28 A8 8 0 0 0 28 31.5 H36 A8 8 0 0 1 36 47.5 H13" fill="none" stroke="#fbfaf7" stroke-width="10"/>
+</svg>
