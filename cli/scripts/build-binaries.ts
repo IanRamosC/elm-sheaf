@@ -12,6 +12,10 @@ import { join, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
 import { grammars, injections } from "tm-grammars";
 import { themes } from "tm-themes";
+import {
+  EXCLUDED_THEMES,
+  excludedLanguageNames,
+} from "../src/highlight/excluded";
 
 export const TARGETS = [
   "bun-darwin-arm64",
@@ -55,10 +59,49 @@ export async function buildBinary(target: Target): Promise<string> {
   return (await compile(target)).binary;
 }
 
+/**
+ * Resolves Shiki's GPL-3.0 grammars and themes to a module of Sheaf's own, so
+ * their files never enter the bundle. Shiki's lists still name them, and
+ * loading one fails loudly, but Sheaf never asks for them.
+ */
+const leaveOutExcluded: Bun.BunPlugin = {
+  name: "leave out excluded grammars and themes",
+  setup(build) {
+    const excluded = {
+      langs: new Set(excludedLanguageNames()),
+      themes: new Set(EXCLUDED_THEMES),
+    };
+    const namespace = "sheaf-excluded";
+    build.onResolve(
+      { filter: /^@shikijs\/(langs|themes)\/[\w.-]+$/ },
+      ({ path }) => {
+        const [, kind, name = ""] = path.split("/");
+        const names = kind === "langs" ? excluded.langs : excluded.themes;
+        return names.has(name) ? { path, namespace } : undefined;
+      },
+    );
+    build.onLoad({ filter: /.*/, namespace }, ({ path }) => ({
+      contents: `throw new Error(${JSON.stringify(`Sheaf leaves out ${path}, which is GPL-3.0.`)});`,
+      loader: "js",
+    }));
+  },
+};
+
+/** What every build of the CLI shares, whatever it is compiled for. */
+export function bundleOptions() {
+  return {
+    entrypoints: [join(cli, "src/index.ts")],
+    target: "bun",
+    plugins: [leaveOutExcluded],
+    minify: true,
+    metafile: true,
+  } satisfies Bun.BuildConfig;
+}
+
 async function compile(target: Target): Promise<Built> {
   const binary = join(out, binaryName(target));
   const result = await Bun.build({
-    entrypoints: [join(cli, "src/index.ts")],
+    ...bundleOptions(),
     compile: {
       target,
       outfile: binary,
@@ -66,8 +109,6 @@ async function compile(target: Target): Promise<Built> {
       autoloadDotenv: false,
       autoloadBunfig: false,
     },
-    minify: true,
-    metafile: true,
   });
   if (!result.success || result.metafile === undefined) {
     throw new AggregateError(result.logs, `Compiling ${target} failed`);
@@ -186,8 +227,30 @@ async function collection(
     version: manifest.version,
     entries,
     license: (await Bun.file(join(folder, "LICENSE")).text()).trim(),
-    notice: (await Bun.file(join(folder, "NOTICE")).text()).trim(),
+    notice: noticeFor(
+      (await Bun.file(join(folder, "NOTICE")).text()).trim(),
+      entries,
+    ),
   };
+}
+
+/**
+ * The NOTICE of tm-grammars or tm-themes without the sections whose files are
+ * all left out of the bundle, so it gives no licence for code Sheaf doesn't
+ * carry. Each section starts with a rule and a `Files:` line.
+ */
+function noticeFor(notice: string, entries: Upstream[]): string {
+  const bundled = new Set(entries.map(({ name }) => `${name}.json`));
+  return notice
+    .split(/\n(?==+\nFiles:)/)
+    .filter((section) => {
+      const files = /^=+\nFiles:(.*)$/m.exec(section)?.[1];
+      return (
+        files === undefined ||
+        files.split(",").some((file) => bundled.has(file.trim()))
+      );
+    })
+    .join("\n");
 }
 
 function thirdPartyLicenses(
@@ -243,6 +306,28 @@ async function main(args: string[]): Promise<void> {
   }
   if (metafile === undefined) return;
 
+  const { text, packages, collections } = await notices(metafile);
+  await writeFile(join(out, "THIRD_PARTY_LICENSES"), text);
+  const [grammarCount, themeCount] = collections.map(
+    ({ entries }) => entries.length,
+  );
+  process.stdout.write(
+    `THIRD_PARTY_LICENSES  ${packages.length} packages, ${grammarCount} grammars, ${themeCount} themes, and Bun\n`,
+  );
+}
+
+/** The text of `THIRD_PARTY_LICENSES` for a bundle. */
+export async function thirdPartyNotices(
+  metafile: Bun.BuildMetafile,
+): Promise<string> {
+  return (await notices(metafile)).text;
+}
+
+async function notices(metafile: Bun.BuildMetafile): Promise<{
+  text: string;
+  packages: BundledPackage[];
+  collections: Collection[];
+}> {
   const packages = await bundledPackages(metafile);
   const collections = await Promise.all([
     collection(
@@ -256,16 +341,11 @@ async function main(args: string[]): Promise<void> {
       bundledUpstream(metafile, "themes", themes),
     ),
   ]);
-  await writeFile(
-    join(out, "THIRD_PARTY_LICENSES"),
-    thirdPartyLicenses(packages, collections),
-  );
-  const [grammarCount, themeCount] = collections.map(
-    ({ entries }) => entries.length,
-  );
-  process.stdout.write(
-    `THIRD_PARTY_LICENSES  ${packages.length} packages, ${grammarCount} grammars, ${themeCount} themes, and Bun\n`,
-  );
+  return {
+    text: thirdPartyLicenses(packages, collections),
+    packages,
+    collections,
+  };
 }
 
 if (import.meta.main) await main(process.argv.slice(2));

@@ -179,6 +179,26 @@ describe("highlightCode", () => {
     ]);
   });
 
+  test("says why a GPL grammar is left out", async () => {
+    for (const language of ["ada", "gnuplot", "nginx", "org", "racket"]) {
+      const [error] = await errorsOf(`\`\`\`${language}\nx\n\`\`\`\n`);
+
+      expect(error).toMatchObject({
+        title: "UNKNOWN LANGUAGE",
+        message: `This code block is marked as \`${language}\`, which Sheaf can't highlight.`,
+        hint: `Shiki's ${language} grammar is GPL-3.0, so Sheaf doesn't include it. Add it to your site with "highlight.grammars" in sheaf.json.`,
+      });
+    }
+  });
+
+  test("never suggests a grammar it leaves out", async () => {
+    for (const typo of ["nginxx", "rackett", "gnuplott"]) {
+      const [error] = await errorsOf(`\`\`\`${typo}\nx\n\`\`\`\n`);
+
+      expect(error?.hint).not.toMatch(/`(nginx|racket|gnuplot)`/);
+    }
+  });
+
   test("reports every unknown language in the document", async () => {
     const errors = await errorsOf(
       "```qqqqqq\n1\n```\n\n```elm\nx\n```\n\n```zzzzzz\n2\n```\n",

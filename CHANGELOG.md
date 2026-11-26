@@ -29,7 +29,9 @@ numbers are those of the npm package `elm-sheaf`.
 - Markdown follows CommonMark and GitHub Flavored Markdown. Directives become
   components rendered by Elm views you write.
 - Code blocks are highlighted with Shiki when the site is built, in a light and
-  a dark theme.
+  a dark theme. Shiki's GPL-3.0 grammars (`ada`, `gnuplot`, `nginx`, `org`,
+  `racket`) and theme (`aurora-x`) are left out, because Sheaf's
+  BSD-3-Clause binaries can't carry them.
 - Local images in Markdown are resized to several widths, encoded as WebP as
   well, and written as `<picture>` elements with their dimensions. Missing
   images and paths whose case doesn't match fail the build.

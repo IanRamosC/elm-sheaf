@@ -56,7 +56,8 @@ written with a time and an offset doesn't depend on it. See
 `highlight.theme.light` and `highlight.theme.dark` name the two
 [Shiki themes](https://shiki.style/themes) code blocks are highlighted with.
 Either can be left out. A name Shiki doesn't have is `BAD CONFIG`, with the
-closest theme as a suggestion.
+closest theme as a suggestion. Sheaf leaves out Shiki's `aurora-x` theme,
+because it is GPL-3.0.
 
 Pages use the light theme. To follow the reader's system setting, add Shiki's
 dark-mode CSS to your stylesheet, as the starter's `static/style.css` does:

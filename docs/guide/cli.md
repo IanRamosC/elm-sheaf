@@ -123,7 +123,7 @@ titles.
 | Title | What it means |
 |---|---|
 | `NO SHEAF.JSON` | There is no `sheaf.json` in the folder the command runs in. |
-| `BAD CONFIG` | `sheaf.json` or `--site-url` has a problem: invalid JSON, an unknown key, a missing or invalid `siteUrl`, an unknown timezone or Shiki theme, or bad image settings. |
+| `BAD CONFIG` | `sheaf.json` or `--site-url` has a problem: invalid JSON, an unknown key, a missing or invalid `siteUrl`, an unknown timezone, an unknown or left-out Shiki theme, or bad image settings. |
 | `FOLDER NOT EMPTY` | `sheaf init` was given a folder with something in it, or a file. |
 | `NOT A SHEAF REPOSITORY` | The `--local` path has no `src/Sheaf.elm` and `cli/package.json`. |
 | `ELM NOT FOUND` | There is no `elm` in the site's `node_modules/.bin` or on the `PATH`. |
@@ -160,7 +160,7 @@ titles.
 | `LINK TO DRAFT` | A published page links to a draft or a future-dated document. |
 | `NO PAGE FOR LINK` | A link to a document whose collection has no `Route.eachItem` route, or to a group with no `Route.groupedBy` route for its pattern. |
 | `RAW HTML` | The Markdown contains HTML. |
-| `UNKNOWN LANGUAGE` | A code block's language isn't one Shiki knows. |
+| `UNKNOWN LANGUAGE` | A code block's language isn't one Sheaf can highlight: Shiki doesn't know it, or it's one of the GPL-3.0 grammars Sheaf leaves out. |
 | `UNKNOWN COMPONENT` | A directive names a component the site doesn't declare. |
 | `WRONG COMPONENT KIND` | A leaf component is used as a container, or the reverse. |
 | `UNKNOWN ATTRIBUTE` | A component attribute the component doesn't declare. |

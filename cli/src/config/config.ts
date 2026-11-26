@@ -1,5 +1,6 @@
 import { bundledThemes } from "shiki/themes";
 import type { Diagnostic } from "../diagnostics/diagnostic";
+import { excludedHint, isExcludedTheme } from "../highlight/excluded";
 import { err, ok, type Result } from "../result";
 import { suggestions } from "../suggest";
 
@@ -213,8 +214,18 @@ function parseTheme(
   if (typeof value !== "string") {
     return err({ message: `"highlight.theme.${variant}" must be a string.` });
   }
-  if (Object.hasOwn(bundledThemes, value)) return ok(value);
-  const [closest] = suggestions(value, Object.keys(bundledThemes), 1);
+  if (isIncludedTheme(value)) return ok(value);
+  if (isExcludedTheme(value)) {
+    return err({
+      message: `The ${variant} theme "${value}" is not a theme Sheaf can use.`,
+      hint: excludedHint("theme", value),
+    });
+  }
+  const [closest] = suggestions(
+    value,
+    Object.keys(bundledThemes).filter(isIncludedTheme),
+    1,
+  );
   return err({
     message: `The ${variant} theme "${value}" is not one of Shiki's themes.`,
     hint:
@@ -222,6 +233,11 @@ function parseTheme(
         ? "The themes are listed at https://shiki.style/themes."
         : `Did you mean "${closest}"?`,
   });
+}
+
+/** Whether Shiki has the theme `name` and Sheaf includes it. */
+function isIncludedTheme(name: string): boolean {
+  return Object.hasOwn(bundledThemes, name) && !isExcludedTheme(name);
 }
 
 function unknownKeys(

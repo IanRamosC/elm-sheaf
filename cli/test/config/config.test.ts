@@ -170,6 +170,28 @@ describe("parseConfig", () => {
     expect(errors[0]?.hint).toContain('"github-light"');
   });
 
+  test("says why a GPL theme is left out", () => {
+    const errors = errorsOf(
+      '{"siteUrl":"https://example.com/","highlight":{"theme":{"dark":"aurora-x"}}}',
+    );
+    expect(errors).toEqual([
+      {
+        severity: "error",
+        title: "BAD CONFIG",
+        message: 'The dark theme "aurora-x" is not a theme Sheaf can use.',
+        sourcePath: "sheaf.json",
+        hint: "Shiki's aurora-x theme is GPL-3.0, so Sheaf doesn't include it. Add it to your site with \"highlight.themes\" in sheaf.json.",
+      },
+    ]);
+  });
+
+  test("never suggests a theme it leaves out", () => {
+    const errors = errorsOf(
+      '{"siteUrl":"https://example.com/","highlight":{"theme":{"dark":"aurora-xx"}}}',
+    );
+    expect(errors[0]?.hint).not.toContain("aurora-x");
+  });
+
   test("rejects unknown keys and wrong types under highlight", () => {
     const errors = errorsOf(
       '{"siteUrl":"https://example.com/","highlight":{"themes":{},"theme":{"light":1,"darkk":"nord"}}}',

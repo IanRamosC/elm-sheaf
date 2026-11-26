@@ -187,10 +187,12 @@ greet name =
 ```
 ````
 
-A block without a language is plain text. A language Shiki doesn't know is
+A block without a language is plain text. A language Sheaf can't highlight is
 `UNKNOWN LANGUAGE`, with a suggestion; names are case-sensitive, as in Shiki.
-Use `text` for a block you don't want highlighted. The themes are set in
-[Configuration](configuration.md#highlight).
+Use `text` for a block you don't want highlighted. Sheaf leaves out Shiki's
+`ada`, `gnuplot`, `nginx`, `org` and `racket` grammars, because they are
+GPL-3.0 and Sheaf is BSD-3-Clause, but a site can
+[add them back](configuration.md#highlight). The themes are set there too.
 
 ### Components
 

@@ -15,6 +15,7 @@ import type { Highlight, Node } from "../markdown/tree";
 import { collect, err, ok, type Result } from "../result";
 import { suggestions } from "../suggest";
 import type { HighlightCache } from "./cache";
+import { excludedGrammar, excludedHint } from "./excluded";
 
 /** Shiki's name for code with no highlighting, used for a block with no language. */
 const PLAIN = "text";
@@ -45,13 +46,14 @@ export async function createCodeHighlighter(
     engine: createJavaScriptRegexEngine(),
     themes: [bundledTheme(themes.light), bundledTheme(themes.dark)],
     langs: languages
-      .filter(isBundledLanguage)
+      .filter(isIncludedLanguage)
       .map((language) => bundledLanguages[language]),
   });
 
   return {
     [Symbol.dispose]: () => shiki.dispose(),
-    knows: (language) => isSpecialLang(language) || isBundledLanguage(language),
+    knows: (language) =>
+      isSpecialLang(language) || isIncludedLanguage(language),
     highlight: (code, language) =>
       cache.get(cacheKey(themes, code, language), () => {
         const { tokens, fg, bg } = shiki.codeToTokens(code, {
@@ -121,19 +123,28 @@ function unknownLanguage(
   language: string,
   document: SourceDocument,
 ): Diagnostic {
-  const [closest] = suggestions(language, Object.keys(bundledLanguages), 1);
-  const plainHint = `Use \`${PLAIN}\` for a block without highlighting.`;
   return {
     severity: "error",
     title: "UNKNOWN LANGUAGE",
     message: `This code block is marked as \`${language}\`, which Sheaf can't highlight.`,
     sourcePath: document.sourcePath,
     span: block.position,
-    hint:
-      closest === undefined
-        ? plainHint
-        : `Did you mean \`${closest}\`? ${plainHint}`,
+    hint: unknownLanguageHint(language),
   };
+}
+
+function unknownLanguageHint(language: string): string {
+  const excluded = excludedGrammar(language);
+  if (excluded !== undefined) return excludedHint("grammar", excluded);
+  const [closest] = suggestions(
+    language,
+    Object.keys(bundledLanguages).filter(isIncludedLanguage),
+    1,
+  );
+  const plainHint = `Use \`${PLAIN}\` for a block without highlighting.`;
+  return closest === undefined
+    ? plainHint
+    : `Did you mean \`${closest}\`? ${plainHint}`;
 }
 
 /**
@@ -158,8 +169,11 @@ function cacheKey(
     .digest("hex");
 }
 
-function isBundledLanguage(name: string): name is BundledLanguage {
-  return Object.hasOwn(bundledLanguages, name);
+/** Whether Shiki has a grammar for `name` and Sheaf includes it. */
+function isIncludedLanguage(name: string): name is BundledLanguage {
+  return (
+    Object.hasOwn(bundledLanguages, name) && excludedGrammar(name) === undefined
+  );
 }
 
 function bundledTheme(name: string) {
