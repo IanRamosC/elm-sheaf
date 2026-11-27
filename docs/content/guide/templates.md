@@ -314,6 +314,16 @@ and the site's address are added for you; a path that is neither a site path
 nor an `http` or `https` URL is `INVALID HTML`. `rssFeed` and `atomFeed` must
 name a feed the site declares, or the page is `UNKNOWN FEED`.
 
+`stylesheet` links a `.css` file from `static/` by the path it has there, but
+the page gets a copy named by a hash of the file's contents, such as
+`/style.3f2a9c1e.css`, so a changed stylesheet is never served from a stale
+cache. The original is still written under its own name. A path that isn't a
+stylesheet in `static/` is `UNKNOWN STYLESHEET`. That includes a hand-made cache
+buster such as `/style.css?v=2`, which the hash makes unnecessary, and a name
+written with percent escapes, such as `/my%20theme.css`: the path is looked up
+as the file's name on disk and isn't decoded. A full `https://` URL is linked
+as it is and never checked.
+
 ## Components
 
 A component turns a Markdown directive into HTML with a view you write. Its

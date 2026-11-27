@@ -29,6 +29,7 @@ import {
 import { runElm } from "./elm/run";
 import { staticClashes } from "./emit/clashes";
 import { atomFeed, rssFeed } from "./emit/feeds";
+import { stylesheetCopies } from "./emit/fingerprint";
 import { providesRobots, robotsTxt } from "./emit/robots";
 import { sitemapXml } from "./emit/sitemap";
 import { listStaticFiles } from "./emit/static";
@@ -137,6 +138,8 @@ export async function build(
 
   const staticFiles = await listStaticFiles(siteRoot);
   if (!staticFiles.ok) return staticFiles;
+  const { stylesheets, copies } = await stylesheetCopies(staticFiles.value);
+  const staticOutputs = [...staticFiles.value, ...copies];
 
   const elm = await findElm(siteRoot);
   if (!elm.ok) return elm;
@@ -155,6 +158,7 @@ export async function build(
     collections,
     imaged.value.documents,
     slugTable(documents.value),
+    stylesheets,
   );
   const ran = await runElm(compiled.value, request, options.log);
   if (!ran.ok) return ran;
@@ -169,16 +173,14 @@ export async function build(
     ...imageOutputs(imaged.value.published),
   ];
   // A default: the site's own file, or a route's, takes its place unreported.
-  const writtenPaths = [...outputs, ...staticFiles.value].map(
-    ({ path }) => path,
-  );
+  const writtenPaths = [...outputs, ...staticOutputs].map(({ path }) => path);
   if (!providesRobots(writtenPaths)) {
     outputs.push(robotsFile(config.value));
   }
-  const clashes = staticClashes(outputs, staticFiles.value);
+  const clashes = staticClashes(outputs, staticFiles.value, stylesheets);
   if (clashes.length > 0) return err(clashes);
   if (options.output !== undefined) {
-    await writeSite(options.output, outputs, staticFiles.value);
+    await writeSite(options.output, outputs, staticOutputs);
   }
   const redirects = pages.filter(({ aliasOf }) => aliasOf !== undefined);
   return ok({

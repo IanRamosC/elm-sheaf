@@ -149,6 +149,17 @@ type Card
 
 {-| `<link rel="stylesheet">`, such as `Head.stylesheet "/style.css"` for
 `static/style.css`.
+
+The path is a `.css` file under `static/`, linked by the path it has there. The
+page links a copy of the file whose name carries a hash of its contents, such as
+`/style.3f2a9c1e.css`, so a changed stylesheet is never served from a stale
+cache and the copy can be cached for a long time. The file itself is still
+written under its own name.
+
+A path that isn't a stylesheet in `static/`, or has a query string such as
+`/style.css?v=2`, is `UNKNOWN STYLESHEET`. A full `https://` URL is linked as
+it is.
+
 -}
 stylesheet : String -> Tag
 stylesheet =

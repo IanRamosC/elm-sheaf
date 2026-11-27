@@ -23,6 +23,7 @@
     {
       "rss": "feed.xml",
       "atom": "atom.xml",
+      "title": "Example",
       "items": [
         {
           "documentId": "posts/hello-world",

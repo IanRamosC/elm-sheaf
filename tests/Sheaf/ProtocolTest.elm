@@ -144,7 +144,7 @@ requestTests =
         , test "rejects another protocol version" <|
             \_ ->
                 ProtocolFixtures.minimalRequest
-                    |> String.replace "\"protocolVersion\": 4" "\"protocolVersion\": 3"
+                    |> String.replace "\"protocolVersion\": 5" "\"protocolVersion\": 4"
                     |> decodeRequest
                     |> Result.mapError (always ())
                     |> Expect.equal (Err ())
@@ -224,6 +224,7 @@ responseTests =
                         , feeds =
                             [ { rss = "feed.xml"
                               , atom = "atom.xml"
+                              , title = "Example"
                               , items =
                                     [ { documentId = "posts/hello-world"
                                       , url = "https://example.com/blog/posts/hello-world/"

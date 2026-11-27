@@ -64,6 +64,9 @@ render ((Site { metadata }) as site) json =
 type alias Context =
     { origin : String
     , basePath : String
+
+    -- The site's title, which names its feeds.
+    , title : String
     , documents : Dict String Document
 
     -- The pattern of the first item route of each collection.
@@ -80,6 +83,7 @@ renderSite (Site site) request =
         context =
             { origin = request.build.origin
             , basePath = request.build.basePath
+            , title = site.metadata.title
             , documents = Dict.fromList (List.map (\document -> ( document.id, document )) request.documents)
             , itemPatterns =
                 -- Reversed, because `Dict.fromList` keeps the last.
@@ -151,6 +155,7 @@ renderSite (Site site) request =
                     , linkProblem = linkTarget context >> Results.error
                     , groupLinkProblem = Grouping.linkTarget context groupPages >> Results.error
                     , feedPaths = feedPaths site.feeds
+                    , stylesheets = request.stylesheets
                     }
                 )
                 written.pages

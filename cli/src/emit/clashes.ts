@@ -1,4 +1,5 @@
 import type { Diagnostic } from "../diagnostics/diagnostic";
+import type { Stylesheet } from "./fingerprint";
 import type { OutputFile } from "./write";
 
 const RESERVED_FOLDER = "_sheaf/";
@@ -9,10 +10,15 @@ const IMAGE_FOLDER = "_sheaf/images/";
  * what Sheaf generates, or each other. Paths are compared lowercased, as
  * `DUPLICATE PAGE` does, because case-insensitive file systems would merge them.
  * Each static file is reported once, for the first problem found.
+ *
+ * The hashed copies of `stylesheets` are written beside them, so they are
+ * checked too. One whose original is already reported is left out, because
+ * the same problem would be reported twice.
  */
 export function staticClashes(
   outputs: OutputFile[],
   staticFiles: OutputFile[],
+  stylesheets: Stylesheet[] = [],
 ): Diagnostic[] {
   const files = new Map<string, Claimed>();
   const folders = new Map<string, Claimed>();
@@ -33,17 +39,37 @@ export function staticClashes(
   }
 
   const diagnostics: Diagnostic[] = [];
+  const reported = new Set<string>();
   for (const { path } of staticFiles) {
     const mine: Claimed = { path, static: true };
     const problem = reservedClash(mine) ?? findClash(mine, files, folders);
+    if (problem !== undefined) {
+      diagnostics.push(problem);
+      reported.add(path);
+    }
+    claim(mine);
+  }
+  for (const { path: copyOf, hashed } of stylesheets) {
+    const mine: Claimed = { path: hashed, static: false, copyOf };
+    const problem = reported.has(copyOf)
+      ? undefined
+      : findClash(mine, files, folders);
     if (problem !== undefined) diagnostics.push(problem);
     claim(mine);
   }
   return diagnostics;
 }
 
-/** A path taken by a static file or an output; a redirect page has `aliasOf`. */
-type Claimed = { path: string; static: boolean; aliasOf?: string };
+/**
+ * A path taken by a static file or an output. A redirect page has `aliasOf`,
+ * and the hashed copy of a stylesheet has `copyOf`, the path of the original.
+ */
+type Claimed = {
+  path: string;
+  static: boolean;
+  aliasOf?: string;
+  copyOf?: string;
+};
 
 function reservedClash({ path }: Claimed): Diagnostic | undefined {
   if (!path.toLowerCase().startsWith(RESERVED_FOLDER)) return undefined;
@@ -67,7 +93,7 @@ function findClash(
     const file = files.get(parts.slice(0, end).join("/"));
     if (file !== undefined) {
       return clash(
-        `static/${mine.path} needs ${file.path} to be a folder, but ${describe(file)} is a file.`,
+        `${subject(mine)} needs ${file.path} to be a folder, but ${describe(file)} is a file.`,
         moveHint(file),
       );
     }
@@ -76,7 +102,7 @@ function findClash(
   const inside = folders.get(key);
   if (inside !== undefined) {
     return clash(
-      `static/${mine.path} is a file, but ${describe(inside)} needs it to be a folder.`,
+      `${subject(mine)} is a file, but ${describe(inside)} needs it to be a folder.`,
       moveHint(inside),
     );
   }
@@ -84,6 +110,17 @@ function findClash(
 }
 
 function samePath(mine: Claimed, other: Claimed): Diagnostic {
+  if (mine.copyOf !== undefined) {
+    return other.static
+      ? clash(
+          `static/${other.path} would replace the ${describe(mine)} that Sheaf generates.`,
+          `Rename static/${other.path}. Sheaf writes each stylesheet again under a name that carries a hash of its contents.`,
+        )
+      : clash(
+          `${subject(mine)} would replace the ${describe(other)} that Sheaf generates.`,
+          moveHint(other),
+        );
+  }
   if (other.static) {
     return clash(
       `static/${other.path} and static/${mine.path} are the same file on a case-insensitive file system.`,
@@ -100,8 +137,14 @@ function samePath(mine: Claimed, other: Claimed): Diagnostic {
  * Names an output by its kind. Apart from redirects, the path alone tells them
  * apart: feeds and the sitemap are the only `.xml`.
  */
-function describe({ path, static: isStatic, aliasOf }: Claimed): string {
+function describe({
+  path,
+  static: isStatic,
+  aliasOf,
+  copyOf,
+}: Claimed): string {
   if (isStatic) return `static/${path}`;
+  if (copyOf !== undefined) return `hashed copy of static/${copyOf}`;
   if (aliasOf !== undefined) return `redirect ${path} (alias of ${aliasOf})`;
   if (path.toLowerCase().startsWith(IMAGE_FOLDER)) {
     return `image variant ${path}`;
@@ -112,6 +155,9 @@ function describe({ path, static: isStatic, aliasOf }: Claimed): string {
 
 function moveHint(other: Claimed): string {
   if (other.static) return "Rename or delete one of them.";
+  if (other.copyOf !== undefined) {
+    return `Rename or delete static/${other.copyOf}, whose hashed copy this is.`;
+  }
   if (other.aliasOf !== undefined) {
     return `Rename or delete the static file, or change the alias in ${other.aliasOf}.`;
   }
@@ -120,4 +166,9 @@ function moveHint(other: Claimed): string {
 
 function clash(message: string, hint: string): Diagnostic {
   return { severity: "error", title: "STATIC FILE CLASH", message, hint };
+}
+
+/** Starts a message about a static file or the hashed copy of one. */
+function subject(mine: Claimed): string {
+  return mine.static ? describe(mine) : `The ${describe(mine)}`;
 }

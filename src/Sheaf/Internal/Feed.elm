@@ -27,6 +27,7 @@ type alias Context a =
     { a
         | origin : String
         , basePath : String
+        , title : String
         , itemPatterns : Dict String String
     }
 
@@ -59,6 +60,7 @@ render context resolve bodies (Feed feed) =
                                     Ok
                                         { rss = Path.dropLeadingSlash feed.rss
                                         , atom = Path.dropLeadingSlash feed.atom
+                                        , title = context.title
                                         , items = Maybe.withDefault items (Maybe.map (\limit -> List.take limit items) feed.limit)
                                         }
 

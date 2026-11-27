@@ -29,6 +29,7 @@ module RenderFixtures exposing
     , request
     , requestUnder
     , requestWithSlugs
+    , requestWithStylesheets
     , span
     , textNode
     , titles
@@ -164,7 +165,7 @@ request =
 -}
 requestUnder : String -> List String -> List Source -> Value
 requestUnder basePath =
-    requestWith { basePath = basePath, slugs = [] }
+    requestWith { basePath = basePath, slugs = [], stylesheets = [] }
 
 
 {-| A request for the site at `https://example.com/blog/`, with the host's
@@ -172,13 +173,21 @@ table of group slugs: each value, its slug and its folded form.
 -}
 requestWithSlugs : List ( String, String, String ) -> List String -> List Source -> Value
 requestWithSlugs slugs =
-    requestWith { basePath = "/blog/", slugs = slugs }
+    requestWith { basePath = "/blog/", slugs = slugs, stylesheets = [] }
 
 
-requestWith : { basePath : String, slugs : List ( String, String, String ) } -> List String -> List Source -> Value
-requestWith { basePath, slugs } collections sources =
+{-| A request for the site at `https://example.com/blog/`, with the stylesheets
+of its `static/` folder: each path and its hashed path.
+-}
+requestWithStylesheets : List ( String, String ) -> List String -> List Source -> Value
+requestWithStylesheets stylesheets =
+    requestWith { basePath = "/blog/", slugs = [], stylesheets = stylesheets }
+
+
+requestWith : { basePath : String, slugs : List ( String, String, String ), stylesheets : List ( String, String ) } -> List String -> List Source -> Value
+requestWith { basePath, slugs, stylesheets } collections sources =
     Encode.object
-        [ ( "protocolVersion", Encode.int 4 )
+        [ ( "protocolVersion", Encode.int 5 )
         , ( "build"
           , Encode.object
                 [ ( "origin", Encode.string "https://example.com" )
@@ -196,6 +205,16 @@ requestWith { basePath, slugs } collections sources =
                         ]
                 )
                 slugs
+          )
+        , ( "stylesheets"
+          , Encode.list
+                (\( path, hashed ) ->
+                    Encode.object
+                        [ ( "path", Encode.string path )
+                        , ( "hashed", Encode.string hashed )
+                        ]
+                )
+                stylesheets
           )
         , ( "collections", Encode.list Encode.string collections )
         , ( "documents", Encode.list encodeSource sources )

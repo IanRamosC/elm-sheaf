@@ -27,7 +27,7 @@ function item(overrides: Partial<FeedItem> = {}): FeedItem {
 }
 
 function feed(items: FeedItem[]): Feed {
-  return { rss: "feed.xml", atom: "atom.xml", items };
+  return { rss: "feed.xml", atom: "atom.xml", title: metadata.title, items };
 }
 
 describe("rssFeed", () => {

@@ -63,3 +63,16 @@ site:
 
 The host must provide Bun 1.4.5 or newer; Sheaf stops with an upgrade message
 on an older one. Both hosts serve `404.html` for addresses with no page.
+
+## Caching
+
+Files whose names carry a hash of their contents, the image variants in
+`_sheaf/images/` and the stylesheets such as `style.<hash>.css`, never change
+under the same name, so a server can send them with a long cache lifetime:
+
+```text
+Cache-Control: public, max-age=31536000, immutable
+```
+
+Everything else, pages and feeds included, is replaced under the same name by
+the next build, so it should be revalidated.

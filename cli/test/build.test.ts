@@ -14,6 +14,7 @@ import {
 } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { type BuildOptions, build } from "../src/build";
+import { hashedPath } from "../src/emit/fingerprint";
 import { imageHash } from "../src/images/codec";
 import { initSite } from "../src/init/init";
 import {
@@ -367,6 +368,51 @@ describe("build", () => {
     },
     SLOW,
   );
+
+  describe("stylesheets", () => {
+    test(
+      "writes each one under a name with its hash, and links that",
+      async () => {
+        const root = copyFixture("blog");
+
+        const result = await build(root, options(root));
+
+        expect(titlesOf(result)).toEqual([]);
+        const bytes = readFileSync(join(root, "static/style.css"));
+        const hashed = hashedPath("style.css", bytes);
+        expect(readFileSync(join(root, "dist/style.css"))).toEqual(bytes);
+        expect(readFileSync(join(root, "dist", hashed))).toEqual(bytes);
+        const home = readFileSync(join(root, "dist/index.html"), "utf8");
+        expect(home).toContain(
+          `<link rel="stylesheet" href="/blog/${hashed}">`,
+        );
+        expect(home).not.toContain('href="/blog/style.css"');
+      },
+      SLOW,
+    );
+
+    test(
+      "reports a layout that links one that is not in static/",
+      async () => {
+        const root = copyFixture("minimal");
+        const layout = join(root, "src/Site.elm");
+        writeFileSync(
+          layout,
+          readFileSync(layout, "utf8")
+            .replace(
+              "import Sheaf.Frontmatter",
+              "import Sheaf.Head as Head\nimport Sheaf.Frontmatter",
+            )
+            .replace("head = []", 'head = [ Head.stylesheet "/nope.css" ]'),
+        );
+
+        const result = await build(root, options(root));
+
+        expect(titlesOf(result)).toEqual(["UNKNOWN STYLESHEET"]);
+      },
+      SLOW,
+    );
+  });
 
   test(
     "highlights code and caches the tokens",

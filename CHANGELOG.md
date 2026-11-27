@@ -8,6 +8,10 @@ numbers are those of the npm package `elm-sheaf`.
 
 ### Added
 
+- `Head.stylesheet` links a copy of the stylesheet whose name carries a hash of
+  its contents, so a changed theme is never served from a stale cache. A path
+  that isn't a stylesheet in `static/`, including one with a query string such
+  as `/style.css?v=2`, is `UNKNOWN STYLESHEET`.
 - `sheaf init` creates a site from a starter blog: a home page, a welcome post,
   an about page, a stylesheet with light and dark colour schemes, and a
   workflow that deploys to GitHub Pages.

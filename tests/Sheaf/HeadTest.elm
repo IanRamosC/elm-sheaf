@@ -1,5 +1,6 @@
 module Sheaf.HeadTest exposing (suite)
 
+import Dict exposing (Dict)
 import Expect
 import Sheaf.Date exposing (Date)
 import Sheaf.Head as Head exposing (Card(..), Kind(..), Tag)
@@ -24,7 +25,15 @@ suite =
 -}
 render : Tag -> String
 render tag =
-    Internal.toHtml { origin = "https://example.com", basePath = "/blog/", url = Just "/posts/a/" } tag
+    renderWith Dict.empty tag
+
+
+{-| A tag as it is rendered on the same page of a site whose stylesheets, by
+path, have the given hashed paths.
+-}
+renderWith : Dict String String -> Tag -> String
+renderWith stylesheets tag =
+    Internal.toHtml { origin = "https://example.com", basePath = "/blog/", stylesheets = stylesheets, url = Just "/posts/a/" } tag
         |> List.map Html.toString
         |> String.concat
 
@@ -101,6 +110,24 @@ pathTests =
             \_ ->
                 render (Head.stylesheet "/style.css")
                     |> Expect.equal "<link rel=\"stylesheet\" href=\"/blog/style.css\">"
+        , test "a stylesheet is linked by its hashed path, in its folder, under the base path" <|
+            \_ ->
+                let
+                    stylesheets : Dict String String
+                    stylesheets =
+                        Dict.fromList [ ( "style.css", "style.0123abcd.css" ), ( "css/site.css", "css/site.0123abcd.css" ) ]
+                in
+                ( renderWith stylesheets (Head.stylesheet "/style.css")
+                , renderWith stylesheets (Head.stylesheet "/css/site.css")
+                )
+                    |> Expect.equal
+                        ( "<link rel=\"stylesheet\" href=\"/blog/style.0123abcd.css\">"
+                        , "<link rel=\"stylesheet\" href=\"/blog/css/site.0123abcd.css\">"
+                        )
+        , test "a full URL is linked as given even when its path is a stylesheet" <|
+            \_ ->
+                renderWith (Dict.fromList [ ( "x.css", "x.0123abcd.css" ) ]) (Head.stylesheet "https://cdn.example/x.css")
+                    |> Expect.equal "<link rel=\"stylesheet\" href=\"https://cdn.example/x.css\">"
         , test "an icon gets the base path and its media type" <|
             \_ ->
                 render (Head.icon { path = "/favicon.svg", mediaType = "image/svg+xml" })

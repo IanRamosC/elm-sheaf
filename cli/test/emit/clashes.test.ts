@@ -101,3 +101,33 @@ describe("staticClashes", () => {
     expect(clashesOf("style.css", "posts/a.png", "fonts/x.woff2")).toEqual([]);
   });
 });
+
+describe("staticClashes with stylesheets", () => {
+  const stylesheets = [{ path: "style.css", hashed: "style.3f2a9c1e.css" }];
+  const files = (...paths: string[]): OutputFile[] =>
+    paths.map((path) => ({ kind: "copy", path, source: "/elsewhere" }));
+
+  test("names the hashed copy a real file would replace, once", () => {
+    const diagnostics = staticClashes(
+      outputs,
+      files("style.css", "style.3f2a9c1e.css"),
+      stylesheets,
+    );
+
+    expect(diagnostics.map(({ title, message }) => [title, message])).toEqual([
+      [
+        "STATIC FILE CLASH",
+        "static/style.3f2a9c1e.css would replace the hashed copy of static/style.css that Sheaf generates.",
+      ],
+    ]);
+    expect(diagnostics[0]?.hint).toContain("Rename static/style.3f2a9c1e.css");
+  });
+
+  test("skips the copy of a file that is already reported", () => {
+    const diagnostics = staticClashes(outputs, files("_sheaf/x.css"), [
+      { path: "_sheaf/x.css", hashed: "_sheaf/x.3f2a9c1e.css" },
+    ]);
+
+    expect(diagnostics).toHaveLength(1);
+  });
+});

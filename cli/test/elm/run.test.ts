@@ -77,6 +77,7 @@ const emptyRequest: Request = {
     mode: "production",
   },
   slugs: [],
+  stylesheets: [],
   collections: [],
   documents: [],
 };
@@ -431,6 +432,7 @@ async function generateSite(siteRoot: string): Promise<Request> {
     collections,
     parsed,
     slugTable(documents),
+    [],
   );
 }
 

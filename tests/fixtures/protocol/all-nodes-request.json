@@ -1,5 +1,5 @@
 {
-  "protocolVersion": 4,
+  "protocolVersion": 5,
   "build": {
     "origin": "https://example.com",
     "basePath": "/blog",
@@ -10,6 +10,12 @@
       "value": "Elm",
       "slug": "elm",
       "folded": "elm"
+    }
+  ],
+  "stylesheets": [
+    {
+      "path": "css/style.css",
+      "hashed": "css/style.3f2a9c1e.css"
     }
   ],
   "collections": [

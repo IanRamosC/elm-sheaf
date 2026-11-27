@@ -38,12 +38,14 @@ import Time
 
 `collections` names every folder in `content/`, including empty ones, which
 have no documents. `slugs` is the host's table of group slugs, by the value
-that was slugged.
+that was slugged. `stylesheets` has the hashed path of each stylesheet in
+`static/`, by its path, both relative to the site's root.
 
 -}
 type alias Request =
     { build : Build
     , slugs : Dict String GroupSlug
+    , stylesheets : Dict String String
     , collections : List String
     , documents : List Document
     }
@@ -163,7 +165,7 @@ type alias FieldPosition =
 -}
 protocolVersion : Int
 protocolVersion =
-    4
+    5
 
 
 {-| Decodes the host's request, which must speak this protocol version.
@@ -174,9 +176,10 @@ requestDecoder =
         |> Decode.andThen
             (\version ->
                 if version == protocolVersion then
-                    Decode.map4 Request
+                    Decode.map5 Request
                         (Decode.field "build" buildDecoder)
                         (Decode.field "slugs" slugsDecoder)
+                        (Decode.field "stylesheets" stylesheetsDecoder)
                         (Decode.field "collections" (Decode.list Decode.string))
                         (Decode.field "documents" (Decode.list documentDecoder))
 
@@ -205,6 +208,16 @@ slugsDecoder =
             (Decode.field "value" Decode.string)
             (Decode.field "slug" Decode.string)
             (Decode.field "folded" Decode.string)
+        )
+        |> Decode.map Dict.fromList
+
+
+stylesheetsDecoder : Decoder (Dict String String)
+stylesheetsDecoder =
+    Decode.list
+        (Decode.map2 Tuple.pair
+            (Decode.field "path" Decode.string)
+            (Decode.field "hashed" Decode.string)
         )
         |> Decode.map Dict.fromList
 
@@ -715,12 +728,13 @@ type alias Page =
     }
 
 
-{-| An RSS and an Atom file for the same items. The paths are relative to
-`dist/`, without the base path.
+{-| An RSS and an Atom file for the same items, under the channel's `title`.
+The paths are relative to `dist/`, without the base path.
 -}
 type alias Feed =
     { rss : String
     , atom : String
+    , title : String
     , items : List FeedItem
     }
 
@@ -800,6 +814,7 @@ encodeFeed feed =
     Encode.object
         [ ( "rss", Encode.string feed.rss )
         , ( "atom", Encode.string feed.atom )
+        , ( "title", Encode.string feed.title )
         , ( "items", Encode.list encodeFeedItem feed.items )
         ]
 

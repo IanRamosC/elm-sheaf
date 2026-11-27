@@ -3,11 +3,12 @@ import type { SourceDocument } from "../content/document";
 import type { BuildMode } from "../content/load";
 import type { GroupSlug } from "../content/slug";
 import type { Diagnostic, Span } from "../diagnostics/diagnostic";
+import type { Stylesheet } from "../emit/fingerprint";
 import type { LocalImage, Node } from "../markdown/tree";
 import { err, ok, type Result } from "../result";
 
 /** Bumped whenever the JSON exchanged with the Elm worker changes shape. */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 export type BuildInfo = {
   siteUrl: string;
@@ -55,6 +56,8 @@ export type Request = {
   build: WireBuild;
   /** Every string value in frontmatter, with the slug the worker groups it by. */
   slugs: GroupSlug[];
+  /** The `.css` files of `static/`, each with its copy named by its contents. */
+  stylesheets: Stylesheet[];
   /** Every folder in `content/`, including empty ones, which send no documents. */
   collections: string[];
   documents: RequestDocument[];
@@ -85,7 +88,13 @@ export type FeedItem = {
 };
 
 /** The paths are relative to `dist/` and do not include the base path. */
-export type Feed = { rss: string; atom: string; items: FeedItem[] };
+export type Feed = {
+  rss: string;
+  atom: string;
+  /** The title of the channel; the site's title for a feed of a collection. */
+  title: string;
+  items: FeedItem[];
+};
 
 export type SitemapEntry = { url: string; lastModified: number | null };
 
@@ -115,6 +124,7 @@ export function encodeRequest(
   collections: string[],
   documents: ParsedDocument[],
   slugs: GroupSlug[],
+  stylesheets: Stylesheet[],
 ): Request {
   return {
     protocolVersion: PROTOCOL_VERSION,
@@ -124,6 +134,7 @@ export function encodeRequest(
       mode: build.mode,
     },
     slugs,
+    stylesheets,
     collections,
     documents: documents.map(({ source, tree, image }) => ({
       id: source.id,
@@ -356,11 +367,18 @@ function decodeFeed(value: unknown, path: string): Decoded<Feed> {
   if (!raw.ok) return raw;
   const rss = decodeText(raw.value.rss, `${path}.rss`);
   const atom = decodeText(raw.value.atom, `${path}.atom`);
+  const title = decodeText(raw.value.title, `${path}.title`);
   const items = decodeList(raw.value.items, `${path}.items`, decodeFeedItem);
   if (!rss.ok) return rss;
   if (!atom.ok) return atom;
+  if (!title.ok) return title;
   return items.ok
-    ? ok({ rss: rss.value, atom: atom.value, items: items.value })
+    ? ok({
+        rss: rss.value,
+        atom: atom.value,
+        title: title.value,
+        items: items.value,
+      })
     : items;
 }
 

@@ -72,6 +72,7 @@ describe("encodeRequest", () => {
           expected.collections,
           sourcesOf(expected),
           expected.slugs,
+          expected.stylesheets,
         ),
       ).toEqual(expected);
     });
@@ -87,20 +88,22 @@ describe("encodeRequest", () => {
       [],
       [],
       [],
+      [],
     );
     expect(request.build.origin).toBe("https://example.com");
   });
 
-  test("speaks protocol version 4, without the site URL, and sends every document's aliases", () => {
+  test("speaks protocol version 5, without the site URL, and sends every document's aliases", () => {
     const expected = fixture("minimal-request") as Request;
     const request = encodeRequest(
       buildOf(expected),
       expected.collections,
       sourcesOf(expected),
       expected.slugs,
+      expected.stylesheets,
     );
 
-    expect(request.protocolVersion).toBe(4);
+    expect(request.protocolVersion).toBe(5);
     expect(request.build).not.toHaveProperty("siteUrl");
     expect(request.documents.map((document) => document.aliases)).toEqual([
       ["/2019/hello/", "/hello.html"],

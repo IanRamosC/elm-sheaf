@@ -2,7 +2,7 @@ module Sheaf.RenderTest exposing (suite)
 
 import Expect
 import Json.Encode as Encode
-import RenderFixtures exposing (Source, bodyAt, draft, error, headAt, leafDirective, markdownLink, metadata, page, paragraph, paths, post, postMeta, postPage, postRoute, posts, render, renderWithFeeds, request, requestUnder, requestWithSlugs, span, titles)
+import RenderFixtures exposing (Source, bodyAt, draft, error, headAt, leafDirective, markdownLink, metadata, page, paragraph, paths, post, postMeta, postPage, postRoute, posts, render, renderWithFeeds, request, requestUnder, requestWithSlugs, requestWithStylesheets, span, titles)
 import Sheaf
 import Sheaf.Collection as Collection
 import Sheaf.Date as Date
@@ -23,6 +23,7 @@ suite =
     describe "Sheaf.Internal.Render"
         [ pageTests
         , headTests
+        , stylesheetTests
         , linkTests
         , frontmatterTests
         , collectionTests
@@ -980,7 +981,7 @@ badRequestTests =
                 Encode.object [ ( "protocolVersion", Encode.int 1 ) ]
                     |> render []
                     |> .diagnostics
-                    |> List.map (.message >> (\message -> String.contains "protocol version 1" message && String.contains "speaks 4" message))
+                    |> List.map (.message >> (\message -> String.contains "protocol version 1" message && String.contains "speaks 5" message))
                     |> Expect.equal [ True ]
         ]
 
@@ -1013,4 +1014,77 @@ siteTests =
                         )
                     |> paths
                     |> Expect.equal [ "index.html", "about/index.html" ]
+        ]
+
+
+stylesheetTests : Test
+stylesheetTests =
+    let
+        known : List ( String, String )
+        known =
+            [ ( "style.css", "style.0123abcd.css" ) ]
+
+        homeLinking : String -> Route
+        homeLinking path =
+            Route.single "/" { title = "Home", head = [ Head.stylesheet path ], body = [] }
+
+        diagnosticsFor : List ( String, String ) -> String -> List Diagnostic
+        diagnosticsFor stylesheets path =
+            requestWithStylesheets stylesheets [] []
+                |> render [ homeLinking path ]
+                |> .diagnostics
+
+        unknown : String -> Maybe String -> Diagnostic
+        unknown path hint =
+            { severity = Error
+            , title = "UNKNOWN STYLESHEET"
+            , message = "This page links to the stylesheet `" ++ path ++ "`, which isn't a file in `static/`.\n\nFound while rendering `/` from the route `/`."
+            , sourcePath = Nothing
+            , span = Nothing
+            , hint = hint
+            }
+    in
+    describe "stylesheets"
+        [ test "a page links the hashed copy of a stylesheet, under the base path" <|
+            \_ ->
+                requestWithStylesheets known [] []
+                    |> render [ homeLinking "/style.css" ]
+                    |> headAt "index.html"
+                    |> Maybe.map (String.contains "<link rel=\"stylesheet\" href=\"/blog/style.0123abcd.css\">")
+                    |> Expect.equal (Just True)
+        , test "a full URL is rendered unchanged and never checked" <|
+            \_ ->
+                requestWithStylesheets [] [] []
+                    |> render [ homeLinking "https://cdn.example/x.css" ]
+                    |> Expect.all
+                        [ .diagnostics >> Expect.equal []
+                        , headAt "index.html" >> Maybe.map (String.contains "href=\"https://cdn.example/x.css\"") >> Expect.equal (Just True)
+                        ]
+        , test "a stylesheet that is not in static/ is unknown, and the closest one is suggested" <|
+            \_ ->
+                diagnosticsFor known "/styles.css"
+                    |> Expect.equal [ unknown "/styles.css" (Just "Did you mean `/style.css`?") ]
+        , test "a cache buster makes the path unknown" <|
+            \_ ->
+                diagnosticsFor known "/style.css?v=2"
+                    |> Expect.equal [ unknown "/style.css?v=2" (Just "Did you mean `/style.css`?") ]
+        , test "a stylesheet that is not close to any lists them all" <|
+            \_ ->
+                diagnosticsFor (( "print.css", "print.89abcdef.css" ) :: known) "/missing.css"
+                    |> Expect.equal [ unknown "/missing.css" (Just "The stylesheets in `static/` are `/print.css` and `/style.css`.") ]
+        , test "a site without stylesheets says where they go" <|
+            \_ ->
+                diagnosticsFor [] "/style.css"
+                    |> Expect.equal [ unknown "/style.css" (Just "Stylesheets are `.css` files under `static/`, linked by their path from the site root.") ]
+        , test "pages that share a layout report a missing stylesheet once" <|
+            \_ ->
+                requestWithStylesheets known [ "posts" ] [ post "a", post "b" ]
+                    |> render
+                        [ Route.eachItem "/posts/:slug/"
+                            posts
+                            (\_ -> { title = "Post", head = [ Head.stylesheet "/nope.css" ], body = [] })
+                        ]
+                    |> .diagnostics
+                    |> List.map .title
+                    |> Expect.equal [ "UNKNOWN STYLESHEET" ]
         ]

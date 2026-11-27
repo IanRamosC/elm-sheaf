@@ -16,6 +16,7 @@ since a layout they share usually made it.
 
 -}
 
+import Dict exposing (Dict)
 import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Head as Head exposing (FeedFormat(..))
 import Sheaf.Internal.Hint as Hint
@@ -80,8 +81,9 @@ type alias CheckedPage =
 
 
 {-| What checking a page needs from the build: where the site is, and what is
-wrong with a link to a document or a group, if anything, and the site paths of
-the feeds it writes in a format.
+wrong with a link to a document or a group, if anything, the site paths of
+the feeds it writes in a format, and the hashed path of each stylesheet of the
+site by its path.
 -}
 type alias Build =
     { origin : String
@@ -89,6 +91,7 @@ type alias Build =
     , linkProblem : Ref -> Maybe LinkProblem
     , groupLinkProblem : GroupLink -> Maybe GroupLinkProblem
     , feedPaths : FeedFormat -> List String
+    , stylesheets : Dict String String
     }
 
 
@@ -117,7 +120,7 @@ check build unchecked =
         head : List Html
         head =
             Html.node "title" [] [ Html.text page.title ]
-                :: List.concatMap (Head.toHtml { origin = build.origin, basePath = build.basePath, url = ownUrl }) page.head
+                :: List.concatMap (Head.toHtml { origin = build.origin, basePath = build.basePath, stylesheets = build.stylesheets, url = ownUrl }) page.head
     in
     { unchecked = unchecked
     , head = head
@@ -138,6 +141,7 @@ check build unchecked =
                 )
         )
             ++ List.filterMap (unknownFeed build.feedPaths) page.head
+            ++ List.filterMap (unknownStylesheet build.stylesheets) page.head
 
     -- Checked before resolving, which would hide a bad site path.
     , problems =
@@ -151,12 +155,14 @@ check build unchecked =
 
 
 {-| A link of a template with nowhere to point, and why. A head tag can also
-link to a feed the site does not write, given the paths of the feeds it does.
+link to a feed the site does not write, given the paths of the feeds it does,
+or to a stylesheet that is not in `static/`, given the paths of those that are.
 -}
 type BrokenLink
     = BrokenDocumentLink Ref LinkProblem
     | BrokenGroupLink GroupLink GroupLinkProblem
     | UnknownFeed FeedFormat String (List String)
+    | UnknownStylesheet String (List String)
 
 
 {-| Feeds are written at their path without the leading slash, so that is how
@@ -172,6 +178,22 @@ unknownFeed feedPaths tag =
 
                 else
                     Just (UnknownFeed format path (feedPaths format))
+            )
+
+
+{-| Stylesheets are found by their path without the leading slash, as they are
+named on disk: the path is not decoded and a query string is part of it.
+-}
+unknownStylesheet : Dict String String -> Head.Tag -> Maybe BrokenLink
+unknownStylesheet stylesheets tag =
+    Head.siteStylesheet tag
+        |> Maybe.andThen
+            (\path ->
+                if Dict.member (Path.dropLeadingSlash path) stylesheets then
+                    Nothing
+
+                else
+                    Just (UnknownStylesheet path (List.map (\name -> "/" ++ name) (Dict.keys stylesheets)))
             )
 
 
@@ -318,6 +340,9 @@ brokenLinkDiagnostic repeated =
         UnknownFeed format path declared ->
             unknownFeedDiagnostic repeated format path declared
 
+        UnknownStylesheet path known ->
+            unknownStylesheetDiagnostic repeated path known
+
 
 {-| The message starts with what the head tag did, and then where it was.
 -}
@@ -327,30 +352,50 @@ unknownFeedDiagnostic repeated format path declared =
         name : String
         name =
             feedFormatName format
-
-        links : String
-        links =
-            if repeated.pages == 1 then
-                "This page links to"
-
-            else
-                "These " ++ String.fromInt repeated.pages ++ " pages link to"
-
-        found : String
-        found =
-            if repeated.pages == 1 then
-                "Found while rendering `" ++ repeated.firstUrl ++ "` from the route `" ++ repeated.routeName ++ "`."
-
-            else
-                "Found while rendering the pages of the route `" ++ repeated.routeName ++ "`, the first of which is `" ++ repeated.firstUrl ++ "`."
     in
     { severity = Error
     , title = "UNKNOWN FEED"
-    , message = links ++ " the " ++ name ++ " feed `" ++ path ++ "`, but the site has no " ++ name ++ " feed at that path.\n\n" ++ found
+    , message = linksTo repeated ++ " the " ++ name ++ " feed `" ++ path ++ "`, but the site has no " ++ name ++ " feed at that path.\n\n" ++ foundWhile repeated
     , sourcePath = Nothing
     , span = Nothing
     , hint = Just (declaredHint name declared)
     }
+
+
+unknownStylesheetDiagnostic : RepeatedLink -> String -> List String -> Diagnostic
+unknownStylesheetDiagnostic repeated path known =
+    { severity = Error
+    , title = "UNKNOWN STYLESHEET"
+    , message = linksTo repeated ++ " the stylesheet `" ++ path ++ "`, which isn't a file in `static/`.\n\n" ++ foundWhile repeated
+    , sourcePath = Nothing
+    , span = Nothing
+    , hint =
+        Hint.didYouMean (\names -> "The stylesheets in `static/` are " ++ names ++ ".") known path
+            |> Maybe.withDefault "Stylesheets are `.css` files under `static/`, linked by their path from the site root."
+            |> Just
+    }
+
+
+{-| How a message starts: what the page or pages of a route linked to.
+-}
+linksTo : RepeatedLink -> String
+linksTo repeated =
+    if repeated.pages == 1 then
+        "This page links to"
+
+    else
+        "These " ++ String.fromInt repeated.pages ++ " pages link to"
+
+
+{-| How a message ends: where the link was found.
+-}
+foundWhile : RepeatedLink -> String
+foundWhile repeated =
+    if repeated.pages == 1 then
+        "Found while rendering `" ++ repeated.firstUrl ++ "` from the route `" ++ repeated.routeName ++ "`."
+
+    else
+        "Found while rendering the pages of the route `" ++ repeated.routeName ++ "`, the first of which is `" ++ repeated.firstUrl ++ "`."
 
 
 declaredHint : String -> List String -> String

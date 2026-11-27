@@ -198,7 +198,7 @@ titles.
 | `BROKEN SYMLINK` | A symlink in `static/` leads to nothing. |
 | `SYMLINK OUTSIDE SITE` | A symlink in `static/` leads outside the site's folder. |
 | `SYMLINK LOOP` | A symlink in `static/` leads to a folder that contains it. |
-| `STATIC FILE CLASH` | A file in `static/` has the path of something Sheaf writes, or is under `static/_sheaf/`. |
+| `STATIC FILE CLASH` | A file in `static/` has the path of something Sheaf writes, or is under `static/_sheaf/`, or has the name of the hashed copy of a stylesheet. |
 
 ### Routes, feeds and pages
 
@@ -210,6 +210,7 @@ titles.
 | `ALIAS WITHOUT PAGE` | A document has `aliases`, but its collection has no `Route.eachItem` route for them to redirect to. |
 | `NO PAGE FOR FEED` | A feed's collection has no `Route.eachItem` route for its items to link to. |
 | `UNKNOWN FEED` | `Head.rssFeed` or `Head.atomFeed` names a feed the site doesn't declare. |
+| `UNKNOWN STYLESHEET` | `Head.stylesheet` links a site path that isn't a `.css` file in `static/`. |
 | `MISSING SLUG` | A group value, such as a tag, has no slug, because no document's frontmatter writes it that way. |
 | `EMPTY GROUP SLUG` | A group value has no letter or digit to make a slug from. |
 | `GROUP COLLISION` | Two different group values, such as `C` and `C++`, have the same slug. |

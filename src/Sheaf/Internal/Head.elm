@@ -1,7 +1,7 @@
 module Sheaf.Internal.Head exposing
     ( Tag(..), OpenGraphType(..), TwitterCard(..), FeedFormat(..)
     , Context, toHtml
-    , PathProblem, problems, siteFeed
+    , PathProblem, problems, siteFeed, siteStylesheet
     )
 
 {-| The head tags behind [`Sheaf.Head`](Sheaf-Head), and how they are
@@ -9,10 +9,11 @@ rendered.
 
 @docs Tag, OpenGraphType, TwitterCard, FeedFormat
 @docs Context, toHtml
-@docs PathProblem, problems, siteFeed
+@docs PathProblem, problems, siteFeed, siteStylesheet
 
 -}
 
+import Dict exposing (Dict)
 import Sheaf.Internal.Date as Date exposing (Date)
 import Sheaf.Internal.Html as Html exposing (Html)
 import Sheaf.Internal.Path as Path
@@ -60,11 +61,13 @@ type FeedFormat
 
 {-| Where the page is: the site's origin and base path, and the page's URL
 without the base path. The 404 page is served in place of any missing page, so
-it has no URL of its own.
+it has no URL of its own. `stylesheets` has the hashed path of each stylesheet
+of the site, by its path, both without a leading slash.
 -}
 type alias Context =
     { origin : String
     , basePath : String
+    , stylesheets : Dict String String
     , url : Maybe String
     }
 
@@ -118,7 +121,7 @@ toHtml context tag =
             [ metaNamed "twitter:card" (twitterCardName card) ]
 
         Stylesheet path ->
-            resolve (Path.join context.basePath) path
+            resolve (Path.join context.basePath << hashedStylesheet context.stylesheets) path
                 |> Maybe.map
                     (\href ->
                         Html.node "link"
@@ -234,6 +237,33 @@ siteFeed tag =
 
         _ ->
             Nothing
+
+
+{-| The path of a tag that links to a stylesheet of this site. A full URL
+points to one elsewhere, which the site cannot check.
+-}
+siteStylesheet : Tag -> Maybe String
+siteStylesheet tag =
+    case tag of
+        Stylesheet path ->
+            if Path.isSitePath path then
+                Just path
+
+            else
+                Nothing
+
+        _ ->
+            Nothing
+
+
+{-| The name a stylesheet is linked by, which carries a hash of its contents.
+A stylesheet the site does not have keeps its path; the page is not written,
+since the link is reported.
+-}
+hashedStylesheet : Dict String String -> String -> String
+hashedStylesheet stylesheets path =
+    Dict.get (Path.dropLeadingSlash path) stylesheets
+        |> Maybe.withDefault path
 
 
 {-| The page's own URL. Search engines and link previews need it absolute.
