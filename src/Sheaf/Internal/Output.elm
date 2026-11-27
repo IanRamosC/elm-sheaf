@@ -274,7 +274,7 @@ nameTooLong output name =
             ++ nameOf output
             ++ " makes a path with the name `"
             ++ shown
-            ++ "` is "
+            ++ "`, which is "
             ++ String.fromInt (utf8Length name)
             ++ " bytes long. Most file systems allow "
             ++ String.fromInt maxNameBytes

@@ -625,7 +625,7 @@ longNameTests =
         tooLong shown bytes =
             { severity = Error
             , title = "NAME TOO LONG"
-            , message = "The route `/tags/:group/` makes a path with the name `" ++ shown ++ "` is " ++ bytes ++ " bytes long. Most file systems allow 255 bytes."
+            , message = "The route `/tags/:group/` makes a path with the name `" ++ shown ++ "`, which is " ++ bytes ++ " bytes long. Most file systems allow 255 bytes."
             , sourcePath = Nothing
             , span = Nothing
             , hint = Just "A name in the path comes from the route's pattern or from a frontmatter value, such as a tag. Shorten it."
@@ -698,7 +698,7 @@ longNameTests =
                             >> Expect.equal
                                 [ { severity = Error
                                   , title = "NAME TOO LONG"
-                                  , message = "The alias `" ++ alias ++ "` of `content/posts/new.md` makes a path with the name `" ++ String.repeat 40 "b" ++ "…` is 300 bytes long. Most file systems allow 255 bytes."
+                                  , message = "The alias `" ++ alias ++ "` of `content/posts/new.md` makes a path with the name `" ++ String.repeat 40 "b" ++ "…`, which is 300 bytes long. Most file systems allow 255 bytes."
                                   , sourcePath = Just "content/posts/new.md"
                                   , span = Nothing
                                   , hint = Just "Shorten the alias."
