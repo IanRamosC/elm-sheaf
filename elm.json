@@ -19,7 +19,9 @@
         "Sheaf.Image",
         "Sheaf.Program",
         "Sheaf.Ref",
-        "Sheaf.Route"
+        "Sheaf.Route",
+        "Sheaf.Svg",
+        "Sheaf.Svg.Attributes"
     ],
     "elm-version": "0.19.3 <= v < 0.20.0",
     "dependencies": {

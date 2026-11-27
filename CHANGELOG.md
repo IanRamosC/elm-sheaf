@@ -28,6 +28,8 @@ numbers are those of the npm package `elm-sheaf`.
   frontmatter each one holds, and the templates that render them.
 - Frontmatter is decoded into Elm records. A missing or misspelled field, or a
   value of the wrong type, fails the build with the file and line.
+- `Sheaf.Svg` and `Sheaf.Svg.Attributes` draw inline SVG icons in templates,
+  with the names of `elm/svg`.
 - Links between documents, written `pages:about` in Markdown or
   `Sheaf.link Content.Pages.about` in Elm, are checked when the site is built.
 - The blog preset, `Sheaf.Blog`, makes posts, pages, a paginated index, tag

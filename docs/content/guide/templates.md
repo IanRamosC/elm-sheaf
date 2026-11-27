@@ -115,6 +115,20 @@ isn't valid HTML, or a `<script>` or `<style>` element, whose content can't be
 escaped, is `INVALID HTML`; put styles and scripts in files under `static/` and
 link to them.
 
+Inline icons are written with `Sheaf.Svg` and `Sheaf.Svg.Attributes`, which
+mirror `elm/svg`. Import them qualified, since `title`, `clipPath` and `mask`
+exist in more than one module:
+
+```elm
+import Sheaf.Svg as Svg
+import Sheaf.Svg.Attributes as SvgA
+
+arrow : Html
+arrow =
+    Svg.svg [ SvgA.viewBox "0 0 24 24", SvgA.width "24", SvgA.height "24" ]
+        [ Svg.path [ SvgA.d "M5 12h14", SvgA.stroke "currentColor" ] [] ]
+```
+
 A template that receives a document gets a `Document meta`:
 
 ```elm

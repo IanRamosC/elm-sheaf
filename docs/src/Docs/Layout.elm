@@ -5,9 +5,11 @@ navigation, the main content and the footer.
 -}
 
 import Sheaf.Head as Head
-import Sheaf.Html exposing (Html, a, div, footer, header, img, li, main_, nav, p, text, ul)
-import Sheaf.Html.Attributes exposing (alt, attribute, class, height, href, id, siteHref, siteSrc, title, width)
+import Sheaf.Html exposing (Html, a, div, footer, header, li, main_, nav, p, text, ul)
+import Sheaf.Html.Attributes exposing (attribute, class, href, id, siteHref, title)
 import Sheaf.Route exposing (Page)
+import Sheaf.Svg exposing (path, rect, svg)
+import Sheaf.Svg.Attributes as SvgA
 
 
 type alias Content =
@@ -73,7 +75,16 @@ siteHeader : Html
 siteHeader =
     header [ class "site-header" ]
         [ a [ class "site-title", siteHref "/" ]
-            [ img [ siteSrc "/favicon.svg", alt "", width 28, height 28 ] []
+            [ svg [ SvgA.viewBox "0 0 64 64", SvgA.width "28", SvgA.height "28", attribute "aria-hidden" "true" ]
+                [ rect [ SvgA.x "2", SvgA.y "2", SvgA.width "60", SvgA.height "60", SvgA.rx "14", SvgA.fill "#24599a" ] []
+                , path
+                    [ SvgA.d "M51 15.5 H28 A8 8 0 0 0 28 31.5 H36 A8 8 0 0 1 36 47.5 H13"
+                    , SvgA.fill "none"
+                    , SvgA.stroke "#fbfaf7"
+                    , SvgA.strokeWidth "10"
+                    ]
+                    []
+                ]
             , text "Sheaf"
             ]
         , nav [ attribute "aria-label" "Site" ]
