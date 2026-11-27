@@ -61,7 +61,8 @@ fileOf output =
 
 
 {-| The pages and redirects of the first output at each file, and a diagnostic
-for every later one that would overwrite it or need its name as a folder. So
+for every later one that would overwrite it or need its name as a folder, and
+for every one with a file or folder name over 255 bytes, which is left out. So
 that a page always wins over an alias, redirects come after the other outputs.
 
 Paths are compared lowercased, because macOS's default disk ignores case: two
@@ -73,7 +74,7 @@ withoutClashes outputs =
     let
         step : Output -> ( Taken, List Output, List Diagnostic ) -> ( Taken, List Output, List Diagnostic )
         step output ( taken, kept, found ) =
-            case clash taken output of
+            case firstJust (longName output) (clash taken output) of
                 Just diagnostic ->
                     ( taken, kept, diagnostic :: found )
 
@@ -91,6 +92,16 @@ withoutClashes outputs =
     , redirects = List.filterMap redirectOf inOrder
     , diagnostics = List.reverse clashes
     }
+
+
+firstJust : Maybe a -> Maybe a -> Maybe a
+firstJust first second =
+    case first of
+        Just _ ->
+            first
+
+        Nothing ->
+            second
 
 
 pageOf : Output -> Maybe UncheckedPage
@@ -181,6 +192,97 @@ clash taken output =
 
         ( Nothing, Nothing, Nothing ) ->
             Nothing
+
+
+
+-- LONG NAMES
+
+
+{-| Most file systems refuse a name over this many bytes. Linux counts bytes,
+and macOS counts fewer, never more, UTF-16 units.
+-}
+maxNameBytes : Int
+maxNameBytes =
+    255
+
+
+longName : Output -> Maybe Diagnostic
+longName output =
+    String.split "/" (fileOf output)
+        |> List.filter (\name -> utf8Length name > maxNameBytes)
+        |> List.head
+        |> Maybe.map (nameTooLong output)
+
+
+utf8Length : String -> Int
+utf8Length string =
+    let
+        bytes : Char -> Int
+        bytes char =
+            let
+                code : Int
+                code =
+                    Char.toCode char
+            in
+            if code < 0x80 then
+                1
+
+            else if code < 0x0800 then
+                2
+
+            else if code < 0x00010000 then
+                3
+
+            else
+                4
+    in
+    String.foldl (bytes >> (+)) 0 string
+
+
+nameTooLong : Output -> String -> Diagnostic
+nameTooLong output name =
+    let
+        characters : List Char
+        characters =
+            String.toList name
+
+        shown : String
+        shown =
+            if List.length characters > 40 then
+                String.fromList (List.take 40 characters) ++ "…"
+
+            else
+                name
+
+        hint : Maybe String
+        hint =
+            case output of
+                PageFile _ ->
+                    Just "A frontmatter value used in the path, such as a tag, becomes this name. Shorten it."
+
+                RedirectFile _ ->
+                    Just "Shorten the alias."
+
+                _ ->
+                    Nothing
+    in
+    { severity = Error
+    , title = "NAME TOO LONG"
+    , message =
+        "The "
+            ++ nameOf output
+            ++ " makes a file whose name `"
+            ++ shown
+            ++ "` is "
+            ++ String.fromInt (utf8Length name)
+            ++ " bytes long. Most file systems allow "
+            ++ String.fromInt maxNameBytes
+            ++ " bytes."
+    , sourcePath = Nothing
+    , span = Nothing
+    , hint = hint
+    }
+        |> pointingAt [ output ]
 
 
 

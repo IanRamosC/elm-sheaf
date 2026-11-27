@@ -1061,6 +1061,22 @@ describe("the blog fixture", () => {
   }
 
   test(
+    "reports a tag too long for a folder name instead of crashing",
+    async () => {
+      const root = copyFixture("blog");
+      writeFileSync(
+        join(root, "content/posts/2026-11-20-long-tag.md"),
+        `---\ntitle: Long tag\ntags: [${"t".repeat(300)}]\n---\n\nA tag longer than a file name may be.\n`,
+      );
+
+      const result = await build(root, options(root));
+
+      expect(titlesOf(result)).toEqual(["NAME TOO LONG"]);
+    },
+    SLOW,
+  );
+
+  test(
     "builds the index, empty feeds and a sitemap with no posts",
     async () => {
       const root = copyFixture("blog");

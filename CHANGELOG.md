@@ -68,3 +68,5 @@ numbers are those of the npm package `elm-sheaf`.
   page at each one.
 - Every build writes a `robots.txt` naming the sitemap, unless the site has its
   own.
+- A page, feed or alias whose file or folder name is over 255 bytes, usually from
+  a long tag, is `NAME TOO LONG`, naming the route.

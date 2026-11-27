@@ -2,7 +2,7 @@ module Sheaf.RenderTest exposing (suite)
 
 import Expect
 import Json.Encode as Encode
-import RenderFixtures exposing (Source, bodyAt, draft, error, headAt, leafDirective, markdownLink, metadata, page, paragraph, paths, post, postMeta, postPage, postRoute, posts, render, renderWithFeeds, request, requestUnder, span, titles)
+import RenderFixtures exposing (Source, bodyAt, draft, error, headAt, leafDirective, markdownLink, metadata, page, paragraph, paths, post, postMeta, postPage, postRoute, posts, render, renderWithFeeds, request, requestUnder, requestWithSlugs, span, titles)
 import Sheaf
 import Sheaf.Collection as Collection
 import Sheaf.Date as Date
@@ -10,7 +10,7 @@ import Sheaf.Feed as Feed
 import Sheaf.Head as Head
 import Sheaf.Html as Html
 import Sheaf.Html.Attributes as Attributes
-import Sheaf.Internal.Protocol exposing (Diagnostic, Severity(..))
+import Sheaf.Internal.Protocol exposing (Diagnostic, Response, Severity(..))
 import Sheaf.Internal.Render as Render
 import Sheaf.Ref as Ref
 import Sheaf.Route as Route exposing (Route)
@@ -30,6 +30,7 @@ suite =
         , componentProblemTests
         , invalidHtmlTests
         , duplicateTests
+        , longNameTests
         , redirectTests
         , badRouteTests
         , badRequestTests
@@ -589,21 +590,138 @@ duplicateTests =
 
 
 
+-- LONG NAMES
+
+
+longNameTests : Test
+longNameTests =
+    let
+        tagged : String -> Source
+        tagged tag =
+            let
+                source : Source
+                source =
+                    post "hello"
+            in
+            { source
+                | date = Just "2026-11-01"
+                , frontmatter = ( "tags", Encode.list Encode.string [ tag ] ) :: source.frontmatter
+            }
+
+        tagRoute : Route
+        tagRoute =
+            Route.groupedBy "/tags/:group/" { by = .tags, perPage = Nothing } posts (\_ _ -> page [])
+
+        withTag : String -> Response
+        withTag tag =
+            requestWithSlugs [ ( tag, tag, tag ) ] [ "posts" ] [ tagged tag ]
+                |> render [ tagRoute ]
+
+        titlesFor : String -> List String
+        titlesFor tag =
+            titles (withTag tag)
+
+        tooLong : String -> String -> Diagnostic
+        tooLong shown bytes =
+            { severity = Error
+            , title = "NAME TOO LONG"
+            , message = "The route `/tags/:group/` makes a file whose name `" ++ shown ++ "` is " ++ bytes ++ " bytes long. Most file systems allow 255 bytes."
+            , sourcePath = Nothing
+            , span = Nothing
+            , hint = Just "A frontmatter value used in the path, such as a tag, becomes this name. Shorten it."
+            }
+    in
+    describe "long names"
+        [ test "a tag whose name is too long is reported and its page left out" <|
+            \_ ->
+                let
+                    tag : String
+                    tag =
+                        String.repeat 256 "a"
+                in
+                withTag tag
+                    |> Expect.all
+                        [ .diagnostics >> Expect.equal [ tooLong (String.repeat 40 "a" ++ "…") "256" ]
+                        , paths >> List.filter (String.contains tag) >> Expect.equal []
+                        ]
+        , test "a name of 255 bytes is allowed" <|
+            \_ ->
+                let
+                    tag : String
+                    tag =
+                        String.repeat 255 "a"
+                in
+                withTag tag
+                    |> Expect.all
+                        [ .diagnostics >> Expect.equal []
+                        , paths >> List.member ("tags/" ++ tag ++ "/index.html") >> Expect.equal True
+                        ]
+        , test "names are measured in bytes" <|
+            \_ ->
+                Expect.equal
+                    [ [ "NAME TOO LONG" ], [], [ "NAME TOO LONG" ] ]
+                    [ titlesFor (String.repeat 128 "ж")
+                    , titlesFor (String.repeat 127 "ж")
+                    , titlesFor (String.repeat 86 "日")
+                    ]
+        , test "a long alias is reported" <|
+            \_ ->
+                let
+                    alias : String
+                    alias =
+                        "/" ++ String.repeat 300 "b" ++ "/"
+                in
+                request [ "posts" ] [ aliased "new" [ alias ] ]
+                    |> render [ postRoute ]
+                    |> Expect.all
+                        [ .diagnostics
+                            >> Expect.equal
+                                [ { severity = Error
+                                  , title = "NAME TOO LONG"
+                                  , message = "The alias `" ++ alias ++ "` of `content/posts/new.md` makes a file whose name `" ++ String.repeat 40 "b" ++ "…` is 300 bytes long. Most file systems allow 255 bytes."
+                                  , sourcePath = Just "content/posts/new.md"
+                                  , span = Nothing
+                                  , hint = Just "Shorten the alias."
+                                  }
+                                ]
+                        , paths >> Expect.equal [ "posts/new/index.html" ]
+                        ]
+        , test "a long feed path is reported" <|
+            \_ ->
+                let
+                    path : String
+                    path =
+                        "/" ++ String.repeat 256 "f" ++ ".xml"
+
+                    source : Source
+                    source =
+                        post "a"
+                in
+                request [ "posts" ] [ { source | date = Just "2026-11-01" } ]
+                    |> renderWithFeeds [ postRoute ] [ Feed.fromCollection { rss = path, atom = "/atom.xml", limit = Nothing } posts (\meta -> { title = meta.title, summary = Nothing }) ]
+                    |> .diagnostics
+                    |> List.map (\diagnostic -> ( diagnostic.title, diagnostic.hint, diagnostic.sourcePath ))
+                    |> Expect.equal [ ( "NAME TOO LONG", Nothing, Nothing ) ]
+        ]
+
+
+aliased : String -> List String -> Source
+aliased slug aliases =
+    let
+        source : Source
+        source =
+            post slug
+    in
+    { source | aliases = aliases }
+
+
+
 -- REDIRECTS
 
 
 redirectTests : Test
 redirectTests =
     let
-        aliased : String -> List String -> Source
-        aliased slug aliases =
-            let
-                source : Source
-                source =
-                    post slug
-            in
-            { source | aliases = aliases }
-
         redirectTo : String -> String
         redirectTo target =
             "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"

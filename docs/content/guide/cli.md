@@ -206,6 +206,7 @@ titles.
 |---|---|
 | `BAD ROUTE` | A route or feed pattern can't be written: no leading `/`, a missing or misplaced `:slug` or `:group`, a path under `/_sheaf/`, or a `perPage` or `limit` below 1. |
 | `DUPLICATE PAGE` | Two routes or aliases write the same file, compared without regard to case. |
+| `NAME TOO LONG` | A page, feed or alias would be written with a file or folder name over 255 bytes, which most file systems refuse; a long tag is the usual cause. |
 | `ALIAS WITHOUT PAGE` | A document has `aliases`, but its collection has no `Route.eachItem` route for them to redirect to. |
 | `NO PAGE FOR FEED` | A feed's collection has no `Route.eachItem` route for its items to link to. |
 | `UNKNOWN FEED` | `Head.rssFeed` or `Head.atomFeed` names a feed the site doesn't declare. |
