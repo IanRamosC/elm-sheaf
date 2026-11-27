@@ -8,6 +8,8 @@ numbers are those of the npm package `elm-sheaf`.
 
 ### Added
 
+- `Feed.groupedBy` writes an RSS and an Atom feed for each group of a
+  collection, such as each tag.
 - `Head.stylesheet` links a copy of the stylesheet whose name carries a hash of
   its contents, so a changed theme is never served from a stale cache. A path
   that isn't a stylesheet in `static/`, including one with a query string such

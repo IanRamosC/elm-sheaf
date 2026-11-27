@@ -1,6 +1,6 @@
 module Sheaf.Internal.Pattern exposing
     ( Kind(..), Problem(..), problem
-    , Placeholder(..), fill, pageOf
+    , Placeholder(..), name, fill, pageOf
     )
 
 {-| Route patterns: which ones a kind of route accepts, and the URLs they give.
@@ -16,7 +16,7 @@ and `/posts/:slugger/` has the placeholder `:slugger`, which no route fills.
 
 # Filling
 
-@docs Placeholder, fill, pageOf
+@docs Placeholder, name, fill, pageOf
 
 -}
 
@@ -31,6 +31,7 @@ import Sheaf.Internal.Path as Path
   - `Grouped`: a page for each group, at `:group`.
   - `GroupedListing`: the pages of each group's listing, at `:group`.
   - `File`: a file that is not a page, such as a feed.
+  - `GroupedFile`: a file for each group, such as its feed, at `:group`.
 
 -}
 type Kind
@@ -40,6 +41,7 @@ type Kind
     | Grouped
     | GroupedListing
     | File
+    | GroupedFile
 
 
 {-| A segment that a route replaces with a value of each page.
@@ -58,6 +60,7 @@ type Problem
     | DotSegment String
     | UnknownPlaceholder String
     | MissingPlaceholder Placeholder
+    | RepeatedPlaceholder Placeholder
     | NotAFolder
     | NotAFile
 
@@ -66,7 +69,8 @@ type Problem
 
 `NoLeadingSlash`, `QueryOrFragment`, `EmptySegment` and `DotSegment` make a
 pattern that cannot be turned into a file path inside the output folder, or a
-URL that leads back to it, whatever the kind of route.
+URL that leads back to it, whatever the kind of route. A group's file names its
+group once, so only a `GroupedFile` has a `RepeatedPlaceholder`.
 
 -}
 problem : Kind -> String -> Maybe Problem
@@ -115,11 +119,19 @@ placeholderProblem kind patternSegments =
             Just (UnknownPlaceholder segment)
 
         ( Nothing, Just needed ) ->
-            if List.member (name needed) patternSegments then
-                Nothing
+            case List.length (List.filter ((==) (name needed)) patternSegments) of
+                0 ->
+                    Just (MissingPlaceholder needed)
 
-            else
-                Just (MissingPlaceholder needed)
+                1 ->
+                    Nothing
+
+                _ ->
+                    if kind == GroupedFile then
+                        Just (RepeatedPlaceholder needed)
+
+                    else
+                        Nothing
 
         ( Nothing, Nothing ) ->
             Nothing
@@ -133,7 +145,7 @@ folderProblem kind pattern =
     if (kind == Listing || kind == GroupedListing) && not (String.endsWith "/" pattern) then
         Just NotAFolder
 
-    else if kind == File && String.endsWith "/" pattern then
+    else if (kind == File || kind == GroupedFile) && String.endsWith "/" pattern then
         Just NotAFile
 
     else
@@ -173,7 +185,12 @@ placeholderOf kind =
         File ->
             Nothing
 
+        GroupedFile ->
+            Just Group
 
+
+{-| How a placeholder is written in a pattern.
+-}
 name : Placeholder -> String
 name placeholder =
     case placeholder of

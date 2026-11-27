@@ -1,9 +1,9 @@
-module Sheaf.Feed exposing (Feed, fromCollection)
+module Sheaf.Feed exposing (Feed, fromCollection, groupedBy)
 
 {-| A feed is an RSS and an Atom file listing the documents of a collection,
 newest first, so that feed readers can follow a site.
 
-@docs Feed, fromCollection
+@docs Feed, fromCollection, groupedBy
 
 -}
 
@@ -39,12 +39,38 @@ site.
 
 -}
 fromCollection : { rss : String, atom : String, limit : Maybe Int } -> Collection meta -> (meta -> { title : String, summary : Maybe String }) -> Feed
-fromCollection files (Site.Collection collection) describe =
+fromCollection files collection describe =
+    feedOf files Nothing collection describe
+
+
+{-| A feed for each group of a collection, such as each tag, at paths where
+`:group` stands for the group's slug, as on the pages of a
+[`Route.groupedBy`](Sheaf-Route#groupedBy) route.
+
+    Feed.groupedBy { rss = "/tags/:group/feed.xml", atom = "/tags/:group/atom.xml", limit = Just 20 }
+        { by = .tags }
+        posts
+        (\meta -> { title = meta.title, summary = meta.summary })
+
+A group's feed lists its documents newest first, keeps at most `limit` of them,
+and is titled after the site and the group's name, as in `My Blog · Elm`. Its
+items are written as those of
+[`fromCollection`](#fromCollection) are.
+
+-}
+groupedBy : { rss : String, atom : String, limit : Maybe Int } -> { by : meta -> List String } -> Collection meta -> (meta -> { title : String, summary : Maybe String }) -> Feed
+groupedBy files { by } collection describe =
+    feedOf files (Just (Site.groupingBy by Site.ByDate collection)) collection describe
+
+
+feedOf : { rss : String, atom : String, limit : Maybe Int } -> Maybe Site.Grouping -> Collection meta -> (meta -> { title : String, summary : Maybe String }) -> Feed
+feedOf files grouping (Site.Collection collection) describe =
     Site.Feed
         { rss = files.rss
         , atom = files.atom
         , limit = files.limit
         , collection = collection.name
+        , grouping = grouping
         , describe =
             \document ->
                 Frontmatter.decode collection.frontmatter

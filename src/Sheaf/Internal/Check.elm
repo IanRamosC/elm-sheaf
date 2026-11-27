@@ -82,8 +82,9 @@ type alias CheckedPage =
 
 {-| What checking a page needs from the build: where the site is, and what is
 wrong with a link to a document or a group, if anything, the site paths of
-the feeds it writes in a format, and the hashed path of each stylesheet of the
-site by its path.
+the feeds it writes in a format and the paths of its feeds as written, with
+`:group` in a feed for each group, and the hashed path of each stylesheet of
+the site by its path.
 -}
 type alias Build =
     { origin : String
@@ -91,6 +92,7 @@ type alias Build =
     , linkProblem : Ref -> Maybe LinkProblem
     , groupLinkProblem : GroupLink -> Maybe GroupLinkProblem
     , feedPaths : FeedFormat -> List String
+    , feedPatterns : FeedFormat -> List String
     , stylesheets : Dict String String
     }
 
@@ -140,7 +142,7 @@ check build unchecked =
                             Nothing
                 )
         )
-            ++ List.filterMap (unknownFeed build.feedPaths) page.head
+            ++ List.filterMap (unknownFeed build) page.head
             ++ List.filterMap (unknownStylesheet build.stylesheets) page.head
 
     -- Checked before resolving, which would hide a bad site path.
@@ -166,10 +168,11 @@ type BrokenLink
 
 
 {-| Feeds are written at their path without the leading slash, so that is how
-paths are compared.
+paths are compared. The hint names the feeds as written, so that a feed for
+each of many groups is named once.
 -}
-unknownFeed : (FeedFormat -> List String) -> Head.Tag -> Maybe BrokenLink
-unknownFeed feedPaths tag =
+unknownFeed : { a | feedPaths : FeedFormat -> List String, feedPatterns : FeedFormat -> List String } -> Head.Tag -> Maybe BrokenLink
+unknownFeed { feedPaths, feedPatterns } tag =
     Head.siteFeed tag
         |> Maybe.andThen
             (\( format, path ) ->
@@ -177,7 +180,7 @@ unknownFeed feedPaths tag =
                     Nothing
 
                 else
-                    Just (UnknownFeed format path (feedPaths format))
+                    Just (UnknownFeed format path (feedPatterns format))
             )
 
 

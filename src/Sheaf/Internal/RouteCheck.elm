@@ -1,10 +1,10 @@
-module Sheaf.Internal.RouteCheck exposing (badRoute, badFeedFile, badFeedLimit)
+module Sheaf.Internal.RouteCheck exposing (badRoute, badFeedFile, badGroupedFeedFile, badFeedLimit)
 
 {-| The rules a route must follow before it makes any page: a pattern its kind
 of route accepts, and at least one document on each page. A feed's files
 follow the same rules for their paths, and a feed keeps at least one item.
 
-@docs badRoute, badFeedFile, badFeedLimit
+@docs badRoute, badFeedFile, badGroupedFeedFile, badFeedLimit
 
 -}
 
@@ -14,11 +14,13 @@ import Sheaf.Internal.Site as Site exposing (Route)
 
 
 {-| What breaks a rule: a route, the file of a feed in one of its formats,
-such as `RSS`, or a whole feed, named by its RSS file.
+such as `RSS`, the file of a feed for each group in a format, or a whole feed,
+named by its RSS file.
 -}
 type Subject
     = RouteSubject Route
     | FeedFile String String
+    | GroupedFeedFile String String
     | FeedSubject String
 
 
@@ -94,6 +96,18 @@ badFeedFile format path =
         |> Maybe.map (BadPattern >> diagnostic (FeedFile format path))
 
 
+{-| Why the files of a feed for each group in `format` cannot be written at
+`path`, which needs `:group` once, if they cannot.
+
+    badGroupedFeedFile "RSS" "/tags/:group/feed.xml" == Nothing
+
+-}
+badGroupedFeedFile : String -> String -> Maybe Diagnostic
+badGroupedFeedFile format path =
+    Pattern.problem Pattern.GroupedFile path
+        |> Maybe.map (BadPattern >> diagnostic (GroupedFeedFile format path))
+
+
 {-| Why a feed, named by its RSS file `rss`, cannot keep `limit` items, if it
 cannot.
 
@@ -125,6 +139,9 @@ diagnostic subject problem =
                 FeedFile format path ->
                     ( "The " ++ format ++ " feed `" ++ path ++ "`", "it" )
 
+                GroupedFeedFile format path ->
+                    ( "The " ++ format ++ " feed `" ++ path ++ "`", "it" )
+
                 FeedSubject rss ->
                     ( "The feed `" ++ rss ++ "`", "it" )
 
@@ -144,7 +161,16 @@ diagnostic subject problem =
 
         fileHint : Maybe String
         fileHint =
-            Just "Name the file, as in `/feed.xml` or `/atom.xml`."
+            case subject of
+                GroupedFeedFile _ _ ->
+                    Just "Name the file, as in `/tags/:group/feed.xml`."
+
+                _ ->
+                    Just "Name the file, as in `/feed.xml` or `/atom.xml`."
+
+        groupFileHint : Maybe String
+        groupFileHint =
+            Just "Put `:group` in a segment of its own, as in `/tags/:group/feed.xml`."
     in
     case problem of
         BadPattern Pattern.NoLeadingSlash ->
@@ -165,6 +191,10 @@ diagnostic subject problem =
                     breaks ("has the placeholder `" ++ placeholder ++ "`, which this kind of route does not fill")
                         (Just "`Route.eachItem` fills `:slug` and `Route.groupedBy` fills `:group`, each in a segment of its own, as in `/posts/:slug/` or `/tags/:group/`.")
 
+                GroupedFeedFile _ _ ->
+                    breaks ("has the placeholder `" ++ placeholder ++ "`, which a feed for each group does not fill")
+                        (Just "`Feed.groupedBy` fills `:group`, in a segment of its own, as in `/tags/:group/feed.xml`.")
+
                 _ ->
                     breaks ("has the placeholder `" ++ placeholder ++ "`, but a feed is one file") fileHint
 
@@ -173,8 +203,16 @@ diagnostic subject problem =
                 (Just "Put `:slug` in a segment of its own, as in `/posts/:slug/`.")
 
         BadPattern (Pattern.MissingPlaceholder Pattern.Group) ->
-            breaks "does not have the placeholder `:group`, which gives each group its own page"
-                (Just "Put `:group` in a segment of its own, as in `/tags/:group/`.")
+            case subject of
+                GroupedFeedFile _ _ ->
+                    breaks "does not have the placeholder `:group`, which gives each group its own feed" groupFileHint
+
+                _ ->
+                    breaks "does not have the placeholder `:group`, which gives each group its own page"
+                        (Just "Put `:group` in a segment of its own, as in `/tags/:group/`.")
+
+        BadPattern (Pattern.RepeatedPlaceholder placeholder) ->
+            breaks ("has the placeholder `" ++ Pattern.name placeholder ++ "` more than once, but each group's feed is one file") groupFileHint
 
         BadPattern Pattern.NotAFolder ->
             breaks "does not end with `/`, but its later pages are written under it"

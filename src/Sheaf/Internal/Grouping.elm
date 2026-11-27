@@ -1,5 +1,5 @@
 module Sheaf.Internal.Grouping exposing
-    ( Grouped, groupRoutes, whole
+    ( Grouped, groupRoutes, groupDocuments, whole
     , diagnostics
     , GroupPages, groupPages, linkTarget
     )
@@ -8,7 +8,7 @@ module Sheaf.Internal.Grouping exposing
 once per build and used to write its pages, to report its problems and to
 point links at its groups.
 
-@docs Grouped, groupRoutes, whole
+@docs Grouped, groupRoutes, groupDocuments, whole
 @docs diagnostics
 @docs GroupPages, groupPages, linkTarget
 
@@ -48,6 +48,8 @@ groupRoutes slugs bodies routes =
         |> Dict.fromList
 
 
+{-| The groups of a collection's documents.
+-}
 groupDocuments : Dict String GroupSlug -> List Body -> Grouping -> Grouped
 groupDocuments slugs bodies grouping =
     let
@@ -91,29 +93,32 @@ whole grouped pages =
     Listing.whole (grouped.complete && List.isEmpty grouped.problems) (undecoded ++ pages)
 
 
-{-| The problems of the values routes group by. Routes grouping the same
-documents by the same values find the same problems, so each is reported once,
-naming the first route that found it.
+{-| The problems of the values routes, and then feeds named by their RSS
+files, group by. Routes and feeds grouping the same documents by the same
+values find the same problems, so each is reported once, naming the first route
+or feed that found it.
 -}
-diagnostics : List ( Int, Route ) -> Dict Int Grouped -> List Diagnostic
-diagnostics routes grouped =
-    routes
+diagnostics : List ( Int, Route ) -> Dict Int Grouped -> List ( String, Grouped ) -> List Diagnostic
+diagnostics routes grouped feeds =
+    (routes
         |> List.concatMap
             (\( index, route ) ->
                 Dict.get index grouped
-                    |> Maybe.map (.problems >> List.map (Tuple.pair (Site.nameOf route)))
+                    |> Maybe.map (.problems >> List.map (Tuple.pair (Group.Route (Site.nameOf route))))
                     |> Maybe.withDefault []
             )
+    )
+        ++ List.concatMap (\( rss, { problems } ) -> List.map (Tuple.pair (Group.Feed rss)) problems) feeds
         |> List.foldl
-            (\( routeName, problem ) found ->
+            (\( finder, problem ) found ->
                 if List.any (\( _, seen ) -> seen == problem) found then
                     found
 
                 else
-                    found ++ [ ( routeName, problem ) ]
+                    found ++ [ ( finder, problem ) ]
             )
             []
-        |> List.map (\( routeName, problem ) -> Group.diagnostic routeName problem)
+        |> List.map (\( finder, problem ) -> Group.diagnostic finder problem)
 
 
 

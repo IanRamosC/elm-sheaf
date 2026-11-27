@@ -1,4 +1,4 @@
-module Sheaf.Internal.Group exposing (Group, Problem, group, diagnostic)
+module Sheaf.Internal.Group exposing (Group, Problem, group, Finder(..), diagnostic)
 
 {-| Grouping documents by a frontmatter value, such as their tags.
 
@@ -7,7 +7,7 @@ cannot normalise Unicode. A value the host did not slug, a slug with nothing
 in it, and different words that share a slug are problems, and a route with
 any of them writes no pages.
 
-@docs Group, Problem, group, diagnostic
+@docs Group, Problem, group, Finder, diagnostic
 
 -}
 
@@ -159,15 +159,22 @@ uniqueBy key items =
 -- DIAGNOSTICS
 
 
-{-| The diagnostic of a problem found by the route named `routeName`.
+{-| What found a problem: a route, by its name, or a feed, by its RSS file.
 -}
-diagnostic : String -> Problem -> Diagnostic
-diagnostic routeName problem =
+type Finder
+    = Route String
+    | Feed String
+
+
+{-| The diagnostic of a problem, named after what found it.
+-}
+diagnostic : Finder -> Problem -> Diagnostic
+diagnostic finder problem =
     case problem of
         MissingSlug value ->
             { severity = Error
             , title = "MISSING SLUG"
-            , message = "The route `" ++ routeName ++ "` groups documents by the value `" ++ value ++ "`, which has no slug."
+            , message = finderName finder ++ " groups documents by the value `" ++ value ++ "`, which has no slug."
             , sourcePath = Nothing
             , span = Nothing
             , hint = Just "Group values must come from frontmatter as written; Sheaf computes their slugs before Elm runs."
@@ -196,6 +203,16 @@ diagnostic routeName problem =
             , span = Nothing
             , hint = Just "Spell them the same way if they are the same thing, or rename one of them."
             }
+
+
+finderName : Finder -> String
+finderName finder =
+    case finder of
+        Route name ->
+            "The route `" ++ name ++ "`"
+
+        Feed rss ->
+            "The feed `" ++ rss ++ "`"
 
 
 joinAnd : List String -> String

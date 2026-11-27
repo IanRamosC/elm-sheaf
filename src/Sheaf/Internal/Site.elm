@@ -1,5 +1,6 @@
 module Sheaf.Internal.Site exposing
     ( Site(..), Metadata, Feed(..), Description, Route(..), Grouping, NamedGroup, ListedDocument, Neighbours, FrontmatterProblems, Pagination, Collection(..), SortOrder(..), Page
+    , groupingBy
     , nameOf, patternOf, collectionOf, itemPattern, datedCollection, perPageOf, groupingOf, groupedPattern
     )
 
@@ -7,6 +8,7 @@ module Sheaf.Internal.Site exposing
 `Sheaf.Collection`, which only expose ways to build it.
 
 @docs Site, Metadata, Feed, Description, Route, Grouping, NamedGroup, ListedDocument, Neighbours, FrontmatterProblems, Pagination, Collection, SortOrder, Page
+@docs groupingBy
 
 
 # What a route uses
@@ -17,7 +19,7 @@ module Sheaf.Internal.Site exposing
 
 import Sheaf.Html exposing (Html)
 import Sheaf.Internal.Component exposing (Component)
-import Sheaf.Internal.Frontmatter exposing (Frontmatter, Problem)
+import Sheaf.Internal.Frontmatter as Frontmatter exposing (Frontmatter, Problem)
 import Sheaf.Internal.Head as Head
 import Sheaf.Internal.Pattern as Pattern
 import Sheaf.Internal.Protocol as Protocol
@@ -44,7 +46,8 @@ type alias Metadata =
 {-| A feed of the site: the paths of its RSS and Atom files, as written, the
 collection it lists and how many of its newest documents, if not all. It
 decodes a document's frontmatter for its title and summary, as an item route
-does for its template.
+does for its template. A feed with a grouping is a feed for each group, with
+`:group` in its paths.
 -}
 type Feed
     = Feed
@@ -52,6 +55,7 @@ type Feed
         , atom : String
         , limit : Maybe Int
         , collection : String
+        , grouping : Maybe Grouping
         , describe : Protocol.Document -> Result (List Problem) Description
         }
 
@@ -139,6 +143,20 @@ type alias Grouping =
     { collection : String
     , valuesOf : Protocol.Document -> Result (List Problem) (List String)
     , order : SortOrder
+    }
+
+
+{-| How to group a collection by the values `by` finds in each document's
+frontmatter, ordering each group in `order`.
+-}
+groupingBy : (meta -> List String) -> SortOrder -> Collection meta -> Grouping
+groupingBy by order (Collection collection) =
+    { collection = collection.name
+    , valuesOf =
+        \document ->
+            Frontmatter.decode collection.frontmatter { values = document.frontmatter, positions = document.frontmatterPositions }
+                |> Result.map by
+    , order = order
     }
 
 

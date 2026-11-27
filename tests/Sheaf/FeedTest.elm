@@ -1,8 +1,8 @@
 module Sheaf.FeedTest exposing (suite)
 
 import Expect
-import Json.Encode exposing (Value)
-import RenderFixtures exposing (PostMeta, Source, bodyAt, containerDirective, draft, footnoteDefinition, footnoteReference, heading, image, imageWith, link, markdownLink, page, paragraph, paths, photo, post, postRoute, posts, renderWithFeeds, request, requestUnder, span, textNode, titles)
+import Json.Encode as Encode exposing (Value)
+import RenderFixtures exposing (PostMeta, Source, bodyAt, containerDirective, draft, footnoteDefinition, footnoteReference, heading, image, imageWith, link, markdownLink, page, paragraph, paths, photo, post, postRoute, posts, renderWithFeeds, request, requestUnder, requestWithSlugs, span, textNode, titles)
 import Sheaf
 import Sheaf.Collection as Collection
 import Sheaf.Component as Component exposing (Component)
@@ -24,6 +24,7 @@ suite =
         [ itemTests
         , absoluteUrlTests
         , feedProblemTests
+        , groupedFeedTests
         , feedLinkTests
         , sitemapTests
         , clashTests
@@ -386,12 +387,213 @@ feedProblemTests =
                     |> renderWithFeeds [ postRoute ] [ feed ]
                     |> titles
                     |> Expect.equal [ "MISSING FIELD" ]
+        , test "a feed is titled after the site" <|
+            \_ ->
+                request [ "posts" ] [ dated "a" "2026-11-01" ]
+                    |> renderWithFeeds [ postRoute ] [ feed ]
+                    |> .feeds
+                    |> List.map .title
+                    |> Expect.equal [ "Example" ]
+        , test "a feed of the whole collection is one file, so it fills no `:group`" <|
+            \_ ->
+                request [ "posts" ] [ dated "a" "2026-11-01" ]
+                    |> renderWithFeeds [ postRoute ] [ feedAt { rss = "/tags/:group/feed.xml", atom = "/atom.xml" } ]
+                    |> Expect.all
+                        [ .diagnostics
+                            >> List.map (\diagnostic -> ( diagnostic.message, diagnostic.hint ))
+                            >> Expect.equal
+                                [ ( "The RSS feed `/tags/:group/feed.xml` has the placeholder `:group`, but a feed is one file, so it could not be written."
+                                  , Just "Name the file, as in `/feed.xml` or `/atom.xml`."
+                                  )
+                                ]
+                        , .feeds >> Expect.equal []
+                        ]
         , test "a feed orders its collection by date" <|
             \_ ->
                 request [ "posts" ] [ post "undated" ]
                     |> renderWithFeeds [ postRoute ] [ feed ]
                     |> titles
                     |> Expect.equal [ "MISSING DATE" ]
+        ]
+
+
+
+-- A FEED FOR EACH GROUP
+
+
+{-| A post with these tags, published on `isoDate`.
+-}
+tagged : String -> String -> List String -> Source
+tagged slug isoDate tags =
+    let
+        source : Source
+        source =
+            dated slug isoDate
+    in
+    { source | frontmatter = ( "tags", Encode.list Encode.string tags ) :: source.frontmatter }
+
+
+{-| What the host would send for the tags these tests use.
+-}
+tagRequest : List Source -> Value
+tagRequest =
+    requestWithSlugs
+        [ ( "elm", "elm", "elm" )
+        , ( "Elm", "elm", "elm" )
+        , ( "css", "css", "css" )
+        ]
+        [ "posts" ]
+
+
+groupedFeedAt : { rss : String, atom : String } -> Feed
+groupedFeedAt files =
+    Feed.groupedBy { rss = files.rss, atom = files.atom, limit = Nothing } { by = .tags } posts aboutPost
+
+
+tagFeed : Feed
+tagFeed =
+    groupedFeedAt { rss = "/tags/:group/feed.xml", atom = "/tags/:group/atom.xml" }
+
+
+writtenFeeds : Response -> List ( ( String, String ), String, List String )
+writtenFeeds response =
+    List.map (\written -> ( ( written.rss, written.atom ), written.title, List.map .documentId written.items )) response.feeds
+
+
+badFeed : String -> Maybe String -> Diagnostic
+badFeed message hint =
+    { severity = Error
+    , title = "BAD ROUTE"
+    , message = message
+    , sourcePath = Nothing
+    , span = Nothing
+    , hint = hint
+    }
+
+
+groupedFeedTests : Test
+groupedFeedTests =
+    describe "a feed for each group"
+        [ test "each group has its own files, with its documents newest first, titled after the site and the group" <|
+            \_ ->
+                tagRequest [ tagged "a" "2026-11-01" [ "elm" ], tagged "b" "2026-11-02" [ "elm", "css" ], tagged "c" "2026-11-03" [] ]
+                    |> renderWithFeeds [ postRoute ] [ tagFeed ]
+                    |> writtenFeeds
+                    |> Expect.equal
+                        [ ( ( "tags/css/feed.xml", "tags/css/atom.xml" ), "Example · css", [ "posts/b" ] )
+                        , ( ( "tags/elm/feed.xml", "tags/elm/atom.xml" ), "Example · elm", [ "posts/b", "posts/a" ] )
+                        ]
+        , test "a limit keeps the newest items of each group" <|
+            \_ ->
+                tagRequest [ tagged "a" "2026-11-01" [ "elm", "css" ], tagged "b" "2026-11-02" [ "elm" ] ]
+                    |> renderWithFeeds [ postRoute ]
+                        [ Feed.groupedBy { rss = "/tags/:group/feed.xml", atom = "/tags/:group/atom.xml", limit = Just 1 } { by = .tags } posts aboutPost ]
+                    |> writtenFeeds
+                    |> List.map (\( _, _, ids ) -> ids)
+                    |> Expect.equal [ [ "posts/a" ], [ "posts/b" ] ]
+        , test "spellings with one slug are one feed, named as the group's page is" <|
+            \_ ->
+                let
+                    nameRoute : Route
+                    nameRoute =
+                        Route.groupedBy "/tags/:group/" { by = .tags, perPage = Nothing } posts (\name _ -> page [ Html.text name ])
+                in
+                tagRequest [ tagged "a" "2026-11-01" [ "Elm" ], tagged "b" "2026-11-02" [ "elm" ], tagged "c" "2026-11-03" [ "Elm" ] ]
+                    |> renderWithFeeds [ postRoute, nameRoute ] [ tagFeed ]
+                    |> Expect.all
+                        [ writtenFeeds >> List.map (\( files, title, _ ) -> ( files, title )) >> Expect.equal [ ( ( "tags/elm/feed.xml", "tags/elm/atom.xml" ), "Example · Elm" ) ]
+                        , bodyAt "tags/elm/index.html" >> Expect.equal (Just "Elm")
+                        ]
+        , test "a file without `:group` is reported, and no group's feed is written" <|
+            \_ ->
+                tagRequest [ tagged "a" "2026-11-01" [ "elm" ] ]
+                    |> renderWithFeeds [ postRoute ] [ groupedFeedAt { rss = "/feed.xml", atom = "/tags/:group/atom.xml" } ]
+                    |> Expect.all
+                        [ .diagnostics
+                            >> Expect.equal
+                                [ badFeed "The RSS feed `/feed.xml` does not have the placeholder `:group`, which gives each group its own feed, so it could not be written."
+                                    (Just "Put `:group` in a segment of its own, as in `/tags/:group/feed.xml`.")
+                                ]
+                        , .feeds >> Expect.equal []
+                        ]
+        , test "a file with `:group` twice is reported" <|
+            \_ ->
+                tagRequest [ tagged "a" "2026-11-01" [ "elm" ] ]
+                    |> renderWithFeeds [ postRoute ] [ groupedFeedAt { rss = "/tags/:group/feed.xml", atom = "/:group/:group/atom.xml" } ]
+                    |> Expect.all
+                        [ .diagnostics
+                            >> Expect.equal
+                                [ badFeed "The Atom feed `/:group/:group/atom.xml` has the placeholder `:group` more than once, but each group's feed is one file, so it could not be written."
+                                    (Just "Put `:group` in a segment of its own, as in `/tags/:group/feed.xml`.")
+                                ]
+                        , .feeds >> Expect.equal []
+                        ]
+        , test "a group's feed fills only `:group`" <|
+            \_ ->
+                tagRequest [ tagged "a" "2026-11-01" [ "elm" ] ]
+                    |> renderWithFeeds [ postRoute ] [ groupedFeedAt { rss = "/tags/:group/:slug/feed.xml", atom = "/tags/:group/atom.xml" } ]
+                    |> .diagnostics
+                    |> Expect.equal
+                        [ badFeed "The RSS feed `/tags/:group/:slug/feed.xml` has the placeholder `:slug`, which a feed for each group does not fill, so it could not be written."
+                            (Just "`Feed.groupedBy` fills `:group`, in a segment of its own, as in `/tags/:group/feed.xml`.")
+                        ]
+        , test "a group's feed is a file" <|
+            \_ ->
+                tagRequest [ tagged "a" "2026-11-01" [ "elm" ] ]
+                    |> renderWithFeeds [ postRoute ] [ groupedFeedAt { rss = "/tags/:group/", atom = "/tags/:group/atom.xml" } ]
+                    |> .diagnostics
+                    |> Expect.equal
+                        [ badFeed "The RSS feed `/tags/:group/` ends with `/`, but a feed is a file, so it could not be written."
+                            (Just "Name the file, as in `/tags/:group/feed.xml`.")
+                        ]
+        , test "a value with no slug is reported once by a route and a feed that group by it" <|
+            \_ ->
+                tagRequest [ tagged "a" "2026-11-01" [ "ELM" ] ]
+                    |> renderWithFeeds [ postRoute, Route.groupedBy "/tags/:group/" { by = .tags, perPage = Nothing } posts (\name _ -> page [ Html.text name ]) ] [ tagFeed ]
+                    |> Expect.all
+                        [ .diagnostics
+                            >> List.map (\diagnostic -> ( diagnostic.title, diagnostic.message ))
+                            >> Expect.equal [ ( "MISSING SLUG", "The route `/tags/:group/` groups documents by the value `ELM`, which has no slug." ) ]
+                        , .feeds >> Expect.equal []
+                        ]
+        , test "a feed names itself when it finds a value with no slug" <|
+            \_ ->
+                tagRequest [ tagged "a" "2026-11-01" [ "ELM" ] ]
+                    |> renderWithFeeds [ postRoute ] [ tagFeed ]
+                    |> .diagnostics
+                    |> List.map (\diagnostic -> ( diagnostic.title, diagnostic.message ))
+                    |> Expect.equal [ ( "MISSING SLUG", "The feed `/tags/:group/feed.xml` groups documents by the value `ELM`, which has no slug." ) ]
+        , test "a group's feed file clashes like any other" <|
+            \_ ->
+                tagRequest [ tagged "a" "2026-11-01" [ "elm" ] ]
+                    |> renderWithFeeds [ postRoute, Route.single "/tags/elm/feed.xml" (page []) ] [ tagFeed ]
+                    |> .diagnostics
+                    |> List.map (\diagnostic -> ( diagnostic.title, diagnostic.message ))
+                    |> Expect.equal
+                        [ ( "DUPLICATE PAGE", "The route `/tags/elm/feed.xml` and the RSS feed `/tags/elm/feed.xml` both make the file `tags/elm/feed.xml`." ) ]
+        , test "the head can link to a group's feed, but not to a group with none" <|
+            \_ ->
+                tagRequest [ tagged "a" "2026-11-01" [ "elm" ] ]
+                    |> renderWithFeeds
+                        [ postRoute
+                        , homeWithHead
+                            [ Head.rssFeed { title = "Elm", path = "/tags/elm/feed.xml" }
+                            , Head.atomFeed { title = "Elm", path = "/tags/elm/atom.xml" }
+                            , Head.rssFeed { title = "Nope", path = "/tags/nope/feed.xml" }
+                            ]
+                        ]
+                        [ tagFeed ]
+                    |> .diagnostics
+                    |> List.map (\diagnostic -> ( diagnostic.title, diagnostic.message ))
+                    |> Expect.equal
+                        [ ( "UNKNOWN FEED", "This page links to the RSS feed `/tags/nope/feed.xml`, but the site has no RSS feed at that path.\n\nFound while rendering `/` from the route `/`." ) ]
+        , test "an unknown feed's hint names the feeds' patterns, not each group's file" <|
+            \_ ->
+                tagRequest [ tagged "a" "2026-11-01" [ "elm" ], tagged "b" "2026-11-02" [ "css" ] ]
+                    |> renderWithFeeds [ postRoute, homeWithHead [ Head.rssFeed { title = "Posts", path = "/feeds.xml" } ] ] [ feed, tagFeed ]
+                    |> .diagnostics
+                    |> List.map .hint
+                    |> Expect.equal [ Just "The RSS feeds of the site are `/feed.xml`, `/tags/:group/feed.xml`." ]
         ]
 
 

@@ -258,7 +258,7 @@ groupedBy pattern { by, perPage } collection template =
     Site.GroupedBy
         { pattern = pattern
         , perPage = perPage
-        , grouping = groupingOf by collection
+        , grouping = Site.groupingBy by (sortOrder collection) collection
         , templateFor =
             \groupName pagination items ->
                 decodeAll collection items
@@ -275,7 +275,7 @@ allGroups : String -> (meta -> List String) -> Collection meta -> (List (Group m
 allGroups pattern by collection template =
     Site.AllGroups
         { pattern = pattern
-        , grouping = groupingOf by collection
+        , grouping = Site.groupingBy by (sortOrder collection) collection
         , templateFor =
             \groups ->
                 groups
@@ -291,14 +291,6 @@ newest first or in the collection's order.
 type alias Group meta =
     { name : String
     , items : List (Document meta)
-    }
-
-
-groupingOf : (meta -> List String) -> Collection meta -> Site.Grouping
-groupingOf by ((Site.Collection { frontmatter }) as collection) =
-    { collection = name collection
-    , valuesOf = \document -> Result.map by (decodeMeta frontmatter document)
-    , order = sortOrder collection
     }
 
 

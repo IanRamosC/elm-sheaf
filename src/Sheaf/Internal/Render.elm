@@ -131,17 +131,22 @@ renderSite (Site site) request =
         groupPages =
             Grouping.groupPages goodRoutes groupings
 
+        -- Grouped once, like the routes.
+        preparedFeeds : List Feed.Prepared
+        preparedFeeds =
+            List.map (Feed.prepare context.slugs bodies) site.feeds
+
         -- A feed item's broken links are not checked again: its item page
         -- has the same body, and reports them when it shows it.
-        feeds : List (Result (List Diagnostic) Protocol.Feed)
+        feeds : List (Result (List Diagnostic) (List Protocol.Feed))
         feeds =
-            List.map (Feed.render context (urlTarget context groupPages) bodies) site.feeds
+            List.map (Feed.render context (urlTarget context groupPages) bodies) preparedFeeds
 
         written : { pages : List UncheckedPage, redirects : List Redirect, diagnostics : List Diagnostic }
         written =
             Output.withoutClashes
                 (List.map PageFile (List.filterMap Result.toMaybe made)
-                    ++ List.concatMap Feed.outputs site.feeds
+                    ++ List.concatMap Feed.outputs preparedFeeds
                     ++ [ Sitemap ]
                     ++ List.map RedirectFile (List.concatMap (redirectsOf context) published)
                 )
@@ -154,7 +159,8 @@ renderSite (Site site) request =
                     , basePath = context.basePath
                     , linkProblem = linkTarget context >> Results.error
                     , groupLinkProblem = Grouping.linkTarget context groupPages >> Results.error
-                    , feedPaths = feedPaths site.feeds
+                    , feedPaths = feedPaths (List.concatMap Feed.outputs preparedFeeds)
+                    , feedPatterns = feedPaths (List.concatMap Feed.patterns site.feeds)
                     , stylesheets = request.stylesheets
                     }
                 )
@@ -168,7 +174,7 @@ renderSite (Site site) request =
     , pages =
         List.map (write (urlTarget context groupPages) site.metadata.language) good
             ++ List.map (writeRedirect context site.metadata.language) written.redirects
-    , feeds = List.filterMap Result.toMaybe feeds
+    , feeds = List.concat (List.filterMap Result.toMaybe feeds)
     , sitemap = List.filterMap (sitemapEntry context) good
     , diagnostics =
         -- A problem is found as often as it is decoded or checked: by a feed
@@ -182,7 +188,7 @@ renderSite (Site site) request =
                 , unknownCollections used request.collections
                 , Listing.missingDates (Results.unique (List.filterMap Site.datedCollection site.routes ++ feedCollections)) published
                 , List.concatMap (Tuple.second >> Results.errors) bodies
-                , Grouping.diagnostics goodRoutes groupings
+                , Grouping.diagnostics goodRoutes groupings (List.filterMap groupedFeed preparedFeeds)
                 , List.concatMap Results.errors made
                 , Check.brokenLinkDiagnostics checked
                 , List.concatMap .problems checked
@@ -193,11 +199,11 @@ renderSite (Site site) request =
     }
 
 
-{-| The paths a head tag can link to for a format: the files the feeds write.
+{-| The paths of the feed files in a format, as a head tag links to them.
 -}
-feedPaths : List Feed -> FeedFormat -> List String
-feedPaths feeds format =
-    List.concatMap Feed.outputs feeds
+feedPaths : List Output -> FeedFormat -> List String
+feedPaths files format =
+    files
         |> List.filterMap
             (\output ->
                 case ( output, format ) of
@@ -210,6 +216,17 @@ feedPaths feeds format =
                     _ ->
                         Nothing
             )
+
+
+{-| A feed for each group, named by its RSS file, and its groups.
+-}
+groupedFeed : Feed.Prepared -> Maybe ( String, Grouped )
+groupedFeed { feed, grouped } =
+    let
+        (Feed declared) =
+            feed
+    in
+    Maybe.map (Tuple.pair declared.rss) grouped
 
 
 {-| A feed uses its collection, and lists it by date as a listing route does.

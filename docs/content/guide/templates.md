@@ -481,7 +481,29 @@ route given the collection without `orderedBy` lists it by date.
 collection, at the two paths you give, with the newest `limit` documents
 (`Nothing` keeps all of them). Each item holds the document's full HTML, with
 every link made absolute. The function you pass gives each item's title and
-summary.
+summary, and the feed is titled after the site.
+
+`Feed.groupedBy` declares an RSS and an Atom feed for each group of a
+collection, such as each tag:
+
+```elm
+Feed.groupedBy
+    { rss = "/tags/:group/feed.xml", atom = "/tags/:group/atom.xml", limit = Just 20 }
+    { by = .tags }
+    posts
+    (\meta -> { title = meta.title, summary = meta.summary })
+```
+
+`:group` is filled with the group's slug, as on the pages of a
+`Route.groupedBy` route, so the feed of `Elm` is `/tags/elm/feed.xml`. Each
+path needs `:group` exactly once. A group's feed lists its documents newest
+first, keeps at most `limit` of them, and is titled after the site and the
+group's name, as in `My Blog · Elm`, the name its group page gets.
+
+The blog preset links each tag's feed from that tag's pages. Elsewhere,
+`Head.rssFeed` and `Head.atomFeed` can link a group's feed only where its path
+is known, such as `/tags/elm/feed.xml`; a path no feed writes is
+`UNKNOWN FEED`.
 
 A feed's items link to their documents, so the collection needs a
 `Route.eachItem` or `Route.eachItemIn` route; without one, the feed is
