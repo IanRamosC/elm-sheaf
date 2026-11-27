@@ -120,12 +120,19 @@ mirror `elm/svg`. Import them qualified, since `title`, `clipPath` and `mask`
 exist in more than one module:
 
 ```elm
+import Sheaf.Html as Html
+import Sheaf.Html.Attributes exposing (attribute)
 import Sheaf.Svg as Svg
 import Sheaf.Svg.Attributes as SvgA
 
-arrow : Html
+arrow : Html.Html
 arrow =
-    Svg.svg [ SvgA.viewBox "0 0 24 24", SvgA.width "24", SvgA.height "24" ]
+    Svg.svg
+        [ SvgA.viewBox "0 0 24 24"
+        , SvgA.width "24"
+        , SvgA.height "24"
+        , attribute "aria-hidden" "true"
+        ]
         [ Svg.path [ SvgA.d "M5 12h14", SvgA.stroke "currentColor" ] [] ]
 ```
 

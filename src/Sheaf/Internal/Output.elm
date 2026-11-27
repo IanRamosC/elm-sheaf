@@ -198,8 +198,9 @@ clash taken output =
 -- LONG NAMES
 
 
-{-| Most file systems refuse a name over this many bytes. Linux counts bytes,
-and macOS counts fewer, never more, UTF-16 units.
+{-| Most file systems allow names of up to 255 bytes. Linux's count bytes;
+macOS's counts UTF-16 units, and a name never has more of those than bytes, so
+this limit is the stricter of the two.
 -}
 maxNameBytes : Int
 maxNameBytes =
@@ -258,7 +259,7 @@ nameTooLong output name =
         hint =
             case output of
                 PageFile _ ->
-                    Just "A frontmatter value used in the path, such as a tag, becomes this name. Shorten it."
+                    Just "A name in the path comes from the route's pattern or from a frontmatter value, such as a tag. Shorten it."
 
                 RedirectFile _ ->
                     Just "Shorten the alias."
@@ -271,7 +272,7 @@ nameTooLong output name =
     , message =
         "The "
             ++ nameOf output
-            ++ " makes a file whose name `"
+            ++ " makes a path with the name `"
             ++ shown
             ++ "` is "
             ++ String.fromInt (utf8Length name)

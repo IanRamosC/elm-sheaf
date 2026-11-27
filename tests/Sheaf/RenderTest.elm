@@ -625,10 +625,10 @@ longNameTests =
         tooLong shown bytes =
             { severity = Error
             , title = "NAME TOO LONG"
-            , message = "The route `/tags/:group/` makes a file whose name `" ++ shown ++ "` is " ++ bytes ++ " bytes long. Most file systems allow 255 bytes."
+            , message = "The route `/tags/:group/` makes a path with the name `" ++ shown ++ "` is " ++ bytes ++ " bytes long. Most file systems allow 255 bytes."
             , sourcePath = Nothing
             , span = Nothing
-            , hint = Just "A frontmatter value used in the path, such as a tag, becomes this name. Shorten it."
+            , hint = Just "A name in the path comes from the route's pattern or from a frontmatter value, such as a tag. Shorten it."
             }
     in
     describe "long names"
@@ -644,6 +644,26 @@ longNameTests =
                         [ .diagnostics >> Expect.equal [ tooLong (String.repeat 40 "a" ++ "…") "256" ]
                         , paths >> List.filter (String.contains tag) >> Expect.equal []
                         ]
+        , test "a long tag on several pages is reported once" <|
+            \_ ->
+                let
+                    tag : String
+                    tag =
+                        String.repeat 256 "a"
+
+                    pagedRoute : Route
+                    pagedRoute =
+                        Route.groupedBy "/tags/:group/" { by = .tags, perPage = Just 1 } posts (\_ _ -> page [])
+
+                    second : Source
+                    second =
+                        tagged tag |> (\source -> { source | slug = "second" })
+                in
+                requestWithSlugs [ ( tag, tag, tag ) ] [ "posts" ] [ tagged tag, second ]
+                    |> render [ pagedRoute ]
+                    |> .diagnostics
+                    |> List.map .title
+                    |> Expect.equal [ "NAME TOO LONG" ]
         , test "a name of 255 bytes is allowed" <|
             \_ ->
                 let
@@ -678,7 +698,7 @@ longNameTests =
                             >> Expect.equal
                                 [ { severity = Error
                                   , title = "NAME TOO LONG"
-                                  , message = "The alias `" ++ alias ++ "` of `content/posts/new.md` makes a file whose name `" ++ String.repeat 40 "b" ++ "…` is 300 bytes long. Most file systems allow 255 bytes."
+                                  , message = "The alias `" ++ alias ++ "` of `content/posts/new.md` makes a path with the name `" ++ String.repeat 40 "b" ++ "…` is 300 bytes long. Most file systems allow 255 bytes."
                                   , sourcePath = Just "content/posts/new.md"
                                   , span = Nothing
                                   , hint = Just "Shorten the alias."
