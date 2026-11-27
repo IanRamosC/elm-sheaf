@@ -74,6 +74,46 @@ suite =
                     |> .feeds
                     |> List.map (.items >> List.map .documentId)
                     |> Expect.equal [ [ "posts/b" ] ]
+        , describe "a feed for each tag"
+            [ test "is written as RSS and Atom files under the tag's folder" <|
+                \_ ->
+                    render [ tagged "a" 1 [ "elm" ], tagged "b" 2 [ "elm", "Tooling" ] ]
+                        |> .feeds
+                        |> List.map (\feed -> ( feed.rss, feed.atom, feed.title ))
+                        |> Expect.equal
+                            [ ( "feed.xml", "atom.xml", "Example" )
+                            , ( "tags/elm/feed.xml", "tags/elm/atom.xml", "Example · elm" )
+                            , ( "tags/tooling/feed.xml", "tags/tooling/atom.xml", "Example · Tooling" )
+                            ]
+            , test "is linked from the tag's page, after the site's feeds" <|
+                \_ ->
+                    render [ tagged "a" 1 [ "elm" ] ]
+                        |> headAt "tags/elm/index.html"
+                        |> Maybe.map (String.endsWith (siteFeedLinks ++ tagFeedLinks "Example · elm" "elm"))
+                        |> Expect.equal (Just True)
+            , test "is linked from every page of the tag's listing" <|
+                \_ ->
+                    render [ tagged "a" 1 [ "elm" ], tagged "b" 2 [ "elm" ], tagged "c" 3 [ "elm" ] ]
+                        |> headAt "tags/elm/page/2/index.html"
+                        |> Maybe.map (String.contains (tagFeedLinks "Example · elm" "elm"))
+                        |> Expect.equal (Just True)
+            , test "is not linked from the home page" <|
+                \_ ->
+                    render [ tagged "a" 1 [ "elm" ] ]
+                        |> headAt "index.html"
+                        |> Maybe.map (String.contains "/tags/")
+                        |> Expect.equal (Just False)
+            , test "is linked at the path it is written, even when the slug is not the lowercased tag" <|
+                \_ ->
+                    requestWithSlugs (( "C++", "c", "c" ) :: slugTable) [ "posts", "pages" ] [ tagged "a" 1 [ "C++" ] ]
+                        |> Render.render (Blog.site config)
+                        |> Expect.all
+                            [ .feeds >> List.map .rss >> Expect.equal [ "feed.xml", "tags/c/feed.xml" ]
+                            , headAt "tags/c/index.html"
+                                >> Maybe.map (String.contains (tagFeedLinks "Example · C++" "c"))
+                                >> Expect.equal (Just True)
+                            ]
+            ]
         , test "the site has the config's components" <|
             \_ ->
                 render [ { about | body = [ leafDirective "divider" (span 3 1 11) ] } ]
@@ -125,6 +165,22 @@ postLayout document =
 titled : Document PostMeta -> Page
 titled document =
     { title = document.meta.title, head = [], body = document.body }
+
+
+siteFeedLinks : String
+siteFeedLinks =
+    String.concat
+        [ "<link rel=\"alternate\" type=\"application/rss+xml\" title=\"Example\" href=\"/blog/feed.xml\">"
+        , "<link rel=\"alternate\" type=\"application/atom+xml\" title=\"Example\" href=\"/blog/atom.xml\">"
+        ]
+
+
+tagFeedLinks : String -> String -> String
+tagFeedLinks title slug =
+    String.concat
+        [ "<link rel=\"alternate\" type=\"application/rss+xml\" title=\"" ++ title ++ "\" href=\"/blog/tags/" ++ slug ++ "/feed.xml\">"
+        , "<link rel=\"alternate\" type=\"application/atom+xml\" title=\"" ++ title ++ "\" href=\"/blog/tags/" ++ slug ++ "/atom.xml\">"
+        ]
 
 
 slugTable : List ( String, String, String )

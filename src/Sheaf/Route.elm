@@ -260,9 +260,9 @@ groupedBy pattern { by, perPage } collection template =
         , perPage = perPage
         , grouping = Site.groupingBy by (sortOrder collection) collection
         , templateFor =
-            \groupName pagination items ->
+            \group pagination items ->
                 decodeAll collection items
-                    |> Result.map (\documents -> template groupName { items = documents, pagination = pagination })
+                    |> Result.map (\documents -> template group.name { items = documents, pagination = pagination })
         }
 
 

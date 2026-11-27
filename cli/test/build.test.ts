@@ -799,6 +799,7 @@ describe("the blog fixture", () => {
         "sitemap.xml",
         "index.html",
         "tags/elm/index.html",
+        "tags/elm/feed.xml",
         "posts/pictures/index.html",
         "old-post/index.html",
       ]) {
@@ -1117,7 +1118,12 @@ describe("the blog fixture", () => {
 
       const result = await build(root, options(root));
 
-      expect(titlesOf(result)).toEqual(["NAME TOO LONG"]);
+      // The tag's page and its two feeds are each too long a name.
+      expect(titlesOf(result)).toEqual([
+        "NAME TOO LONG",
+        "NAME TOO LONG",
+        "NAME TOO LONG",
+      ]);
     },
     SLOW,
   );

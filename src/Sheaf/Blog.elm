@@ -124,7 +124,9 @@ Git does not keep empty folders, so commit an empty `.gitkeep` file in it.
         }
 
 Every layout's head also gets links to the RSS feed at `/feed.xml` and the
-Atom feed at `/atom.xml`, so feed readers find them from any page.
+Atom feed at `/atom.xml`, so feed readers find them from any page. Each tag
+has feeds of its own at `/tags/<tag>/feed.xml` and `/tags/<tag>/atom.xml`,
+which its pages link too.
 
 Add routes, feeds and components of your own with
 [`Sheaf.withRoutes`](Sheaf#withRoutes), [`Sheaf.withFeeds`](Sheaf#withFeeds)
@@ -142,6 +144,8 @@ import Sheaf.Feed as Feed
 import Sheaf.Frontmatter exposing (Frontmatter)
 import Sheaf.Head as Head
 import Sheaf.Html exposing (Html)
+import Sheaf.Internal.Pattern as Pattern
+import Sheaf.Internal.Site as Site
 import Sheaf.Route as Route exposing (Group, Listing, Page)
 
 
@@ -226,14 +230,19 @@ site config =
             , Route.eachItem "/posts/:slug/" posts (layouts.post >> withFeeds)
             , Route.eachItem "/:slug/" pages (layouts.page >> withFeeds)
             , Route.allGroups "/tags/" config.tags posts (layouts.tags >> withFeeds)
-            , Route.groupedBy tagPattern
-                { by = config.tags, perPage = Just config.postsPerPage }
-                posts
-                (\name -> layouts.tag name >> withFeeds)
+            , Site.mapGroupPages (withTagFeeds config.site.title)
+                (Route.groupedBy tagPattern
+                    { by = config.tags, perPage = Just config.postsPerPage }
+                    posts
+                    (\name -> layouts.tag name >> withFeeds)
+                )
             , Route.allItems "/archive/" posts (layouts.archive >> withFeeds)
             , Route.notFound (withFeeds layouts.notFound)
             ]
-        , feeds = [ Feed.fromCollection { rss = rssPath, atom = atomPath, limit = config.feedSize } posts config.feedItem ]
+        , feeds =
+            [ Feed.fromCollection { rss = rssPath, atom = atomPath, limit = config.feedSize } posts config.feedItem
+            , Feed.groupedBy { rss = tagRssPath, atom = tagAtomPath, limit = config.feedSize } { by = config.tags } posts config.feedItem
+            ]
         , components = config.components
         }
 
@@ -249,6 +258,26 @@ withFeedLinks title page =
     }
 
 
+withTagFeeds : String -> { name : String, slug : String } -> Page -> Page
+withTagFeeds siteTitle group page =
+    let
+        title : String
+        title =
+            siteTitle ++ " · " ++ group.name
+
+        pathOf : String -> String
+        pathOf =
+            Pattern.fill Pattern.Group group.slug
+    in
+    { page
+        | head =
+            page.head
+                ++ [ Head.rssFeed { title = title, path = pathOf tagRssPath }
+                   , Head.atomFeed { title = title, path = pathOf tagAtomPath }
+                   ]
+    }
+
+
 rssPath : String
 rssPath =
     "/feed.xml"
@@ -257,6 +286,16 @@ rssPath =
 atomPath : String
 atomPath =
     "/atom.xml"
+
+
+tagRssPath : String
+tagRssPath =
+    "/tags/:group/feed.xml"
+
+
+tagAtomPath : String
+tagAtomPath =
+    "/tags/:group/atom.xml"
 
 
 tagPattern : String

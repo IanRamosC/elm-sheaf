@@ -543,7 +543,7 @@ pagesOf context bodies groupings index route =
                                 , perPage = Maybe.withDefault (List.length group.items) grouped.perPage
                                 }
                                 group.items
-                                |> List.map (\page -> Result.map (madeAt page.url) (grouped.templateFor group.name page.pagination page.items))
+                                |> List.map (\page -> Result.map (madeAt page.url) (grouped.templateFor { name = group.name, slug = group.slug } page.pagination page.items))
                         )
                         groups
                 )

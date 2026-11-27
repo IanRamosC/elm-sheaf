@@ -73,7 +73,8 @@ each with the frontmatter decoder you give it, and declares these routes:
 It also writes an RSS feed at `/feed.xml` and an Atom feed at `/atom.xml`, with
 the newest `feedSize` posts (`Nothing` keeps every post), and adds links to both
 to the head of every page. `tags` says where a post's tags are, and `feedItem`
-gives each post's title and summary in the feeds.
+gives each post's title and summary in the feeds. Each tag has feeds of its own,
+at `/tags/<tag>/feed.xml` and `/tags/<tag>/atom.xml`, which its pages link.
 
 A page's slug can't be one of the blog's own folders, such as `archive` or
 `tags`: both would be written to the same file, which is `DUPLICATE PAGE`.

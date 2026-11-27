@@ -1,6 +1,6 @@
 module Sheaf.Internal.Site exposing
     ( Site(..), Metadata, Feed(..), Description, Route(..), Grouping, NamedGroup, ListedDocument, Neighbours, FrontmatterProblems, Pagination, Collection(..), SortOrder(..), Page
-    , groupingBy
+    , groupingBy, mapGroupPages
     , nameOf, patternOf, collectionOf, itemPattern, datedCollection, perPageOf, routeGrouping, groupedPattern
     )
 
@@ -12,7 +12,7 @@ module Sheaf.Internal.Site exposing
 
 # Grouping a collection
 
-@docs groupingBy
+@docs groupingBy, mapGroupPages
 
 
 # What a route uses
@@ -131,7 +131,7 @@ type Route
         { pattern : String
         , perPage : Maybe Int
         , grouping : Grouping
-        , templateFor : String -> Pagination -> List ListedDocument -> Result (List FrontmatterProblems) Page
+        , templateFor : { name : String, slug : String } -> Pagination -> List ListedDocument -> Result (List FrontmatterProblems) Page
         }
     | AllGroups
         { pattern : String
@@ -211,6 +211,25 @@ type alias Page =
 
 
 -- GROUPING A COLLECTION
+
+
+{-| Change each page a `groupedBy` route makes, given the name and slug of its
+group. Any other route is left as it is.
+-}
+mapGroupPages : ({ name : String, slug : String } -> Page -> Page) -> Route -> Route
+mapGroupPages change route =
+    case route of
+        GroupedBy grouped ->
+            GroupedBy
+                { grouped
+                    | templateFor =
+                        \group pagination items ->
+                            grouped.templateFor group pagination items
+                                |> Result.map (change group)
+                }
+
+        _ ->
+            route
 
 
 {-| How to group a collection by the values `by` finds in each document's

@@ -8,6 +8,8 @@ numbers are those of the npm package `elm-sheaf`.
 
 ### Added
 
+- The blog preset writes RSS and Atom feeds for each tag and links them from
+  the tag's pages.
 - `Feed.groupedBy` writes an RSS and an Atom feed for each group of a
   collection, such as each tag.
 - `Head.stylesheet` links a copy of the stylesheet whose name carries a hash of
