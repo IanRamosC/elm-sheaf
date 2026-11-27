@@ -43,13 +43,15 @@ type alias Prepared =
     }
 
 
-{-| Group a feed's documents, if it has a feed for each group.
+{-| Group a feed's documents, if it has a feed for each group and its files
+are good. A bad limit does not stop this, so that the files the feed would
+write are still known to the pages that link to them.
 -}
 prepare : Dict String GroupSlug -> List Body -> Feed -> Prepared
 prepare slugs bodies ((Feed { grouping }) as feed) =
     { feed = feed
     , grouped =
-        if List.isEmpty (problems feed) then
+        if List.isEmpty (List.filterMap identity (fileProblems feed)) then
             Maybe.map (Grouping.groupDocuments slugs bodies) grouping
 
         else
@@ -196,13 +198,16 @@ badFile feed =
             RouteCheck.badFeedFile
 
 
+fileProblems : Feed -> List (Maybe Diagnostic)
+fileProblems (Feed feed) =
+    [ badFile feed "RSS" feed.rss
+    , badFile feed "Atom" feed.atom
+    ]
+
+
 problems : Feed -> List Diagnostic
-problems (Feed feed) =
-    List.filterMap identity
-        [ badFile feed "RSS" feed.rss
-        , badFile feed "Atom" feed.atom
-        , RouteCheck.badFeedLimit feed.rss feed.limit
-        ]
+problems ((Feed feed) as declared) =
+    List.filterMap identity (fileProblems declared ++ [ RouteCheck.badFeedLimit feed.rss feed.limit ])
 
 
 {-| A document's item, or nothing if it has no date, which is reported on its

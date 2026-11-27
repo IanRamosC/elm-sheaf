@@ -74,6 +74,13 @@ suite =
                     |> .feeds
                     |> List.map (.items >> List.map .documentId)
                     |> Expect.equal [ [ "posts/b" ] ]
+        , test "a bad feedSize is reported without calling the tag feeds unknown" <|
+            \_ ->
+                requestWithSlugs slugTable [ "posts", "pages" ] [ tagged "a" 1 [ "elm" ] ]
+                    |> Render.render (Blog.site { config | feedSize = Just 0 })
+                    |> .diagnostics
+                    |> List.map .title
+                    |> Expect.equal [ "BAD ROUTE", "BAD ROUTE" ]
         , describe "a feed for each tag"
             [ test "is written as RSS and Atom files under the tag's folder" <|
                 \_ ->
