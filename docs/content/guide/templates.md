@@ -79,9 +79,11 @@ at `/tags/<tag>/feed.xml` and `/tags/<tag>/atom.xml`, which its pages link.
 A page's slug can't be one of the blog's own folders, such as `archive` or
 `tags`: both would be written to the same file, which is `DUPLICATE PAGE`.
 
-The preset is built only from what the package exposes, so you can add to it
-with `Sheaf.withRoutes`, `Sheaf.withFeeds` and `Sheaf.withComponents`, or build
-a site without it (see [Routes](#routes)).
+You can add to the preset with `Sheaf.withRoutes`, `Sheaf.withFeeds` and
+`Sheaf.withComponents`, or build a site without it (see [Routes](#routes)). The
+links from a tag's pages to that tag's feeds are the one part the public API
+doesn't offer yet: a site built without the preset can write the feeds with
+`Feed.groupedBy`, but can't link them from its group pages.
 
 ## Pages
 

@@ -1,23 +1,23 @@
 module Sheaf.Internal.Site exposing
-    ( Site(..), Metadata, Feed(..), Description, Route(..), Grouping, NamedGroup, ListedDocument, Neighbours, FrontmatterProblems, Pagination, Collection(..), SortOrder(..), Page
-    , groupingBy, mapGroupPages
-    , nameOf, patternOf, collectionOf, itemPattern, datedCollection, perPageOf, routeGrouping, groupedPattern
+    ( Site(..), Metadata, Feed(..), Description, Route(..), Grouping, NamedGroup, GroupName, ListedDocument, Neighbours, FrontmatterProblems, Pagination, Collection(..), SortOrder(..), Page
+    , groupingBy
+    , nameOf, patternOf, collectionOf, itemPattern, datedCollection, perPageOf, routeGrouping, groupedPattern, mapGroupPages
     )
 
 {-| The site a user declares, behind `Sheaf`, `Sheaf.Route` and
 `Sheaf.Collection`, which only expose ways to build it.
 
-@docs Site, Metadata, Feed, Description, Route, Grouping, NamedGroup, ListedDocument, Neighbours, FrontmatterProblems, Pagination, Collection, SortOrder, Page
+@docs Site, Metadata, Feed, Description, Route, Grouping, NamedGroup, GroupName, ListedDocument, Neighbours, FrontmatterProblems, Pagination, Collection, SortOrder, Page
 
 
 # Grouping a collection
 
-@docs groupingBy, mapGroupPages
+@docs groupingBy
 
 
 # What a route uses
 
-@docs nameOf, patternOf, collectionOf, itemPattern, datedCollection, perPageOf, routeGrouping, groupedPattern
+@docs nameOf, patternOf, collectionOf, itemPattern, datedCollection, perPageOf, routeGrouping, groupedPattern, mapGroupPages
 
 -}
 
@@ -131,7 +131,7 @@ type Route
         { pattern : String
         , perPage : Maybe Int
         , grouping : Grouping
-        , templateFor : { name : String, slug : String } -> Pagination -> List ListedDocument -> Result (List FrontmatterProblems) Page
+        , templateFor : GroupName -> Pagination -> List ListedDocument -> Result (List FrontmatterProblems) Page
         }
     | AllGroups
         { pattern : String
@@ -147,6 +147,14 @@ type alias Grouping =
     { collection : String
     , valuesOf : Protocol.Document -> Result (List Problem) (List String)
     , order : SortOrder
+    }
+
+
+{-| A group's display name and its slug, which names its pages and files.
+-}
+type alias GroupName =
+    { name : String
+    , slug : String
     }
 
 
@@ -216,7 +224,7 @@ type alias Page =
 {-| Change each page a `groupedBy` route makes, given the name and slug of its
 group. Any other route is left as it is.
 -}
-mapGroupPages : ({ name : String, slug : String } -> Page -> Page) -> Route -> Route
+mapGroupPages : (GroupName -> Page -> Page) -> Route -> Route
 mapGroupPages change route =
     case route of
         GroupedBy grouped ->

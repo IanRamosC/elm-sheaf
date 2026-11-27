@@ -258,7 +258,7 @@ withFeedLinks title page =
     }
 
 
-withTagFeeds : String -> { name : String, slug : String } -> Page -> Page
+withTagFeeds : String -> Site.GroupName -> Page -> Page
 withTagFeeds siteTitle group page =
     let
         title : String
