@@ -23,7 +23,7 @@ This is every key, with the defaults of those you can leave out:
   "siteUrl": "https://example.com/blog/",
   "timezone": "UTC",
   "highlight": {
-    "theme": { "light": "github-light", "dark": "github-dark" },
+    "theme": { "light": "github-light-default", "dark": "github-dark-default" },
     "grammars": {},
     "themes": {}
   },
@@ -65,9 +65,9 @@ written with a time and an offset doesn't depend on it. See
 blocks are highlighted with: [Shiki's](https://shiki.style/themes), or
 [your own](#your-own-grammars-and-themes). Either can be left out, and the
 defaults are `github-light-default` and `github-dark-default`, chosen because
-their colours pass WCAG AA contrast. A name Sheaf
-doesn't have is `BAD CONFIG`, with the closest theme as a suggestion. Sheaf
-leaves out Shiki's `aurora-x` theme, because it is GPL-3.0.
+their colours pass WCAG AA contrast. A name Sheaf doesn't have is
+`BAD CONFIG`, with the closest theme as a suggestion. Sheaf leaves out Shiki's
+`aurora-x` theme, because it is GPL-3.0.
 
 Pages use the light theme. To follow the reader's system setting, add Shiki's
 dark-mode CSS to your stylesheet, as the starter's `static/style.css` does:
@@ -92,7 +92,7 @@ from files in your site:
 
 ```json
 "highlight": {
-  "theme": { "light": "github-light", "dark": "my-theme" },
+  "theme": { "light": "github-light-default", "dark": "my-theme" },
   "grammars": { "nginx": "highlight/nginx.tmLanguage.json" },
   "themes": { "my-theme": "highlight/my-theme.json" }
 }

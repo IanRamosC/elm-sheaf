@@ -39,9 +39,10 @@ numbers are those of the npm package `elm-sheaf`.
   components rendered by Elm views you write.
 - Code blocks are highlighted with Shiki when the site is built, in a light and
   a dark theme: `github-light-default` and `github-dark-default` unless
-  `sheaf.json` says otherwise; their colours meet WCAG AA contrast. Shiki's GPL-3.0 grammars (`ada`, `gnuplot`, `nginx`, `org`,
-  `racket`) and theme (`aurora-x`) are left out, because Sheaf's
-  BSD-3-Clause binaries can't carry them.
+  `sheaf.json` says otherwise; their colours meet WCAG AA contrast. Shiki's
+  GPL-3.0 grammars (`ada`, `gnuplot`, `nginx`, `org`, `racket`) and theme
+  (`aurora-x`) are left out, because Sheaf's BSD-3-Clause binaries can't carry
+  them.
 - A site can add grammars and themes of its own, or replace Shiki's, with
   `highlight.grammars` and `highlight.themes` in `sheaf.json`.
 - Local images in Markdown are resized to several widths, encoded as WebP as
