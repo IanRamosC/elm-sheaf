@@ -124,6 +124,10 @@ pathTests =
                         ( "<link rel=\"stylesheet\" href=\"/blog/style.0123abcd.css\">"
                         , "<link rel=\"stylesheet\" href=\"/blog/css/site.0123abcd.css\">"
                         )
+        , test "a space in a stylesheet's name is encoded in its link, though it is found by its name on disk" <|
+            \_ ->
+                renderWith (Dict.fromList [ ( "my theme.css", "my theme.0123abcd.css" ) ]) (Head.stylesheet "/my theme.css")
+                    |> Expect.equal "<link rel=\"stylesheet\" href=\"/blog/my%20theme.0123abcd.css\">"
         , test "a full URL is linked as given even when its path is a stylesheet" <|
             \_ ->
                 renderWith (Dict.fromList [ ( "x.css", "x.0123abcd.css" ) ]) (Head.stylesheet "https://cdn.example/x.css")

@@ -27,11 +27,15 @@ function item(overrides: Partial<FeedItem> = {}): FeedItem {
 }
 
 function feed(items: FeedItem[]): Feed {
-  return { rss: "feed.xml", atom: "atom.xml", title: metadata.title, items };
+  return { rss: "feed.xml", atom: "atom.xml", title: "Site & Co · Elm", items };
 }
 
 describe("rssFeed", () => {
   const xml = rssFeed(feed([item()]), urls, metadata);
+
+  test("titles the channel after the feed", () => {
+    expect(xml).toContain("<title>Site &amp; Co · Elm</title>");
+  });
 
   test("escapes text without CDATA", () => {
     expect(xml).toContain("Tom &amp; &quot;Jerry&quot; &lt;3");
@@ -71,6 +75,12 @@ describe("rssFeed", () => {
 });
 
 describe("atomFeed", () => {
+  test("titles the feed after the feed, not the site", () => {
+    expect(atomFeed(feed([item()]), urls, metadata)).toContain(
+      "<title>Site &amp; Co · Elm</title>",
+    );
+  });
+
   test("separates published and updated", () => {
     const xml = atomFeed(feed([item()]), urls, metadata);
     expect(xml).toContain("<published>2026-01-01T00:00:00.000Z</published>");

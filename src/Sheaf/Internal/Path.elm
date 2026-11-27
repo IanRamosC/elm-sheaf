@@ -1,8 +1,8 @@
-module Sheaf.Internal.Path exposing (join, isSitePath, dropLeadingSlash, dropTrailingSlash)
+module Sheaf.Internal.Path exposing (join, isSitePath, dropLeadingSlash, dropTrailingSlash, encodeSegments)
 
 {-| URL paths, shared by the renderer and the parts of a page that hold a path.
 
-@docs join, isSitePath, dropLeadingSlash, dropTrailingSlash
+@docs join, isSitePath, dropLeadingSlash, dropTrailingSlash, encodeSegments
 
 -}
 
@@ -45,3 +45,37 @@ dropTrailingSlash path =
 
     else
         path
+
+
+{-| A path written as a URL: each character a URL cannot hold as it is, such
+as a space, becomes `%` and its code in hexadecimal. Characters outside ASCII
+are kept, which HTML allows in a link.
+
+    encodeSegments "my theme/a.css" == "my%20theme/a.css"
+
+-}
+encodeSegments : String -> String
+encodeSegments path =
+    path
+        |> String.split "/"
+        |> List.map (String.concat << List.map encodeChar << String.toList)
+        |> String.join "/"
+
+
+encodeChar : Char -> String
+encodeChar char =
+    let
+        code : Int
+        code =
+            Char.toCode char
+    in
+    if code <= 0x20 || code == 0x7F || String.contains (String.fromChar char) "\"#%<>?[\\]^`{|}" then
+        "%" ++ hexDigit (code // 16) ++ hexDigit (modBy 16 code)
+
+    else
+        String.fromChar char
+
+
+hexDigit : Int -> String
+hexDigit digit =
+    String.slice digit (digit + 1) "0123456789ABCDEF"

@@ -263,6 +263,7 @@ since the link is reported.
 hashedStylesheet : Dict String String -> String -> String
 hashedStylesheet stylesheets path =
     Dict.get (Path.dropLeadingSlash path) stylesheets
+        |> Maybe.map Path.encodeSegments
         |> Maybe.withDefault path
 
 

@@ -9,6 +9,7 @@ import {
   type BuildInfo,
   decodeResponse,
   encodeRequest,
+  type Feed,
   type Request,
   type Response,
 } from "../../src/elm/protocol";
@@ -216,6 +217,16 @@ describe("decodeResponse", () => {
     expect(result).toEqual({
       ok: false,
       error: "pages[0].html must be a string",
+    });
+  });
+
+  test("rejects a feed without a title", () => {
+    const base = fixture("response-with-diagnostic") as Response;
+    const { title: _title, ...untitled } = base.feeds[0] as Feed;
+    const result = decodeResponse({ ...base, feeds: [untitled] });
+    expect(result).toEqual({
+      ok: false,
+      error: "feeds[0].title must be a string",
     });
   });
 

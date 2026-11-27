@@ -501,7 +501,8 @@ Feed.groupedBy
 `Route.groupedBy` route, so the feed of `Elm` is `/tags/elm/feed.xml`. Each
 path needs `:group` exactly once. A group's feed lists its documents newest
 first, keeps at most `limit` of them, and is titled after the site and the
-group's name, as in `My Blog · Elm`, the name its group page gets.
+group's name, as in `My Blog · Elm`, where `Elm` is the group's most common
+spelling, the same name the group's page template receives.
 
 The blog preset links each tag's feed from that tag's pages. Elsewhere,
 `Head.rssFeed` and `Head.atomFeed` can link a group's feed only where its path

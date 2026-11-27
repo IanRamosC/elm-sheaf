@@ -13,9 +13,7 @@ numbers are those of the npm package `elm-sheaf`.
 - `Feed.groupedBy` writes an RSS and an Atom feed for each group of a
   collection, such as each tag.
 - `Head.stylesheet` links a copy of the stylesheet whose name carries a hash of
-  its contents, so a changed theme is never served from a stale cache. A path
-  that isn't a stylesheet in `static/`, including one with a query string such
-  as `/style.css?v=2`, is `UNKNOWN STYLESHEET`.
+  its contents, so a changed theme is never served from a stale cache.
 - `sheaf init` creates a site from a starter blog: a home page, a welcome post,
   an about page, a stylesheet with light and dark colour schemes, and a
   workflow that deploys to GitHub Pages.
@@ -80,3 +78,10 @@ numbers are those of the npm package `elm-sheaf`.
   own.
 - A page, feed or alias whose file or folder name is over 255 bytes, usually from
   a long tag, is `NAME TOO LONG`, naming the route.
+
+### Changed
+
+- A path given to `Head.stylesheet` must now be a `.css` file under `static/`,
+  or it is `UNKNOWN STYLESHEET`. A query string such as `/style.css?v=2` is no
+  longer needed, since the link carries a hash of the file, and is no longer
+  accepted. A full URL to another site is still linked as given.

@@ -13,6 +13,7 @@ function clashesOf(...paths: string[]) {
   return staticClashes(
     outputs,
     paths.map((path) => ({ kind: "copy", path, source: "/elsewhere" })),
+    [],
   );
 }
 
@@ -84,6 +85,7 @@ describe("staticClashes", () => {
         },
       ],
       [{ kind: "copy", path: "old/index.html", source: "/elsewhere" }],
+      [],
     );
 
     expect(diagnostics).toEqual([

@@ -18,7 +18,7 @@ const IMAGE_FOLDER = "_sheaf/images/";
 export function staticClashes(
   outputs: OutputFile[],
   staticFiles: OutputFile[],
-  stylesheets: Stylesheet[] = [],
+  stylesheets: Stylesheet[],
 ): Diagnostic[] {
   const files = new Map<string, Claimed>();
   const folders = new Map<string, Claimed>();

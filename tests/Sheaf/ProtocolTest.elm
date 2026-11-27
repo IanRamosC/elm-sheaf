@@ -51,6 +51,11 @@ requestTests =
                                 ]
                             )
                         )
+        , test "decodes the hashed path of each stylesheet" <|
+            \_ ->
+                decodeRequest ProtocolFixtures.minimalRequest
+                    |> Result.map (.stylesheets >> Dict.toList)
+                    |> Expect.equal (Ok [ ( "css/style.css", "css/style.3f2a9c1e.css" ) ])
         , test "decodes the names of the collections" <|
             \_ ->
                 decodeRequest ProtocolFixtures.allNodesRequest
