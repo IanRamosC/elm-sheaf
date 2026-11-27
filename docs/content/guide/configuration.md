@@ -63,7 +63,9 @@ written with a time and an offset doesn't depend on it. See
 
 `highlight.theme.light` and `highlight.theme.dark` name the two themes code
 blocks are highlighted with: [Shiki's](https://shiki.style/themes), or
-[your own](#your-own-grammars-and-themes). Either can be left out. A name Sheaf
+[your own](#your-own-grammars-and-themes). Either can be left out, and the
+defaults are `github-light-default` and `github-dark-default`, chosen because
+their colours pass WCAG AA contrast. A name Sheaf
 doesn't have is `BAD CONFIG`, with the closest theme as a suggestion. Sheaf
 leaves out Shiki's `aurora-x` theme, because it is GPL-3.0.
 

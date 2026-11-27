@@ -32,9 +32,10 @@ const knownKeys = ["siteUrl", "timezone", "highlight", "images"];
 
 const defaultTimezone = "UTC";
 
+// GitHub's themes whose token colours meet WCAG AA contrast; `github-light` and `github-dark` have some that don't.
 const defaultThemes: Config["highlight"]["theme"] = {
-  light: "github-light",
-  dark: "github-dark",
+  light: "github-light-default",
+  dark: "github-dark-default",
 };
 
 const defaultImages: Config["images"] = {

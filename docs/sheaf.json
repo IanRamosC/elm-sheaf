@@ -1,6 +1,3 @@
 {
-  "siteUrl": "https://ianramosc.github.io/elm-sheaf/",
-  "highlight": {
-    "theme": { "light": "github-light-default", "dark": "github-dark-default" }
-  }
+  "siteUrl": "https://ianramosc.github.io/elm-sheaf/"
 }

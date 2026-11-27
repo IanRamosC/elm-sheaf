@@ -144,7 +144,7 @@ describe("parseConfig", () => {
     ]) {
       const result = parse(json);
       expect(result.ok && result.value.highlight).toEqual({
-        theme: { light: "github-light", dark: "github-dark" },
+        theme: { light: "github-light-default", dark: "github-dark-default" },
         grammars: new Map(),
         themes: new Map(),
       });
@@ -156,7 +156,7 @@ describe("parseConfig", () => {
       '{"siteUrl":"https://example.com/","highlight":{"theme":{"dark":"nord"}}}',
     );
     expect(result.ok && result.value.highlight.theme).toEqual({
-      light: "github-light",
+      light: "github-light-default",
       dark: "nord",
     });
   });
@@ -173,7 +173,7 @@ describe("parseConfig", () => {
       }),
     );
     expect(result.ok && result.value.highlight).toEqual({
-      theme: { light: "github-light", dark: "my-theme" },
+      theme: { light: "github-light-default", dark: "my-theme" },
       grammars: new Map([["nginx", "highlight/nginx.tmLanguage.json"]]),
       themes: new Map([["my-theme", "highlight/my-theme.json"]]),
     });
