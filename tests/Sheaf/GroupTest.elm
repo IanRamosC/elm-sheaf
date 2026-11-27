@@ -269,7 +269,7 @@ slugProblemTests =
                     |> List.map .message
                     |> Expect.equal
                         [ "The values `C` and `C++` have the same slug, `c`, but are different words, so they cannot share a group:\n\n"
-                            ++ "    `C` in content/posts/d.md, content/posts/c.md, content/posts/a.md\n"
+                            ++ "    `C` in content/posts/a.md, content/posts/c.md, content/posts/d.md\n"
                             ++ "    `C++` in content/posts/b.md"
                         ]
         , test "a collision is reported once, however many routes group the values" <|

@@ -556,6 +556,42 @@ groupedFeedTests =
                             >> Expect.equal [ ( "MISSING SLUG", "The route `/tags/:group/` groups documents by the value `ELM`, which has no slug." ) ]
                         , .feeds >> Expect.equal []
                         ]
+        , test "colliding spellings are reported once by a route in the collection's order and a feed in date order" <|
+            \_ ->
+                let
+                    inOrder : Int -> Source -> Source
+                    inOrder key source =
+                        { source | frontmatter = ( "order", Encode.int key ) :: source.frontmatter }
+
+                    numbered : Collection.Collection { title : String, tags : List String, order : Int }
+                    numbered =
+                        Collection.named "posts"
+                            (Frontmatter.succeed (\title tags order -> { title = title, tags = tags, order = order })
+                                |> Frontmatter.required "title" Frontmatter.string
+                                |> Frontmatter.withDefault "tags" [] (Frontmatter.list Frontmatter.string)
+                                |> Frontmatter.required "order" Frontmatter.int
+                            )
+                in
+                requestWithSlugs [ ( "C", "c", "c" ), ( "C++", "c", "c++" ) ]
+                    [ "posts" ]
+                    [ tagged "a" "2026-11-01" [ "C" ] |> inOrder 1
+                    , tagged "b" "2026-11-02" [ "C" ] |> inOrder 2
+                    , tagged "c" "2026-11-03" [ "C++" ] |> inOrder 3
+                    ]
+                    |> renderWithFeeds
+                        [ Route.eachItem "/posts/:slug/" numbered (\_ -> page [])
+                        , Route.groupedBy "/tags/:group/" { by = .tags, perPage = Nothing } (Collection.orderedBy .order numbered) (\name _ -> page [ Html.text name ])
+                        ]
+                        [ Feed.groupedBy { rss = "/tags/:group/feed.xml", atom = "/tags/:group/atom.xml", limit = Nothing } { by = .tags } numbered (\meta -> { title = meta.title, summary = Nothing }) ]
+                    |> .diagnostics
+                    |> List.map (\diagnostic -> ( diagnostic.title, diagnostic.message ))
+                    |> Expect.equal
+                        [ ( "GROUP COLLISION"
+                          , "The values `C` and `C++` have the same slug, `c`, but are different words, so they cannot share a group:\n\n"
+                                ++ "    `C` in content/posts/a.md, content/posts/b.md\n"
+                                ++ "    `C++` in content/posts/c.md"
+                          )
+                        ]
         , test "a feed names itself when it finds a value with no slug" <|
             \_ ->
                 tagRequest [ tagged "a" "2026-11-01" [ "ELM" ] ]

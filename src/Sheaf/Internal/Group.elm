@@ -109,7 +109,8 @@ mostCommonSpelling uses =
 {-| The host folds case, accents, spaces, dashes and underscores the same way
 for both, so values with different folds share a slug only by accident of
 their other punctuation, as `C` and `C++` do. Each fold is one word, named by
-its most common spelling.
+its most common spelling, with the files that use it in code-point order, so
+that routes and feeds grouping in different orders find the same problem.
 -}
 collisionOf : String -> List (Use { a | document : Document }) -> Maybe Problem
 collisionOf slug uses =
@@ -129,6 +130,7 @@ collisionOf slug uses =
                                     in
                                     ( Maybe.withDefault fold (mostCommonSpelling usesOfFold)
                                     , Results.unique (List.map (.item >> .document >> .sourcePath) usesOfFold)
+                                        |> List.sortWith Compare.byCodePoint
                                     )
                                 )
                             |> List.sortWith (\( a, _ ) ( b, _ ) -> Compare.byCodePoint a b)

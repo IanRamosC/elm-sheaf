@@ -1,7 +1,8 @@
 module Sheaf.Feed exposing (Feed, fromCollection, groupedBy)
 
 {-| A feed is an RSS and an Atom file listing the documents of a collection,
-newest first, so that feed readers can follow a site.
+or of one of its groups, newest first, so that feed readers can follow a site
+or one of its tags.
 
 @docs Feed, fromCollection, groupedBy
 

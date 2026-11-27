@@ -44,7 +44,7 @@ list of routes.
 groupRoutes : Dict String GroupSlug -> List Body -> List ( Int, Route ) -> Dict Int Grouped
 groupRoutes slugs bodies routes =
     routes
-        |> List.filterMap (\( index, route ) -> Maybe.map (\grouping -> ( index, groupDocuments slugs bodies grouping )) (Site.groupingOf route))
+        |> List.filterMap (\( index, route ) -> Maybe.map (\grouping -> ( index, groupDocuments slugs bodies grouping )) (Site.routeGrouping route))
         |> Dict.fromList
 
 

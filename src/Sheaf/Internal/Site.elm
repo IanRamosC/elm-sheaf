@@ -1,19 +1,23 @@
 module Sheaf.Internal.Site exposing
     ( Site(..), Metadata, Feed(..), Description, Route(..), Grouping, NamedGroup, ListedDocument, Neighbours, FrontmatterProblems, Pagination, Collection(..), SortOrder(..), Page
     , groupingBy
-    , nameOf, patternOf, collectionOf, itemPattern, datedCollection, perPageOf, groupingOf, groupedPattern
+    , nameOf, patternOf, collectionOf, itemPattern, datedCollection, perPageOf, routeGrouping, groupedPattern
     )
 
 {-| The site a user declares, behind `Sheaf`, `Sheaf.Route` and
 `Sheaf.Collection`, which only expose ways to build it.
 
 @docs Site, Metadata, Feed, Description, Route, Grouping, NamedGroup, ListedDocument, Neighbours, FrontmatterProblems, Pagination, Collection, SortOrder, Page
+
+
+# Grouping a collection
+
 @docs groupingBy
 
 
 # What a route uses
 
-@docs nameOf, patternOf, collectionOf, itemPattern, datedCollection, perPageOf, groupingOf, groupedPattern
+@docs nameOf, patternOf, collectionOf, itemPattern, datedCollection, perPageOf, routeGrouping, groupedPattern
 
 -}
 
@@ -146,20 +150,6 @@ type alias Grouping =
     }
 
 
-{-| How to group a collection by the values `by` finds in each document's
-frontmatter, ordering each group in `order`.
--}
-groupingBy : (meta -> List String) -> SortOrder -> Collection meta -> Grouping
-groupingBy by order (Collection collection) =
-    { collection = collection.name
-    , valuesOf =
-        \document ->
-            Frontmatter.decode collection.frontmatter { values = document.frontmatter, positions = document.frontmatterPositions }
-                |> Result.map by
-    , order = order
-    }
-
-
 {-| A group's display name and its items, in the order of its collection.
 -}
 type alias NamedGroup item =
@@ -216,6 +206,24 @@ type alias Page =
     { title : String
     , head : List Head.Tag
     , body : List Html
+    }
+
+
+
+-- GROUPING A COLLECTION
+
+
+{-| How to group a collection by the values `by` finds in each document's
+frontmatter, ordering each group in `order`.
+-}
+groupingBy : (meta -> List String) -> SortOrder -> Collection meta -> Grouping
+groupingBy by order (Collection collection) =
+    { collection = collection.name
+    , valuesOf =
+        \document ->
+            Frontmatter.decode collection.frontmatter { values = document.frontmatter, positions = document.frontmatterPositions }
+                |> Result.map by
+    , order = order
     }
 
 
@@ -394,8 +402,8 @@ perPageOf route =
 
 {-| How a route groups its collection, if it does.
 -}
-groupingOf : Route -> Maybe Grouping
-groupingOf route =
+routeGrouping : Route -> Maybe Grouping
+routeGrouping route =
     case route of
         GroupedBy grouped ->
             Just grouped.grouping
